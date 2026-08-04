@@ -1,0 +1,28 @@
+{% load i18n %}
+{# Single source of truth for storefront location copy. Pass compact=1 for footer. #}
+<div class="jm-locations{% if compact %} jm-locations--compact{% endif %}">
+  <div class="jm-locations__block">
+    <strong class="jm-locations__label">{% trans "Store location" %}</strong>
+    <p class="jm-locations__body">
+      PRAYAI HERBS L.L.C - S.P.C<br>
+      Ghayathi, Industrial Area<br>
+      Municipal Affairs, Block 6, Plot 13<br>
+      Abu Dhabi, UAE<br>
+      <a href="tel:+971503131065">+971 50 313 1065</a>
+    </p>
+  </div>
+
+  {% if not compact %}
+  <div class="jm-locations__block">
+    <strong class="jm-locations__label">{% trans "Licence activities" %}</strong>
+    <ul class="jm-locations__branches" role="list">
+      <li>{% trans "Retail Sale of Herbal & Ayurvedic Products" %}</li>
+      <li>{% trans "Retail Sale of Natural Skincare & Cosmetics" %}</li>
+      <li>{% trans "Wholesale of Herbal Extracts & Essential Oils" %}</li>
+      <li>{% trans "Herbal Product Formulation & Packaging" %}</li>
+      <li>{% trans "Retail Sale of Wellness & Nutrition Supplements" %}</li>
+      <li>{% trans "Aromatherapy & Spa Products Trading" %}</li>
+    </ul>
+  </div>
+  {% endif %}
+</div>
