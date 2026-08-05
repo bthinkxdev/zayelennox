@@ -30,6 +30,7 @@ LOCAL_APPS = [
     "orders",
     "payments",
     "delivery",
+    "shipping",
     "recurring",
     "marketing",
     "cms",
@@ -246,3 +247,11 @@ EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=False)
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="desertherbalco@gmail.com")
 
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
+
+# Shiprocket
+SHIPROCKET_EMAIL = env("SHIPROCKET_EMAIL", default="")
+SHIPROCKET_PASSWORD = env("SHIPROCKET_PASSWORD", default="")
+SHIPROCKET_BASE_URL = env("SHIPROCKET_BASE_URL", default="https://apiv2.shiprocket.in/v1/external")
+SHIPROCKET_PICKUP_LOCATION = env("SHIPROCKET_PICKUP_LOCATION", default="Primary")
+SHIPROCKET_PICKUP_PINCODE = env("SHIPROCKET_PICKUP_PINCODE", default="")
+SHIPROCKET_WEBHOOK_TOKEN = env("SHIPROCKET_WEBHOOK_TOKEN", default="")

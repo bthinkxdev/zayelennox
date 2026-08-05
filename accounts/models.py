@@ -134,8 +134,34 @@ class Address(TimeStampedModel):
         on_delete=models.PROTECT,
         related_name="addresses",
         verbose_name="City",
-        help_text="Deliverable city for this address.",
+        help_text="Legacy same-day delivery zone city. Optional — new (pincode-based) addresses leave this blank.",
+        null=True,
+        blank=True,
     )
+    city_name = models.CharField(
+        max_length=120,
+        blank=True,
+        verbose_name="City / Town",
+        help_text="Free-text city entered at checkout (pincode-based flow).",
+    )
+    state_name = models.CharField(
+        max_length=120,
+        blank=True,
+        verbose_name="State",
+        help_text="Free-text state entered at checkout — required by Shiprocket for courier booking.",
+    )
+    pincode = models.CharField(
+        max_length=10,
+        blank=True,
+        db_index=True,
+        verbose_name="Pincode",
+        help_text="Delivery pincode/postal code — required for courier serviceability (e.g. Shiprocket).",
+    )
+
+    @property
+    def display_city(self) -> str:
+        """City name for display/invoices: prefers the new free-text field, falls back to the legacy FK."""
+        return self.city_name or (self.city.name if self.city_id else "")
     is_default = models.BooleanField(
         default=False,
         db_index=True,

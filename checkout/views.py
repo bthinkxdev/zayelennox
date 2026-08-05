@@ -15,7 +15,7 @@ from django.views.decorators.http import require_GET, require_POST, require_http
 from accounts.selectors import get_address_by_id, get_saved_addresses
 from cart.selectors import get_cart_for_request, get_cart_summary
 from cart.services import get_or_create_cart
-from checkout.forms import CheckoutAddressForm, CheckoutDeliveryForm, CheckoutPaymentForm
+from checkout.forms import CheckoutAddressForm, CheckoutPaymentForm
 from checkout.selectors import get_checkout_session_by_id
 from checkout.services import create_checkout_session, place_order, update_checkout_session
 
@@ -53,9 +53,6 @@ def checkout_view(request: HttpRequest) -> HttpResponse:
             dashboard_address = Address.objects.select_related("city").filter(customer_profile=profile).first()
         if dashboard_address:
             addresses = [dashboard_address]
-            
-    from delivery.models import City
-    active_cities = City.objects.filter(is_active=True)
 
     selected_gateway_key = None
     if session.order:
@@ -81,8 +78,6 @@ def checkout_view(request: HttpRequest) -> HttpResponse:
             "summary": summary,
             "checkout_session": session,
             "addresses": addresses,
-            "active_cities": active_cities,
-
             "payment_gateways": available_gateways,
             "selected_gateway_key": selected_gateway_key,
             "has_active_coupons": has_any_active_coupons(),
@@ -131,13 +126,15 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
             guest_phone = request.POST.get("guest_phone", "").strip()
             guest_address_line1 = request.POST.get("guest_address_line1", "").strip()
             guest_address_line2 = request.POST.get("guest_address_line2", "").strip()
-            guest_city_id = request.POST.get("guest_city_id", "").strip()
+            guest_city_name = request.POST.get("guest_city_name", "").strip()
+            guest_state_name = request.POST.get("guest_state_name", "").strip()
+            guest_pincode = request.POST.get("guest_pincode", "").strip()
 
             errors = {}
-            if not guest_name: 
+            if not guest_name:
                 errors["guest_name"] = ["Name is required."]
-            
-            if not guest_email: 
+
+            if not guest_email:
                 errors["guest_email"] = ["Email is required."]
             else:
                 try:
@@ -145,7 +142,7 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
                 except ValidationError:
                     errors["guest_email"] = ["Enter a valid email address."]
 
-            if not guest_phone: 
+            if not guest_phone:
                 errors["guest_phone"] = ["Phone is required."]
             else:
                 if not re.match(r'^\+?\d+$', guest_phone):
@@ -154,7 +151,12 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
                     errors["guest_phone"] = ["Enter a valid phone number."]
 
             if not guest_address_line1: errors["guest_address_line1"] = ["Address Line 1 is required."]
-            if not guest_city_id: errors["guest_city_id"] = ["City is required."]
+            if not guest_city_name: errors["guest_city_name"] = ["City is required."]
+            if not guest_state_name: errors["guest_state_name"] = ["State is required."]
+            if not guest_pincode:
+                errors["guest_pincode"] = ["Pincode is required."]
+            elif not re.match(r'^[1-9][0-9]{5}$', guest_pincode):
+                errors["guest_pincode"] = ["Enter a valid 6-digit pincode."]
 
             if errors:
                 return render(
@@ -176,17 +178,23 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
                 customer_profile=profile,
                 line1=guest_address_line1,
                 line2=guest_address_line2,
-                city_id=int(guest_city_id),
+                pincode=guest_pincode,
             ).first()
             if not address:
                 address = Address.objects.create(
                     customer_profile=profile,
                     line1=guest_address_line1,
                     line2=guest_address_line2,
-                    city_id=int(guest_city_id),
+                    city_name=guest_city_name,
+                    state_name=guest_state_name,
+                    pincode=guest_pincode,
                     label="Delivery Address"
                 )
-                
+            else:
+                address.city_name = guest_city_name
+                address.state_name = guest_state_name
+                address.save(update_fields=["city_name", "state_name", "updated_at"])
+
             if profile.default_address is None:
                 from accounts.services import set_default_address
                 set_default_address(customer_profile=profile, address_id=address.pk)
@@ -199,11 +207,18 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
         else:
             guest_address_line1 = request.POST.get("guest_address_line1", "").strip()
             guest_address_line2 = request.POST.get("guest_address_line2", "").strip()
-            guest_city_id = request.POST.get("guest_city_id", "").strip()
+            guest_city_name = request.POST.get("guest_city_name", "").strip()
+            guest_state_name = request.POST.get("guest_state_name", "").strip()
+            guest_pincode = request.POST.get("guest_pincode", "").strip()
 
             errors = {}
             if not guest_address_line1: errors["guest_address_line1"] = ["Address Line 1 is required."]
-            if not guest_city_id: errors["guest_city_id"] = ["City is required."]
+            if not guest_city_name: errors["guest_city_name"] = ["City is required."]
+            if not guest_state_name: errors["guest_state_name"] = ["State is required."]
+            if not guest_pincode:
+                errors["guest_pincode"] = ["Pincode is required."]
+            elif not re.match(r'^[1-9][0-9]{5}$', guest_pincode):
+                errors["guest_pincode"] = ["Enter a valid 6-digit pincode."]
 
             if errors:
                 return render(
@@ -218,29 +233,28 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
                 customer_profile=profile,
                 line1=guest_address_line1,
                 line2=guest_address_line2,
-                city_id=int(guest_city_id),
+                pincode=guest_pincode,
             ).first()
             if not address:
                 address = Address.objects.create(
                     customer_profile=profile,
                     line1=guest_address_line1,
                     line2=guest_address_line2,
-                    city_id=int(guest_city_id),
+                    city_name=guest_city_name,
+                    state_name=guest_state_name,
+                    pincode=guest_pincode,
                     label="Delivery Address"
                 )
-            
+            else:
+                address.city_name = guest_city_name
+                address.state_name = guest_state_name
+                address.save(update_fields=["city_name", "state_name", "updated_at"])
+
             if profile.default_address is None:
                 from accounts.services import set_default_address
                 set_default_address(customer_profile=profile, address_id=address.pk)
                 
             update_checkout_session(checkout_session=session, address=address)
-
-    delivery_form = CheckoutDeliveryForm(request.POST)
-    if delivery_form.is_valid():
-        update_checkout_session(
-            checkout_session=session,
-            delivery_date=delivery_form.cleaned_data.get("delivery_date"),
-        )
 
     from cart.selectors import get_cart_summary
     summary = get_cart_summary(cart=cart)
@@ -253,12 +267,26 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
             status=200,
         )
 
+    shipping_charge_override = None
+    delivery_pincode = session.address.pincode if session.address_id else None
+    from shipping.views import SESSION_KEY as SHIPROCKET_SESSION_KEY
+
+    stored_quote = request.session.get(SHIPROCKET_SESSION_KEY)
+    if delivery_pincode and stored_quote and stored_quote.get("pincode") == delivery_pincode:
+        from decimal import Decimal
+
+        try:
+            shipping_charge_override = Decimal(str(stored_quote.get("shipping_charge", 0)))
+        except Exception:
+            shipping_charge_override = None
+
     try:
         from catalog.exceptions import InsufficientStockError
         order = place_order(
             checkout_session_id=session.pk,
             idempotency_key=form.cleaned_data["idempotency_key"],
             customer_profile=profile,
+            shipping_charge_override=shipping_charge_override,
         )
     except InsufficientStockError as exc:
         return render(
@@ -335,7 +363,7 @@ def razorpay_pay_view(request: HttpRequest, order_id: int) -> HttpResponse:
     amount_in_paise = int(order.total_amount * 100)
     from core.selectors import get_default_currency
     default_curr = get_default_currency()
-    currency_code = order.currency.code if order.currency else (default_curr.code if default_curr else "AED")
+    currency_code = order.currency.code if order.currency else (default_curr.code if default_curr else "INR")
     razorpay_order_id = payment_tx.external_intent_id if payment_tx else f"rzp_order_{order.pk}"
 
     #determine prefill method based on gateway key
@@ -435,7 +463,7 @@ def razorpay_callback_view(request: HttpRequest) -> HttpResponse:
         adapter.capture_payment(
             razorpay_payment_id=razorpay_payment_id,
             amount=payment_tx.amount,
-            currency=payment_tx.currency.code if payment_tx.currency else (default_curr.code if default_curr else "AED"),
+            currency=payment_tx.currency.code if payment_tx.currency else (default_curr.code if default_curr else "INR"),
         )
         payment_tx.external_transaction_id = razorpay_payment_id
         payment_tx.save(update_fields=["external_transaction_id", "updated_at"])

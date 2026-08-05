@@ -31,7 +31,7 @@
             <div class="form-check mb-2">
               <input class="form-check-input" type="radio" name="address_id" value="{{ address.pk }}"
                 id="addr-{{ address.pk }}" {% if forloop.first %}checked{% endif %}>
-              <label class="form-check-label small" for="addr-{{ address.pk }}">{{ address.label }} — {{ address.line1 }}, {{ address.city.name }}</label>
+              <label class="form-check-label small" for="addr-{{ address.pk }}">{{ address.label }} — {{ address.line1 }}, {{ address.display_city }}{% if address.pincode %} - {{ address.pincode }}{% endif %}</label>
             </div>
             {% endfor %}
           </div>
@@ -71,26 +71,48 @@
               <label class="form-label small">{% trans "Address Line 2 (Optional)" %}</label>
               <input type="text" name="guest_address_line2" class="form-control form-control-sm" value="{{ checkout_session.address.line2|default:'' }}">
             </div>
-            <div class="mb-3">
-              <label class="form-label small">{% trans "City" %} <span class="text-danger">*</span></label>
-              <select name="guest_city_id" class="form-select form-select-sm">
-                <option value="">{% trans "Select City" %}</option>
-                {% for city in active_cities %}
-                <option value="{{ city.pk }}" {% if checkout_session.address.city_id == city.pk %}selected{% endif %}>{{ city.name }}</option>
-                {% endfor %}
-              </select>
-              <div id="error-guest_city_id" class="text-danger small mt-1"></div>
+            <div class="row g-2 mb-3">
+              <div class="col-md-6">
+                <label class="form-label small">{% trans "City / Town" %} <span class="text-danger">*</span></label>
+                <input type="text" name="guest_city_name" class="form-control form-control-sm" value="{{ checkout_session.address.city_name|default:'' }}">
+                <div id="error-guest_city_name" class="text-danger small mt-1"></div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small">{% trans "State" %} <span class="text-danger">*</span></label>
+                <input type="text" name="guest_state_name" class="form-control form-control-sm" value="{{ checkout_session.address.state_name|default:'' }}">
+                <div id="error-guest_state_name" class="text-danger small mt-1"></div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <div class="checkout-step">
-          <h2>{% trans "Delivery" %}</h2>
-          <div class="row g-2">
-            <div class="col-md-12">
-              <label class="form-label small">{% trans "Date" %}</label>
-              <input type="date" name="delivery_date" class="form-control" value="{{ checkout_session.delivery_date|date:'Y-m-d'|default:'' }}">
-              <div id="error-delivery_date" class="text-danger small mt-1"></div>
+            <div class="mb-2">
+              <label class="form-label small">{% trans "Pincode" %} <span class="text-danger">*</span></label>
+              <div class="d-flex gap-2">
+                <input type="text" inputmode="numeric" maxlength="6" id="checkout-pincode" name="guest_pincode"
+                  class="form-control form-control-sm" style="max-width: 160px;"
+                  value="{{ checkout_session.address.pincode|default:'' }}">
+                <button type="button" id="check-delivery-btn" class="btn btn-sm btn-outline-dark flex-shrink-0">{% trans "Check delivery" %}</button>
+              </div>
+              <div id="error-guest_pincode" class="text-danger small mt-1"></div>
+              <div id="delivery-check-result" class="small mt-2"></div>
+              <div id="shipping-details-panel" class="border rounded p-3 mt-2" style="display:none; background:#f8f9fa;">
+                <div class="fw-semibold mb-2">{% trans "Shipping Details" %}</div>
+                <div class="d-flex justify-content-between small mb-1">
+                  <span class="text-muted">{% trans "Courier Partner" %}</span>
+                  <span id="ship-courier-name" class="fw-semibold"></span>
+                </div>
+                <div class="d-flex justify-content-between small mb-1">
+                  <span class="text-muted">{% trans "Estimated Delivery" %}</span>
+                  <span id="ship-eta"></span>
+                </div>
+                <div class="d-flex justify-content-between small mb-2 pb-2 border-bottom">
+                  <span class="text-muted">{% trans "Shipping Charge" %}</span>
+                  <span id="ship-charge" class="fw-semibold"></span>
+                </div>
+                <div id="ship-other-couriers-wrap" style="display:none;">
+                  <div class="small text-muted mb-1">{% trans "Other available couriers" %}</div>
+                  <ul id="ship-other-couriers" class="small ps-3 mb-0"></ul>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -171,9 +193,17 @@
           <button type="submit" class="btn btn-dark btn-sm px-3">{% trans "Apply" %}</button>
         </form>
         {% endif %}
-        <div class="d-flex justify-content-between fw-semibold mt-3 pt-2 border-top">
+        <div class="d-flex justify-content-between small pt-3">
+          <span>{% trans "Subtotal" %}</span>
+          <span id="summary-subtotal" data-value="{{ summary.subtotal|stringformat:'f' }}">{{ display_currency.symbol }}{{ summary.subtotal }}</span>
+        </div>
+        <div class="d-flex justify-content-between small pt-1">
+          <span>{% trans "Shipping" %}</span>
+          <span id="summary-shipping" data-value="{{ summary.delivery_charge|stringformat:'f' }}">{{ display_currency.symbol }}{{ summary.delivery_charge }}</span>
+        </div>
+        <div class="d-flex justify-content-between fw-semibold mt-2 pt-2 border-top">
           <span>{% trans "Total" %}</span>
-          <span class="text-floward">{{ display_currency.symbol }} {{ summary.grand_total }}</span>
+          <span class="text-floward" id="summary-total" data-value="{{ summary.grand_total|stringformat:'f' }}">{{ display_currency.symbol }} {{ summary.grand_total }}</span>
         </div>
         {% if summary.has_stock_issues %}
         <button type="button" class="btn btn-floward w-100 py-2 mt-3" disabled style="cursor: not-allowed;">{% trans "Place Order & Pay" %}</button>
@@ -233,6 +263,116 @@
         } else {
           errorDiv.innerText = "";
         }
+      });
+    }
+
+    var checkDeliveryBtn = document.getElementById('check-delivery-btn');
+    var pincodeInput = document.getElementById('checkout-pincode');
+    var resultBox = document.getElementById('delivery-check-result');
+    var shipPanel = document.getElementById('shipping-details-panel');
+    var shipCourierName = document.getElementById('ship-courier-name');
+    var shipEta = document.getElementById('ship-eta');
+    var shipCharge = document.getElementById('ship-charge');
+    var shipOtherWrap = document.getElementById('ship-other-couriers-wrap');
+    var shipOtherList = document.getElementById('ship-other-couriers');
+
+    var summarySubtotalEl = document.getElementById('summary-subtotal');
+    var summaryShippingEl = document.getElementById('summary-shipping');
+    var summaryTotalEl = document.getElementById('summary-total');
+    var currencySymbol = "{{ display_currency.symbol }}";
+    // Base = subtotal net of any coupon discount, derived from the server-rendered
+    // total minus the server-rendered delivery charge so coupons stay accounted for
+    // when the shipping charge is later replaced by a live Shiprocket quote.
+    var initialTotal = summaryTotalEl ? parseFloat(summaryTotalEl.getAttribute('data-value')) || 0 : 0;
+    var initialShipping = summaryShippingEl ? parseFloat(summaryShippingEl.getAttribute('data-value')) || 0 : 0;
+    var baseAfterDiscount = initialTotal - initialShipping;
+
+    function formatMoney(amount) {
+      return currencySymbol + amount.toFixed(2);
+    }
+
+    function updateOrderSummary(shippingCharge) {
+      var total = baseAfterDiscount + shippingCharge;
+      if (summaryShippingEl) {
+        summaryShippingEl.setAttribute('data-value', shippingCharge.toFixed(2));
+        summaryShippingEl.textContent = formatMoney(shippingCharge);
+      }
+      if (summaryTotalEl) {
+        summaryTotalEl.setAttribute('data-value', total.toFixed(2));
+        summaryTotalEl.textContent = formatMoney(total);
+      }
+    }
+
+    function resetShippingPanel() {
+      if (shipPanel) shipPanel.style.display = 'none';
+      if (shipOtherWrap) shipOtherWrap.style.display = 'none';
+      if (shipOtherList) shipOtherList.innerHTML = '';
+    }
+
+    if (checkDeliveryBtn && pincodeInput && resultBox) {
+      checkDeliveryBtn.addEventListener('click', function () {
+        var pincode = pincodeInput.value.trim();
+        resultBox.className = 'small mt-2';
+        resetShippingPanel();
+        if (!/^[1-9][0-9]{5}$/.test(pincode)) {
+          resultBox.className = 'small mt-2 text-danger';
+          resultBox.textContent = "{% trans 'Enter a valid 6-digit pincode.' %}";
+          return;
+        }
+        checkDeliveryBtn.disabled = true;
+        checkDeliveryBtn.textContent = "{% trans 'Checking...' %}";
+        resultBox.textContent = '';
+
+        fetch("{% url 'shipping:check-serviceability' %}?pincode=" + encodeURIComponent(pincode))
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (!data.ok) {
+              resultBox.className = 'small mt-2 text-muted';
+              resultBox.textContent = data.error || "{% trans 'Could not verify delivery right now.' %}";
+            } else if (data.is_serviceable) {
+              resultBox.className = 'small mt-2 text-success fw-semibold';
+              resultBox.textContent = "{% trans '✓ Delivery available to this pincode' %}";
+
+              var charge = parseFloat(data.shipping_charge) || 0;
+              if (shipPanel) {
+                shipPanel.style.display = 'block';
+                if (shipCourierName) shipCourierName.textContent = data.courier_name || '—';
+                if (shipEta) {
+                  shipEta.textContent = data.estimated_delivery_days
+                    ? data.estimated_delivery_days + " {% trans 'day(s)' %}"
+                    : '—';
+                }
+                if (shipCharge) shipCharge.textContent = formatMoney(charge);
+
+                if (data.available_couriers && data.available_couriers.length > 1 && shipOtherWrap && shipOtherList) {
+                  var others = data.available_couriers.filter(function (c) {
+                    return c.courier_name !== data.courier_name;
+                  });
+                  if (others.length) {
+                    shipOtherList.innerHTML = others.map(function (c) {
+                      var days = c.estimated_delivery_days ? (c.estimated_delivery_days + " {% trans 'day(s)' %}") : '';
+                      return '<li>' + (c.courier_name || '') + ' — ' + formatMoney(parseFloat(c.freight_charge) || 0) + (days ? ' (' + days + ')' : '') + '</li>';
+                    }).join('');
+                    shipOtherWrap.style.display = 'block';
+                  }
+                }
+              }
+
+              updateOrderSummary(charge);
+            } else {
+              resultBox.className = 'small mt-2 text-danger fw-semibold';
+              resultBox.textContent = "{% trans 'Sorry, we cannot deliver to this pincode yet.' %}";
+              updateOrderSummary(0);
+            }
+          })
+          .catch(function () {
+            resultBox.className = 'small mt-2 text-muted';
+            resultBox.textContent = "{% trans 'Could not verify delivery right now.' %}";
+          })
+          .finally(function () {
+            checkDeliveryBtn.disabled = false;
+            checkDeliveryBtn.textContent = "{% trans 'Check delivery' %}";
+          });
       });
     }
   });

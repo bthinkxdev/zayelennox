@@ -58,6 +58,10 @@ class ProductForm(SlugAutoMixin):
             "is_featured",
             "is_bestseller",
             "is_new_arrival",
+            "weight_kg",
+            "length_cm",
+            "width_cm",
+            "height_cm",
             "meta_title",
             "meta_description",
             "og_image",
@@ -70,11 +74,23 @@ class ProductForm(SlugAutoMixin):
             "mrp": {"required": "MRP is required."},
             "purchase_price": {"required": "Purchase price is required."},
             "stock_quantity": {"required": "Stock quantity is required."},
+            "weight_kg": {"required": "Weight is required for courier booking."},
+            "length_cm": {"required": "Length is required for courier booking."},
+            "width_cm": {"required": "Width is required for courier booking."},
+            "height_cm": {"required": "Height is required for courier booking."},
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["slug"].required = False
+        # These fields carry model-level defaults (0.5kg / 10x10x10cm) purely so the
+        # migration didn't break existing rows. On CREATE, don't pre-fill them as if
+        # they were real values — blank the widgets so the vendor has to type an
+        # actual weight/size rather than silently accepting a placeholder default.
+        if not self.instance.pk:
+            for name in ("weight_kg", "length_cm", "width_cm", "height_cm"):
+                self.initial[name] = None
+                self.fields[name].widget.attrs["placeholder"] = "0.00"
 
 
 class CategoryForm(SlugAutoMixin):
@@ -117,13 +133,27 @@ class ReviewForm(forms.ModelForm):
 class ProductVariantForm(forms.ModelForm):
     class Meta:
         model = ProductVariant
-        fields = ["variant_type", "name", "price_delta", "sku_suffix", "stock_quantity"]
+        fields = [
+            "variant_type",
+            "name",
+            "price_delta",
+            "sku_suffix",
+            "stock_quantity",
+            "weight_kg",
+            "length_cm",
+            "width_cm",
+            "height_cm",
+        ]
         widgets = {
             "variant_type": forms.TextInput(attrs={
                 "list": "variant-type-list",
                 "class": "form-control",
                 "placeholder": "e.g. Size, Packaging, Color"
             }),
+            "weight_kg": forms.NumberInput(attrs={"placeholder": "Product default", "step": "0.001"}),
+            "length_cm": forms.NumberInput(attrs={"placeholder": "Product default", "step": "0.01"}),
+            "width_cm": forms.NumberInput(attrs={"placeholder": "Product default", "step": "0.01"}),
+            "height_cm": forms.NumberInput(attrs={"placeholder": "Product default", "step": "0.01"}),
         }
         error_messages = {
             "variant_type": {"required": "Variant type is required."},
@@ -132,6 +162,11 @@ class ProductVariantForm(forms.ModelForm):
             "sku_suffix": {"required": "SKU suffix is required."},
             "stock_quantity": {"required": "Stock quantity is required."},
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name in ("weight_kg", "length_cm", "width_cm", "height_cm"):
+            self.fields[name].required = False
 
     def has_changed(self):
         """Ignore empty extra forms even if fields have model defaults (like stock_quantity=0)."""

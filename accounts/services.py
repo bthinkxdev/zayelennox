@@ -390,6 +390,7 @@ def update_address(
     line1: str,
     line2: str,
     city_id: int,
+    pincode: str = "",
     is_default: bool = False,
 ) -> Address:
     """
@@ -402,6 +403,7 @@ def update_address(
         line1: Primary address line.
         line2: Secondary address line.
         city_id: delivery.City primary key.
+        pincode: Delivery pincode/postal code — used for courier serviceability.
         is_default: When True, demotes other defaults atomically.
     Returns:
         Updated Address instance.
@@ -411,7 +413,8 @@ def update_address(
     address.line1 = line1
     address.line2 = line2
     address.city_id = city_id
-    address.save(update_fields=["label", "line1", "line2", "city_id", "updated_at"])
+    address.pincode = pincode
+    address.save(update_fields=["label", "line1", "line2", "city_id", "pincode", "updated_at"])
     if is_default:
         return set_default_address(customer_profile=customer_profile, address_id=address.pk)
     return address
@@ -425,6 +428,7 @@ def create_address(
     line1: str,
     line2: str,
     city_id: int,
+    pincode: str = "",
     is_default: bool = False,
 ) -> Address:
     """
@@ -436,6 +440,7 @@ def create_address(
         line1: Primary address line.
         line2: Secondary address line.
         city_id: delivery.City primary key.
+        pincode: Delivery pincode/postal code — used for courier serviceability.
         is_default: When True, demotes other defaults atomically.
     Returns:
         Created Address instance.
@@ -446,6 +451,7 @@ def create_address(
         line1=line1,
         line2=line2,
         city_id=city_id,
+        pincode=pincode,
         is_default=False,
     )
     if is_default:

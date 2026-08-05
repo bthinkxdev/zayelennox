@@ -29,9 +29,9 @@ class CustomerProfileAdmin(admin.ModelAdmin):
 class AddressAdmin(admin.ModelAdmin):
     """Admin interface for customer addresses."""
 
-    list_display = ("label", "customer_profile", "city", "is_default", "updated_at")
-    list_filter = ("is_default", "city")
-    search_fields = ("label", "line1", "customer_profile__user__email")
+    list_display = ("label", "customer_profile", "display_city", "pincode", "is_default", "updated_at")
+    list_filter = ("is_default",)
+    search_fields = ("label", "line1", "city_name", "pincode", "customer_profile__user__email")
     raw_id_fields = ("customer_profile", "city")
 
 

@@ -148,9 +148,15 @@ class ResetPasswordEmailForm(forms.Form):
 class AddressForm(forms.ModelForm):
     """Create or update a customer delivery address."""
 
+    pincode = forms.RegexField(
+        regex=r"^[1-9][0-9]{5}$",
+        error_messages={"invalid": "Enter a valid 6-digit Indian pincode."},
+        label="Pincode",
+    )
+
     class Meta:
         model = Address
-        fields = ("label", "line1", "line2", "city", "is_default")
+        fields = ("label", "line1", "line2", "city", "pincode", "is_default")
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)

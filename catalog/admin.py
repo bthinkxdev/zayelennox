@@ -50,6 +50,17 @@ class ProductImageInline(admin.TabularInline):
 class ProductVariantInline(admin.TabularInline):
     model = ProductVariant
     extra = 0
+    fields = (
+        "variant_type",
+        "name",
+        "price_delta",
+        "sku_suffix",
+        "stock_quantity",
+        "weight_kg",
+        "length_cm",
+        "width_cm",
+        "height_cm",
+    )
 
 
 class ProductSpecificationInline(admin.TabularInline):
@@ -88,6 +99,48 @@ class ProductAdmin(admin.ModelAdmin):
     search_fields = ("name", "slug", "sku")
     list_select_related = ("category", "brand")
     prepopulated_fields = {"slug": ("name",)}
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "name",
+                    "slug",
+                    "sku",
+                    "category",
+                    "brand",
+                    "base_price",
+                    "mrp",
+                    "purchase_price",
+                    "is_rental",
+                    "rental_price",
+                    "show_rental_storefront",
+                    "color",
+                    "is_active",
+                    "is_featured",
+                    "is_bestseller",
+                    "is_new_arrival",
+                    "stock_quantity",
+                    "low_stock_threshold",
+                    "meta_title",
+                    "meta_description",
+                    "og_image",
+                ),
+            },
+        ),
+        (
+            "Shipping — package dimensions",
+            {
+                "fields": ("weight_kg", "length_cm", "width_cm", "height_cm"),
+                "description": (
+                    "Default packed weight/size used to book couriers (e.g. Shiprocket) for "
+                    "this product. If a specific variant below needs different dimensions or "
+                    "weight (e.g. a larger size), set an override on that variant — otherwise "
+                    "leave variant overrides blank and these product-level defaults apply."
+                ),
+            },
+        ),
+    )
     inlines = [
         ProductVariantInline,
         ProductImageInline,
@@ -101,10 +154,41 @@ class ProductAdmin(admin.ModelAdmin):
 class ProductVariantAdmin(admin.ModelAdmin):
     """Admin for product variants."""
 
-    list_display = ("product", "variant_type", "name", "price_delta", "stock_quantity")
+    list_display = (
+        "product",
+        "variant_type",
+        "name",
+        "price_delta",
+        "stock_quantity",
+        "has_shipping_override",
+    )
     list_filter = ("variant_type",)
     search_fields = ("product__name", "product__sku", "name")
     list_select_related = ("product",)
+    fieldsets = (
+        (
+            None,
+            {"fields": ("product", "variant_type", "name", "price_delta", "sku_suffix", "stock_quantity")},
+        ),
+        (
+            "Shipping override (optional)",
+            {
+                "fields": ("weight_kg", "length_cm", "width_cm", "height_cm"),
+                "description": (
+                    "Leave all four blank to inherit the product's default package "
+                    "dimensions. Only fill these in if this specific variant is packed "
+                    "differently (e.g. a larger size)."
+                ),
+            },
+        ),
+    )
+
+    @admin.display(description="Shipping override", boolean=True)
+    def has_shipping_override(self, obj) -> bool:
+        return any(
+            getattr(obj, field) is not None
+            for field in ("weight_kg", "length_cm", "width_cm", "height_cm")
+        )
 
 
 @admin.register(ProductImage)

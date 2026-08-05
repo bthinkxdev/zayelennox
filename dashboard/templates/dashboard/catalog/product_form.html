@@ -31,6 +31,23 @@
         </div>
       </div>
 
+      <div class="card mb-3">
+        <div class="card-header panel-header">
+          <div>
+            <h3 class="panel-title">Shipping — package dimensions</h3>
+            <p class="panel-sub">Default packed weight &amp; size used to book couriers (e.g. Shiprocket) for this product. Individual variants below can override these if they're packed differently.</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.weight_kg %}</div>
+            <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.length_cm %}</div>
+            <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.width_cm %}</div>
+            <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.height_cm %}</div>
+          </div>
+        </div>
+      </div>
+
       <div class="card mb-3" data-formset="variants">
         <div class="card-header panel-header">
           <div>
@@ -60,6 +77,10 @@
                   <th>Price delta</th>
                   <th>SKU suffix</th>
                   <th>Stock</th>
+                  <th>Weight (kg)</th>
+                  <th>Length (cm)</th>
+                  <th>Width (cm)</th>
+                  <th>Height (cm)</th>
                   <th class="text-center">Remove</th>
                 </tr>
               </thead>
@@ -87,6 +108,22 @@
                     {{ vform.stock_quantity }}
                     {% if vform.stock_quantity.errors %}<div class="text-danger small mt-1">{{ vform.stock_quantity.errors|join:", " }}</div>{% endif %}
                   </td>
+                  <td>
+                    {{ vform.weight_kg }}
+                    {% if vform.weight_kg.errors %}<div class="text-danger small mt-1">{{ vform.weight_kg.errors|join:", " }}</div>{% endif %}
+                  </td>
+                  <td>
+                    {{ vform.length_cm }}
+                    {% if vform.length_cm.errors %}<div class="text-danger small mt-1">{{ vform.length_cm.errors|join:", " }}</div>{% endif %}
+                  </td>
+                  <td>
+                    {{ vform.width_cm }}
+                    {% if vform.width_cm.errors %}<div class="text-danger small mt-1">{{ vform.width_cm.errors|join:", " }}</div>{% endif %}
+                  </td>
+                  <td>
+                    {{ vform.height_cm }}
+                    {% if vform.height_cm.errors %}<div class="text-danger small mt-1">{{ vform.height_cm.errors|join:", " }}</div>{% endif %}
+                  </td>
                   <td class="text-center">
                     {% if vform.instance.pk %}
                     <label class="form-check d-inline-flex m-0" title="Delete on save">{{ vform.DELETE }}</label>
@@ -100,6 +137,7 @@
               </tbody>
             </table>
           </div>
+          <p class="text-muted small px-3 pt-2 mb-0">Leave Weight/Length/Width/Height blank on a variant to use the product's default dimensions above — only set them if that variant is packed differently.</p>
           <template data-formset-empty>
             <tr>
               <td class="d-none">{{ variants.empty_form.id }}</td>
@@ -108,6 +146,10 @@
               <td>{{ variants.empty_form.price_delta }}</td>
               <td>{{ variants.empty_form.sku_suffix }}</td>
               <td>{{ variants.empty_form.stock_quantity }}</td>
+              <td>{{ variants.empty_form.weight_kg }}</td>
+              <td>{{ variants.empty_form.length_cm }}</td>
+              <td>{{ variants.empty_form.width_cm }}</td>
+              <td>{{ variants.empty_form.height_cm }}</td>
               <td class="text-center"><button type="button" class="btn btn-icon btn-sm btn-light text-danger"
                   data-row-remove><i class="ti ti-trash"></i></button></td>
             </tr>

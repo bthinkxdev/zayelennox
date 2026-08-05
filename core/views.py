@@ -159,7 +159,7 @@ def set_currency_view(request: HttpRequest) -> HttpResponse:
     if not code:
         from core.selectors import get_default_currency
         default_curr = get_default_currency()
-        code = default_curr.code if default_curr else "AED"
+        code = default_curr.code if default_curr else "INR"
     request.session["storefront_currency"] = code
 
     if not is_htmx_request(request):

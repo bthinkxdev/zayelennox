@@ -182,6 +182,16 @@ class OrderItem(TimeStampedModel):
     def __str__(self) -> str:
         return f"{self.product_id} x{self.quantity}"
 
+    def get_shipping_dims(self) -> dict:
+        """
+        Resolve package dims for this line: the selected variant's override
+        if present, otherwise the parent product's default dims. Handles
+        products sold with no variant at all.
+        """
+        if self.variant_id and self.variant is not None:
+            return self.variant.get_shipping_dims()
+        return self.product.get_shipping_dims()
+
 
 OrderLineItem = OrderItem
 

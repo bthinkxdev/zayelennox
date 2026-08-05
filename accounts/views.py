@@ -102,6 +102,7 @@ def _serialize_address(address) -> dict[str, Any]:
         "line2": address.line2,
         "city": address.city.name,
         "city_id": address.city_id,
+        "pincode": address.pincode,
         "is_default": address.is_default,
     }
 
@@ -530,6 +531,7 @@ def address_list_create_view(request: HttpRequest) -> HttpResponse:
         line1=form.cleaned_data["line1"],
         line2=form.cleaned_data.get("line2", ""),
         city_id=form.cleaned_data["city"].pk,
+        pincode=form.cleaned_data.get("pincode", ""),
         is_default=form.cleaned_data.get("is_default", False),
     )
     return _success_response({"address": _serialize_address(address)}, status=201)
@@ -555,6 +557,7 @@ def address_detail_view(request: HttpRequest, address_id: int) -> HttpResponse:
         line1=form.cleaned_data["line1"],
         line2=form.cleaned_data.get("line2", ""),
         city_id=form.cleaned_data["city"].pk,
+        pincode=form.cleaned_data.get("pincode", ""),
         is_default=form.cleaned_data.get("is_default", False),
     )
     address = get_address_by_id(address_id=address.pk, customer_profile=profile)

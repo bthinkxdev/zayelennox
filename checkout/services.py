@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 from typing import Any, Optional
 
 from django.db import IntegrityError, transaction
@@ -73,6 +74,7 @@ def place_order(
     checkout_session_id: int,
     idempotency_key: str,
     customer_profile: Optional[CustomerProfile] = None,
+    shipping_charge_override: Optional[Decimal] = None,
 ) -> Order:
     """
     Atomically place an order from a checkout session.
@@ -83,6 +85,12 @@ def place_order(
     Reserves delivery slot capacity before finalizing the order.
 
     Stock is decremented via ``catalog.services.adjust_stock`` (select_for_update).
+
+    Args:
+        shipping_charge_override: Real Shiprocket-quoted shipping charge for
+            this delivery pincode (see ``shipping.views.check_serviceability_view``).
+            When provided, this replaces the cart's city-based delivery charge
+            so the customer is billed exactly what they were quoted at checkout.
 
     Raises:
         CheckoutSessionError: When session is not in a placeable state.
@@ -120,7 +128,14 @@ def place_order(
     if not summary.lines:
         raise CheckoutSessionError("Cart is empty.")
 
-
+    delivery_charge = summary.delivery_charge
+    grand_total = summary.grand_total
+    if shipping_charge_override is not None:
+        delivery_charge = shipping_charge_override
+        grand_total = max(
+            summary.subtotal - summary.coupon_discount + delivery_charge,
+            Decimal("0.00"),
+        )
 
     for line in summary.lines:
         target = line.variant if line.variant else line.product
@@ -136,8 +151,10 @@ def place_order(
             "label": addr.label,
             "line1": addr.line1,
             "line2": addr.line2,
-            "city": addr.city.name if hasattr(addr, 'city') and addr.city else "",
-            "state": addr.city.state.name if hasattr(addr, 'city') and addr.city and getattr(addr.city, 'state', None) else "",
+            "city": addr.display_city,
+            "state": addr.state_name,
+            "pincode": addr.pincode,
+            "country": "India",
         }
 
     try:
@@ -150,8 +167,8 @@ def place_order(
             delivery_date=session.delivery_date,
             subtotal=summary.subtotal,
             coupon_discount=summary.coupon_discount,
-            delivery_charge=summary.delivery_charge,
-            total_amount=summary.grand_total,
+            delivery_charge=delivery_charge,
+            total_amount=grand_total,
             currency=session.cart.currency,
             delivery_address_snapshot=address_snapshot,
             invoice_details=session.invoice_details,

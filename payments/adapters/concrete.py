@@ -286,7 +286,7 @@ class RazorpayAdapter(PaymentGatewayAdapter):
         if not currency:
             from core.selectors import get_default_currency
             default_curr = get_default_currency()
-            currency = default_curr.code if default_curr else "AED"
+            currency = default_curr.code if default_curr else "INR"
         key_id, key_secret = _get_razorpay_credentials()
         if key_id and key_secret and razorpay_payment_id and not razorpay_payment_id.startswith("pay_test_"):
             try:

@@ -130,3 +130,14 @@ class CartItem(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.product_id} x{self.quantity}"
+
+    def get_shipping_dims(self) -> dict:
+        """
+        Resolve package dims for this line: the selected variant's override
+        if present, otherwise the parent product's default dims. Mirrors
+        ``orders.models.OrderItem.get_shipping_dims`` — used to quote real
+        Shiprocket shipping rates before an order even exists.
+        """
+        if self.variant_id and self.variant is not None:
+            return self.variant.get_shipping_dims()
+        return self.product.get_shipping_dims()

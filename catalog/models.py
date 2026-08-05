@@ -188,6 +188,41 @@ class Product(TimeStampedModel):
         help_text="Triggers low-stock alerts when stock falls at or below this value.",
     )
 
+    # Default shipping package dimensions — used by courier integrations (e.g. Shiprocket)
+    # for every order line unless the selected variant overrides them below.
+    weight_kg = models.DecimalField(
+        max_digits=6,
+        decimal_places=3,
+        default=0.5,
+        validators=[MinValueValidator(0)],
+        verbose_name="Weight (kg)",
+        help_text="Weight in kilograms, used for courier booking.",
+    )
+    length_cm = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=10,
+        validators=[MinValueValidator(0)],
+        verbose_name="Length (cm)",
+        help_text="Length in centimeters.",
+    )
+    width_cm = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=10,
+        validators=[MinValueValidator(0)],
+        verbose_name="Width (cm)",
+        help_text="Width (breadth) in centimeters.",
+    )
+    height_cm = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        default=10,
+        validators=[MinValueValidator(0)],
+        verbose_name="Height (cm)",
+        help_text="Height in centimeters.",
+    )
+
     class Meta:
         verbose_name = "Product"
         verbose_name_plural = "Products"
@@ -221,6 +256,15 @@ class Product(TimeStampedModel):
     @price.setter
     def price(self, value):
         self.base_price = value
+
+    def get_shipping_dims(self) -> dict:
+        """Return this product's default package dims for courier booking."""
+        return {
+            "weight": self.weight_kg,
+            "length": self.length_cm,
+            "breadth": self.width_cm,
+            "height": self.height_cm,
+        }
 
 
 class VariantType(models.TextChoices):
@@ -261,6 +305,46 @@ class ProductVariant(TimeStampedModel):
         verbose_name="Stock quantity",
     )
 
+    # Optional shipping overrides — only set these when this specific variant
+    # (e.g. a different size or packaging) actually changes the packed weight
+    # or dimensions. Leave blank to inherit the parent product's dims.
+    weight_kg = models.DecimalField(
+        max_digits=6,
+        decimal_places=3,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Weight override (kg)",
+        help_text="Leave blank to use the product's default weight.",
+    )
+    length_cm = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Length override (cm)",
+        help_text="Leave blank to use the product's default length.",
+    )
+    width_cm = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Width override (cm)",
+        help_text="Leave blank to use the product's default width.",
+    )
+    height_cm = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Height override (cm)",
+        help_text="Leave blank to use the product's default height.",
+    )
+
     class Meta:
         verbose_name = "Product variant"
         verbose_name_plural = "Product variants"
@@ -268,6 +352,19 @@ class ProductVariant(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.product.sku}-{self.sku_suffix}"
+
+    def get_shipping_dims(self) -> dict:
+        """
+        Return this variant's package dims, falling back field-by-field to the
+        parent product's defaults for any override left blank.
+        """
+        product_dims = self.product.get_shipping_dims()
+        return {
+            "weight": self.weight_kg if self.weight_kg is not None else product_dims["weight"],
+            "length": self.length_cm if self.length_cm is not None else product_dims["length"],
+            "breadth": self.width_cm if self.width_cm is not None else product_dims["breadth"],
+            "height": self.height_cm if self.height_cm is not None else product_dims["height"],
+        }
 
 
 class ProductImage(TimeStampedModel):
