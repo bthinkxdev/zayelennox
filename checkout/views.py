@@ -14,7 +14,7 @@ from django.views.decorators.http import require_GET, require_POST, require_http
 
 from accounts.selectors import get_address_by_id, get_saved_addresses
 from cart.selectors import get_cart_for_request, get_cart_summary
-from cart.services import get_or_create_cart
+from cart.services import get_or_create_buy_now_cart, get_or_create_cart
 from checkout.forms import CheckoutAddressForm, CheckoutPaymentForm
 from checkout.selectors import get_checkout_session_by_id
 from checkout.services import create_checkout_session, place_order, update_checkout_session
@@ -23,10 +23,35 @@ from payments.registry import PAYMENT_GATEWAYS
 from payments.services import process_payment
 
 
+def _is_buy_now_request(request: HttpRequest) -> bool:
+    """True when the current checkout request is for the isolated Buy Now cart."""
+    if request.method == "GET":
+        return request.GET.get("buy_now") == "1"
+    return request.POST.get("buy_now") == "1"
+
+
+def _resolve_checkout_cart(request: HttpRequest):
+    """
+    Resolve which cart this checkout request should operate on.
+
+    Returns (cart, buy_now_mode). Buy Now checkout always resolves to its own
+    isolated single-item cart — never the customer's persistent cart, and
+    never affected by what's already sitting in it.
+    """
+    if _is_buy_now_request(request):
+        return get_or_create_buy_now_cart(request=request), True
+    return get_or_create_cart(request=request), False
+
+
+def _checkout_url(*, buy_now_mode: bool) -> str:
+    url = reverse("checkout:checkout")
+    return f"{url}?buy_now=1" if buy_now_mode else url
+
+
 @require_GET
 def checkout_view(request: HttpRequest) -> HttpResponse:
     """Multi-step checkout page with gift Order Preview partial."""
-    cart = get_or_create_cart(request=request)
+    cart, buy_now_mode = _resolve_checkout_cart(request)
     summary = get_cart_summary(cart=cart)
     if not summary.lines:
         #do not redirect,render the empty state in checkout.html
@@ -81,6 +106,7 @@ def checkout_view(request: HttpRequest) -> HttpResponse:
             "payment_gateways": available_gateways,
             "selected_gateway_key": selected_gateway_key,
             "has_active_coupons": has_any_active_coupons(),
+            "buy_now_mode": buy_now_mode,
         },
     )
 
@@ -97,7 +123,12 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
             status=200,
         )
 
-    cart = get_cart_for_request(request=request)
+    buy_now_mode = _is_buy_now_request(request)
+    if buy_now_mode:
+        from cart.selectors import get_buy_now_cart_for_request
+        cart = get_buy_now_cart_for_request(request=request)
+    else:
+        cart = get_cart_for_request(request=request)
     if cart is None:
         raise Http404("Cart not found.")
 
@@ -388,7 +419,8 @@ def razorpay_pay_view(request: HttpRequest, order_id: int) -> HttpResponse:
 
     #build absolute callback URL for Razorpay redirect
     callback_url = request.build_absolute_uri(reverse("checkout:razorpay-callback"))
-    cancel_url = request.build_absolute_uri(reverse("checkout:checkout"))
+    order_was_buy_now = bool(order.cart_id and getattr(order.cart, "is_buy_now", False))
+    cancel_url = request.build_absolute_uri(_checkout_url(buy_now_mode=order_was_buy_now))
 
     return render(
         request,
@@ -472,7 +504,8 @@ def razorpay_callback_view(request: HttpRequest) -> HttpResponse:
     else:
         if payment_tx:
             confirm_payment_failed(payment_transaction=payment_tx)
-        return redirect("checkout:checkout")
+        order_was_buy_now = bool(order.cart_id and getattr(order.cart, "is_buy_now", False))
+        return redirect(_checkout_url(buy_now_mode=order_was_buy_now))
 
 
 @require_POST
@@ -482,15 +515,20 @@ def checkout_coupon_apply_view(request: HttpRequest) -> HttpResponse:
     from cart.services import apply_coupon
     from marketing.exceptions import InvalidCouponError
     from django.contrib import messages
-    from cart.selectors import get_cart_for_request
     from django.utils.translation import gettext as _
+
+    buy_now_mode = _is_buy_now_request(request)
 
     form = CartCouponForm(request.POST)
     if not form.is_valid():
         messages.error(request, _("Enter a valid coupon code."))
-        return redirect("checkout:checkout")
+        return redirect(_checkout_url(buy_now_mode=buy_now_mode))
 
-    cart = get_cart_for_request(request=request)
+    if buy_now_mode:
+        from cart.selectors import get_buy_now_cart_for_request
+        cart = get_buy_now_cart_for_request(request=request)
+    else:
+        cart = get_cart_for_request(request=request)
     if cart is None:
         raise Http404("Cart not found.")
 
@@ -500,19 +538,24 @@ def checkout_coupon_apply_view(request: HttpRequest) -> HttpResponse:
     except InvalidCouponError as exc:
         messages.error(request, str(exc))
 
-    return redirect("checkout:checkout")
+    return redirect(_checkout_url(buy_now_mode=buy_now_mode))
 
 
 @require_POST
 def checkout_coupon_remove_view(request: HttpRequest) -> HttpResponse:
     """Remove any applied coupon from the cart from checkout."""
     from cart.services import remove_coupon
-    from cart.selectors import get_cart_for_request
     from django.contrib import messages
     from django.utils.translation import gettext as _
-    
-    cart = get_cart_for_request(request=request)
+
+    buy_now_mode = _is_buy_now_request(request)
+
+    if buy_now_mode:
+        from cart.selectors import get_buy_now_cart_for_request
+        cart = get_buy_now_cart_for_request(request=request)
+    else:
+        cart = get_cart_for_request(request=request)
     if cart:
         remove_coupon(cart=cart)
         messages.success(request, _("Coupon removed."))
-    return redirect("checkout:checkout")
+    return redirect(_checkout_url(buy_now_mode=buy_now_mode))

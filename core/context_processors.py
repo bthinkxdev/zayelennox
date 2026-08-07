@@ -7,10 +7,38 @@ from typing import Any
 from django.http import HttpRequest
 
 from cart.selectors import get_cart_count, get_wishlist_count, get_wishlist_product_ids, get_cart_product_ids
-from catalog.selectors import get_category_tree
+from catalog.selectors import get_category_by_slug, get_category_tree
 from core.selectors import get_currency_by_code, get_default_currency
 from core.services import get_site_settings
 from delivery.selectors import get_active_countries
+
+
+def _resolve_current_category(request: HttpRequest):
+    """
+    Resolve the category the customer is currently browsing, if any.
+
+    Used by the header's search category dropdown so it reflects where the
+    customer actually is instead of always saying "All Categories" —
+    whether they landed on a category page directly or filtered the PLP
+    via ?category=<id>.
+    """
+    match = getattr(request, "resolver_match", None)
+    if match is None:
+        return None
+
+    if match.view_name == "catalog:plp-category":
+        slug = match.kwargs.get("category_slug")
+        return get_category_by_slug(slug=slug) if slug else None
+
+    if match.view_name == "catalog:plp":
+        category_id = request.GET.get("category")
+        if category_id and category_id.isdigit():
+            from catalog.models import Category
+
+            return Category.objects.filter(pk=category_id, is_active=True).first()
+        return None
+
+    return None
 
 
 def storefront(request: HttpRequest) -> dict[str, Any]:
@@ -51,6 +79,7 @@ def storefront(request: HttpRequest) -> dict[str, Any]:
     return {
         "site_settings": get_site_settings(),
         "category_tree": get_category_tree(),
+        "current_search_category": _resolve_current_category(request),
         "cart_count": get_cart_count(request=request),
         "cart_product_ids": get_cart_product_ids(request=request),
         "wishlist_count": get_wishlist_count(request=request),

@@ -57,6 +57,16 @@ class Cart(TimeStampedModel):
         related_name="carts",
         verbose_name="Destination city",
     )
+    is_buy_now = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name="Is buy-now cart",
+        help_text=(
+            "Isolated single-item cart created by the PDP 'Buy Now' action. "
+            "Never returned by the persistent-cart lookups, never merged on "
+            "login, and always independent of the customer's real cart."
+        ),
+    )
 
     class Meta:
         verbose_name = "Cart"
@@ -77,6 +87,8 @@ class Cart(TimeStampedModel):
                 fields=["updated_at", "customer_profile"],
                 name="cart_abandoned_scan_idx",
             ),
+            models.Index(fields=["is_buy_now", "customer_profile"], name="cart_buy_now_customer_idx"),
+            models.Index(fields=["is_buy_now", "session_key"], name="cart_buy_now_session_idx"),
         ]
 
     def __str__(self) -> str:

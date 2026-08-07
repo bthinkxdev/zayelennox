@@ -63,3 +63,31 @@ def get_hero_slides() -> list[dict[str, Any]]:
             }
         )
     return slides
+
+
+def get_secondary_slides() -> list[dict[str, Any]]:
+    """
+    Return active secondary banner slides (9:3 ratio) ordered for display.
+
+    Query guarantee: exactly 1 SELECT on cms_secondaryslide.
+
+    Returns:
+        List of slide dicts with keys: type, src, poster, title.
+        Slides without any media file are skipped.
+    """
+    from cms.models import SecondarySlide
+
+    slides: list[dict[str, Any]] = []
+    for slide in SecondarySlide.objects.filter(is_active=True).order_by("display_order", "id"):
+        src = slide.media_src
+        if not src:
+            continue
+        slides.append(
+            {
+                "type": slide.media_type,
+                "src": src,
+                "poster": slide.poster_src,
+                "title": slide.title,
+            }
+        )
+    return slides

@@ -6,7 +6,18 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
-EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+# Trust any ngrok tunnel domain in dev so POST requests (login, checkout, etc.)
+# don't get a 403 "Origin checking failed" when testing through a tunnel — ngrok's
+# free-tier URL changes every time you restart it, so this covers all of them
+# instead of needing to hardcode/update one URL each time.
+CSRF_TRUSTED_ORIGINS = CSRF_TRUSTED_ORIGINS + [
+    "https://*.ngrok-free.dev",
+    "https://*.ngrok-free.app",
+    "https://*.ngrok.io",
+    "https://*.ngrok.app",
+]
+
+EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")
 
 try:
     import debug_toolbar  # noqa: F401

@@ -113,6 +113,13 @@ urlpatterns += _crud(
     cms.HeroSlideDeleteView,
 )
 urlpatterns += _crud(
+    "secondaryslide",
+    cms.SecondarySlideListView,
+    cms.SecondarySlideCreateView,
+    cms.SecondarySlideUpdateView,
+    cms.SecondarySlideDeleteView,
+)
+urlpatterns += _crud(
     "blogpost",
     cms.BlogPostListView,
     cms.BlogPostCreateView,

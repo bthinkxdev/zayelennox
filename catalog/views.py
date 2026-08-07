@@ -8,6 +8,7 @@ from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.shortcuts import get_object_or_404, redirect
 from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.cache import never_cache
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 
@@ -79,7 +80,7 @@ def plp_view(request: HttpRequest, category_slug: str | None = None) -> HttpResp
         if category is None:
             raise Http404("Category not found")
 
-        if not filters.get("subcategory_id"):
+        if not filters.get("subcategory_id") and not filters.get("category_id"):
             filters["category_id"] = category.pk
 
     resolved_cat = category
@@ -136,13 +137,26 @@ def plp_view(request: HttpRequest, category_slug: str | None = None) -> HttpResp
     )
 
     if request.headers.get("HX-Request"):
-        return render(request, "catalog/partials/product_grid.html", context)
+        # product_grid_htmx.html includes the grid partial and also OOB-swaps
+        # #plp-toolbar-copy (title + result count), which otherwise sit
+        # outside #product-grid and never got the memo. See templates/catalog/plp.html.
+        return render(request, "catalog/partials/product_grid_htmx.html", context)
     return render(request, "catalog/plp.html", context)
 
 
 @require_GET
+@never_cache
 def pdp_view(request: HttpRequest, slug: str) -> HttpResponse:
-    """Product detail page with gallery, variants, reviews, and delivery estimate."""
+    """
+    Product detail page with gallery, variants, reviews, and delivery estimate.
+
+    @never_cache sends Cache-Control: no-store — without it, browsers may
+    serve this page from disk cache or restore it from the back/forward
+    cache on a browser-back navigation, showing a stale "View Cart"/
+    "Add to Cart" state if the cart changed on another page in between.
+    no-store also makes the page ineligible for bfcache in the first place,
+    so every back navigation here is guaranteed to hit the server fresh.
+    """
     product = get_product_detail(slug=slug)
     if product is None:
         raise Http404("Product not found")
@@ -318,11 +332,11 @@ def delivery_estimate_view(request: HttpRequest, product_id: int) -> JsonRespons
 
 @require_GET
 def rental_list_view(request: HttpRequest) -> HttpResponse:
-    from catalog.selectors import _primary_image_prefetch, PLP_CARD_FIELDS
+    from catalog.selectors import _primary_image_prefetch, _variant_list_prefetch, PLP_CARD_FIELDS
     products = (
         Product.objects.filter(is_active=True, is_rental=True, show_rental_storefront=True)
         .select_related("category", "brand")
-        .prefetch_related(_primary_image_prefetch())
+        .prefetch_related(_primary_image_prefetch(), _variant_list_prefetch())
         .only(*PLP_CARD_FIELDS)
     )
     return render(request, "catalog/rentals.html", {"products": list(products)})

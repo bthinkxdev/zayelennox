@@ -1,0 +1,59 @@
+{% load i18n %}
+<section class="jm-secbanner" aria-label="{% trans 'Promotions' %}">
+  <div class="jm-secbanner__stage">
+    {% if section_context.slides %}
+    <div id="secondaryCarousel"
+         class="carousel slide carousel-fade jm-secbanner__carousel"
+         data-bs-ride="carousel"
+         data-bs-interval="6500"
+         data-bs-pause="hover">
+      <div class="carousel-inner">
+        {% for slide in section_context.slides %}
+        <div class="carousel-item {% if forloop.first %}active{% endif %}">
+          {% if slide.type == 'video' %}
+          <video class="jm-secbanner__img"
+                 autoplay muted loop playsinline
+                 preload="{% if forloop.first %}auto{% else %}metadata{% endif %}"
+                 {% if slide.poster %}poster="{{ slide.poster }}"{% endif %}>
+            <source src="{{ slide.src }}">
+          </video>
+          {% else %}
+          <img src="{{ slide.src }}"
+               class="jm-secbanner__img"
+               alt="{{ slide.title|default:'PRAYAI HERBS' }}"
+               width="1440"
+               loading="lazy">
+          {% endif %}
+
+          <div class="jm-secbanner__caption">
+            <div class="container jm-secbanner__caption-inner">
+              {% if slide.title %}
+              <h3 class="jm-secbanner__title">{{ slide.title }}</h3>
+              {% endif %}
+              <div class="jm-secbanner__ctas">
+                <a href="{% url 'catalog:plp' %}" class="btn btn-floward jm-btn-lg">{% trans "Explore Collections" %}</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% if section_context.slides|length > 1 %}
+      <div class="carousel-indicators jm-secbanner__dots">
+        {% for slide in section_context.slides %}
+        <button type="button" data-bs-target="#secondaryCarousel" data-bs-slide-to="{{ forloop.counter0 }}"
+                {% if forloop.first %}class="active" aria-current="true"{% endif %}
+                aria-label="{% blocktrans with number=forloop.counter %}Slide {{ number }}{% endblocktrans %}"></button>
+        {% endfor %}
+      </div>
+      <button class="jm-secbanner__nav jm-secbanner__nav--prev d-none d-md-grid" type="button" data-bs-target="#secondaryCarousel" data-bs-slide="prev" aria-label="{% trans 'Previous' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <button class="jm-secbanner__nav jm-secbanner__nav--next d-none d-md-grid" type="button" data-bs-target="#secondaryCarousel" data-bs-slide="next" aria-label="{% trans 'Next' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</section>

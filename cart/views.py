@@ -7,6 +7,7 @@ import json
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils.translation import gettext as _
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
 from cart.exceptions import CartItemNotFoundError, InsufficientStockError
@@ -16,9 +17,11 @@ from cart.services import (
     add_to_cart,
     adjust_cart_item_quantity,
     apply_coupon,
+    get_or_create_buy_now_cart,
     get_or_create_cart,
     remove_coupon,
     remove_cart_item,
+    set_buy_now_item,
     toggle_wishlist,
 )
 from catalog.selectors import get_product_for_cart_add
@@ -76,8 +79,14 @@ def _cart_page_response(
 
 
 @require_GET
+@never_cache
 def cart_page_view(request: HttpRequest) -> HttpResponse:
-    """Standalone cart page — full item list, coupon box, and order summary."""
+    """
+    Standalone cart page — full item list, coupon box, and order summary.
+
+    @never_cache so this page is never served stale from disk/back-forward
+    cache after items are added/removed elsewhere in the same session.
+    """
     cart = get_or_create_cart(request=request)
     summary = get_cart_summary(cart=cart)
     from marketing.selectors import has_any_active_coupons
@@ -114,7 +123,7 @@ def wishlist_count_view(request: HttpRequest) -> HttpResponse:
 
 @require_POST
 def cart_add_view(request: HttpRequest) -> HttpResponse:
-    """Add product to persistent cart and return drawer partial or redirect to checkout."""
+    """Add product to the persistent cart and return the drawer partial."""
     product_id = int(request.POST.get("product_id", 0))
     quantity = int(request.POST.get("quantity", 1))
     variant_id_raw = request.POST.get("variant_id")
@@ -124,10 +133,34 @@ def cart_add_view(request: HttpRequest) -> HttpResponse:
     if product is None:
         raise Http404("Product not found.")
 
-    cart = get_or_create_cart(request=request)
-
     buy_now = request.POST.get("buy_now") == "true"
-    
+
+    if buy_now:
+        # Buy Now is fully independent of the real cart: it never reads from
+        # or writes to it. It gets its own isolated single-item cart that
+        # checkout resolves separately (see checkout/views.py).
+        buy_now_cart = get_or_create_buy_now_cart(request=request)
+        try:
+            set_buy_now_item(
+                cart=buy_now_cart,
+                product=product,
+                variant=variant,
+                quantity=quantity,
+            )
+        except InsufficientStockError as exc:
+            from django.contrib import messages
+            messages.error(request, str(exc))
+            return redirect(request.META.get("HTTP_REFERER", "/"))
+
+        from django.urls import reverse
+        checkout_url = reverse("checkout:checkout") + "?buy_now=1"
+        if request.headers.get("HX-Request"):
+            response = HttpResponse(status=204)
+            response["HX-Redirect"] = checkout_url
+            return response
+        return redirect(checkout_url)
+
+    cart = get_or_create_cart(request=request)
     try:
         new_item = add_to_cart(
             cart=cart,
@@ -139,19 +172,9 @@ def cart_add_view(request: HttpRequest) -> HttpResponse:
     except InsufficientStockError as exc:
         from django.contrib import messages
         messages.error(request, str(exc))
-        if request.headers.get("HX-Request") and not buy_now:
-            return _cart_drawer_response(request, error=str(exc))
-        # If buy_now or not htmx, redirect back to referer
-        return redirect(request.META.get("HTTP_REFERER", "/"))
-
-    if buy_now:
-        from django.urls import reverse
-        checkout_url = reverse("checkout:checkout")
         if request.headers.get("HX-Request"):
-            response = HttpResponse(status=204)
-            response["HX-Redirect"] = checkout_url
-            return response
-        return redirect("checkout:checkout")
+            return _cart_drawer_response(request, error=str(exc))
+        return redirect(request.META.get("HTTP_REFERER", "/"))
 
     return _cart_drawer_response(
         request,

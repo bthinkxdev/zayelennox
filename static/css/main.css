@@ -145,6 +145,17 @@ img { max-width: 100%; height: auto; display: block; }
   color: #fff;
 }
 
+.btn-floward:disabled,
+.btn-outline-floward:disabled {
+  background: #c5ced8;
+  border-color: #c5ced8;
+  color: #fff;
+  opacity: 1;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 .btn-ghost {
   background: transparent;
   border: none;
@@ -1264,6 +1275,13 @@ body.mobile-search-open {
   text-decoration: line-through;
   font-weight: 500;
   margin-right: 0.35rem;
+}
+
+.jm-pdp-buybox__stock-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
 }
 
 .jm-pdp-buybox__stock {
@@ -3822,6 +3840,168 @@ body.mobile-search-open .jm-wa-float {
   width: 8px;
 }
 
+/* ----- Secondary Banner (9:3 ratio) ----- */
+.jm-secbanner {
+  padding: 0 clamp(12px, 4vw, 32px);
+  background: transparent;
+}
+
+.jm-secbanner__stage {
+  position: relative;
+  overflow: hidden;
+  background: #0B1220;
+  height: auto;
+  min-height: 0;
+  border-radius: 28px;
+}
+
+.jm-secbanner__carousel {
+  position: relative;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: none;
+  background: #0B1220;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.jm-secbanner__carousel .carousel-inner,
+.jm-secbanner__carousel .carousel-item {
+  height: auto;
+  position: relative;
+}
+
+.jm-secbanner__carousel .carousel-item.active {
+  display: block;
+}
+
+.jm-secbanner__img {
+  width: 100%;
+  aspect-ratio: 3 / 1;
+  max-width: 100%;
+  object-fit: cover;
+  object-position: center center;
+  display: block;
+}
+
+@media (min-width: 768px) {
+  .jm-secbanner__img {
+    max-height: 280px;
+  }
+}
+
+.jm-secbanner__caption {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, transparent 45%, rgba(11, 18, 32, 0.45) 78%, rgba(11, 18, 32, 0.72) 100%);
+}
+
+.jm-secbanner__caption-inner {
+  width: 100%;
+  padding: 1rem 0 1.5rem;
+  pointer-events: none;
+}
+
+.jm-secbanner__title {
+  margin: 0 0 0.75rem;
+  max-width: 34rem;
+  font-family: var(--font-display, "Plus Jakarta Sans", sans-serif);
+  font-size: clamp(1.1rem, 0.95rem + 1vw, 1.75rem);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  color: #fff;
+  text-shadow: 0 1px 16px rgba(0, 0, 0, 0.28);
+}
+
+.jm-secbanner__ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  pointer-events: auto;
+}
+
+.jm-secbanner__ctas .btn {
+  min-height: 44px;
+}
+
+.jm-secbanner__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--jm-ink);
+  display: grid;
+  place-items: center;
+  box-shadow: var(--jm-shadow);
+  z-index: 3;
+  pointer-events: auto;
+  transition: transform var(--jm-transition), background var(--jm-transition);
+}
+
+.jm-secbanner__nav:hover {
+  transform: translateY(-50%) scale(1.05);
+  background: #fff;
+}
+
+.jm-secbanner__nav svg {
+  width: 18px;
+  height: 18px;
+}
+
+.jm-secbanner__nav--prev {
+  left: 12px;
+}
+
+.jm-secbanner__nav--next {
+  right: 12px;
+}
+
+.jm-secbanner__dots,
+.jm-secbanner__dots [data-bs-target] {
+  pointer-events: auto;
+}
+
+.jm-secbanner__dots {
+  position: absolute;
+  bottom: 14px;
+  left: 0;
+  right: 0;
+  margin: 0;
+  z-index: 3;
+}
+
+.jm-secbanner__dots [data-bs-target] {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.jm-secbanner__dots .active {
+  background: #fff;
+  width: 8px;
+}
+
+@media (max-width: 575.98px) {
+  .jm-secbanner__stage,
+  .jm-secbanner__carousel {
+    border-radius: 18px;
+  }
+}
+
 /* ----- Categories ----- */
 .jm-categories {
   padding-top: calc(var(--jm-space) * 2);
@@ -4928,6 +5108,10 @@ body.mobile-search-open .jm-wa-float {
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem;
+}
+
+.jm-variant-modal__field {
+  margin-bottom: 1.25rem;
 }
 
 @media (max-width: 767.98px) {

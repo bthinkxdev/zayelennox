@@ -20,6 +20,12 @@ class HeroSliderConfigForm(BaseSectionConfigForm):
     pass
 
 
+class SecondaryBannerConfigForm(BaseSectionConfigForm):
+    """Secondary banner slides are managed via SecondarySlide uploads — no section JSON caption config."""
+
+    pass
+
+
 
 class ProductCollectionConfigForm(BaseSectionConfigForm):
     product_ids = forms.CharField(
@@ -99,6 +105,7 @@ class EmptyConfigForm(BaseSectionConfigForm):
 
 SECTION_CONFIG_FORMS: dict[str, type[BaseSectionConfigForm]] = {
     HomepageSectionType.HERO_SLIDER: HeroSliderConfigForm,
+    HomepageSectionType.SECONDARY_BANNER: SecondaryBannerConfigForm,
     HomepageSectionType.SHOP_BY_CATEGORY: EmptyConfigForm,
     HomepageSectionType.FEATURED_PRODUCTS: EmptyConfigForm,
     HomepageSectionType.NEW_ARRIVALS: EmptyConfigForm,
@@ -138,7 +145,7 @@ def _flatten_config_for_form(*, section_type: str, config: dict) -> dict:
             "instagram_handle": config.get("instagram_handle", ""),
             "post_urls": "\n".join(config.get("post_urls", [])),
         }
-    if section_type == HomepageSectionType.HERO_SLIDER:
+    if section_type in (HomepageSectionType.HERO_SLIDER, HomepageSectionType.SECONDARY_BANNER):
         return {}
     return {k: v for k, v in config.items() if isinstance(v, (str, int, float, bool))}
 
@@ -148,6 +155,6 @@ def config_from_form(*, section_type: str, form: BaseSectionConfigForm) -> dict:
     if not form.is_valid():
         return {}
     data = form.to_config()
-    if section_type == HomepageSectionType.HERO_SLIDER:
+    if section_type in (HomepageSectionType.HERO_SLIDER, HomepageSectionType.SECONDARY_BANNER):
         return {}
     return data

@@ -16,7 +16,7 @@ from accounts.models import (
     Wishlist,
     Subscription
 )
-from catalog.models import ProductImage
+from catalog.models import ProductImage, ProductVariant
 from notifications.selectors import get_unread_notification_count
 from orders.selectors import get_customer_orders
 
@@ -184,6 +184,11 @@ def get_wishlist(
                 "product__images",
                 queryset=ProductImage.objects.filter(is_primary=True).order_by("display_order"),
                 to_attr="primary_images",
+            ),
+            Prefetch(
+                "product__variants",
+                queryset=ProductVariant.objects.order_by("variant_type", "name"),
+                to_attr="variant_list",
             ),
         ),
     )

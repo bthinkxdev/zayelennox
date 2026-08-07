@@ -1,24 +1,27 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block title %}{% trans "Checkout" %} | DESERT STAR MOBILE PHONES{% endblock %}
+{% block title %}{% trans "Checkout" %} | PRAYAI HERBS{% endblock %}
 
 {% block content %}
-<div class="container page-container checkout-page jm-page" hx-get="{% url 'checkout:checkout' %}" hx-trigger="cartUpdated from:body" hx-select=".checkout-page" hx-swap="outerHTML">
+<div class="container page-container checkout-page jm-page" hx-get="{% url 'checkout:checkout' %}{% if buy_now_mode %}?buy_now=1{% endif %}" hx-trigger="cartUpdated from:body" hx-select=".checkout-page" hx-swap="outerHTML">
   {% if not summary.lines %}
   <div class="text-center py-5 mt-5">
     <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5" class="mb-3 mx-auto"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-    <h2 class="h4 text-dark mb-3">{% trans "Your cart is empty" %}</h2>
-    <p class="text-muted mb-4">{% trans "You need to add items to your cart before you can checkout." %}</p>
+    <h2 class="h4 text-dark mb-3">{% if buy_now_mode %}{% trans "Nothing to buy right now" %}{% else %}{% trans "Your cart is empty" %}{% endif %}</h2>
+    <p class="text-muted mb-4">{% if buy_now_mode %}{% trans "Pick a product and use Buy Now to check out instantly." %}{% else %}{% trans "You need to add items to your cart before you can checkout." %}{% endif %}</p>
     <a href="{% url 'catalog:plp' %}" class="btn btn-floward px-4">{% trans "Continue Shopping" %}</a>
   </div>
   {% else %}
-  <h1 class="section-title jm-page-title">{% trans "Checkout" %}</h1>
+  <h1 class="section-title jm-page-title">
+    {% trans "Checkout" %}
+  </h1>
   <div class="row g-4">
     <div class="col-lg-7">
       <form id="checkout-form" method="post" action="{% url 'checkout:place-order' %}"
         hx-post="{% url 'checkout:place-order' %}" hx-target="#checkout-result" hx-swap="innerHTML" novalidate>
         {% csrf_token %}
+        {% if buy_now_mode %}<input type="hidden" name="buy_now" value="1">{% endif %}
         <input type="hidden" name="idempotency_key" value="{{ checkout_session.pk }}-{{ summary.grand_total }}-{{ summary.lines|length }}-{{ request.user.pk|default:'guest' }}">
 
         <div class="checkout-step">
@@ -138,7 +141,9 @@
       <div class="checkout-step sticky-top" style="top: 100px;">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h2 class="mb-0">{% trans "Order Summary" %}</h2>
+          {% if not buy_now_mode %}
           <a href="#" class="text-decoration-none small text-floward fw-semibold" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">{% trans "Edit Cart" %}</a>
+          {% endif %}
         </div>
         {% for line in summary.lines %}
         <div class="d-flex align-items-center justify-content-between py-2 border-bottom gap-2">
@@ -183,12 +188,14 @@
           <span class="small fw-semibold text-floward">{{ summary.coupon_code }}</span>
           <form method="post" action="{% url 'checkout:coupon-remove' %}">
             {% csrf_token %}
+            {% if buy_now_mode %}<input type="hidden" name="buy_now" value="1">{% endif %}
             <button type="submit" class="btn btn-link text-danger p-0 ms-2" style="font-size: 0.8rem; text-decoration: none;">{% trans "Remove" %}</button>
           </form>
         </div>
         {% elif has_active_coupons %}
         <form method="post" action="{% url 'checkout:coupon-apply' %}" class="d-flex gap-2 py-3 border-bottom">
           {% csrf_token %}
+          {% if buy_now_mode %}<input type="hidden" name="buy_now" value="1">{% endif %}
           <input type="text" name="code" class="form-control form-control-sm" placeholder="{% trans 'Enter coupon code' %}">
           <button type="submit" class="btn btn-dark btn-sm px-3">{% trans "Apply" %}</button>
         </form>

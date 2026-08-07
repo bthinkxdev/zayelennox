@@ -14,17 +14,11 @@ from catalog.models import ProductImage
 from delivery.selectors import get_delivery_charge
 
 _CART_CACHE_ATTR = "_floward_resolved_cart"
+_BUY_NOW_CART_CACHE_ATTR = "_floward_resolved_buy_now_cart"
 
 
-def get_cart_for_request(*, request: HttpRequest) -> Optional[Cart]:
-    """
-    Resolve the persistent cart for the current request (guest or authenticated).
-
-    Query guarantee: at most 1 SELECT on cart_cart per request (request-scoped cache).
-    """
-    if hasattr(request, _CART_CACHE_ATTR):
-        return getattr(request, _CART_CACHE_ATTR)
-
+def _lookup_cart(*, request: HttpRequest, is_buy_now: bool) -> Optional[Cart]:
+    """Shared lookup for the persistent cart or the isolated buy-now cart."""
     if not request.session.session_key:
         request.session.create()
     session_key = request.session.session_key
@@ -32,19 +26,52 @@ def get_cart_for_request(*, request: HttpRequest) -> Optional[Cart]:
     cart = None
     if request.user.is_authenticated and hasattr(request.user, "customer_profile"):
         cart = (
-            Cart.objects.filter(customer_profile=request.user.customer_profile)
+            Cart.objects.filter(customer_profile=request.user.customer_profile, is_buy_now=is_buy_now)
             .select_related("currency", "destination_city")
             .first()
         )
 
     if cart is None:
         cart = (
-            Cart.objects.filter(session_key=session_key)
+            Cart.objects.filter(session_key=session_key, is_buy_now=is_buy_now)
             .select_related("currency", "destination_city")
             .first()
         )
 
+    return cart
+
+
+def get_cart_for_request(*, request: HttpRequest) -> Optional[Cart]:
+    """
+    Resolve the persistent cart for the current request (guest or authenticated).
+
+    Always excludes buy-now carts — this is the real, editable cart shown in
+    the drawer/cart page, never affected by a PDP "Buy Now" click.
+
+    Query guarantee: at most 1 SELECT on cart_cart per request (request-scoped cache).
+    """
+    if hasattr(request, _CART_CACHE_ATTR):
+        return getattr(request, _CART_CACHE_ATTR)
+
+    cart = _lookup_cart(request=request, is_buy_now=False)
     setattr(request, _CART_CACHE_ATTR, cart)
+    return cart
+
+
+def get_buy_now_cart_for_request(*, request: HttpRequest) -> Optional[Cart]:
+    """
+    Resolve the isolated "Buy Now" cart for the current request.
+
+    Completely separate row from the persistent cart — never returned by
+    ``get_cart_for_request`` and never touched by normal add-to-cart flows.
+
+    Query guarantee: at most 1 SELECT on cart_cart per request (request-scoped cache).
+    """
+    if hasattr(request, _BUY_NOW_CART_CACHE_ATTR):
+        return getattr(request, _BUY_NOW_CART_CACHE_ATTR)
+
+    cart = _lookup_cart(request=request, is_buy_now=True)
+    setattr(request, _BUY_NOW_CART_CACHE_ATTR, cart)
     return cart
 
 

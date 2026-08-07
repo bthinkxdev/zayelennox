@@ -1,6 +1,6 @@
 {% load i18n %}
 {{ subcategories_map|json_script:"subcategories-data" }}
-<form class="plp-filters card p-3" method="get" action="{{ request.path }}" hx-get="{{ request.path }}"
+<form class="plp-filters card p-3" method="get" action="{% url 'catalog:plp' %}" hx-get="{% url 'catalog:plp' %}"
   hx-target="#product-grid" hx-swap="innerHTML show:window:top" hx-push-url="true" hx-indicator="#product-grid"
   hx-trigger="submit">
   <h2 class="h6">{% trans "Filters" %}</h2>

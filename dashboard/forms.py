@@ -16,7 +16,15 @@ from catalog.models import (
     ProductVariant,
     Review,
 )
-from cms.models import BlogPost, FAQItem, HeroSlide, HomepageSection, Page, PolicyDocument
+from cms.models import (
+    BlogPost,
+    FAQItem,
+    HeroSlide,
+    HomepageSection,
+    Page,
+    PolicyDocument,
+    SecondarySlide,
+)
 from core.models import SiteSettings, Currency
 from delivery.models import City
 from marketing.models import Coupon, FlashSale, NewsletterSubscriber
@@ -360,6 +368,42 @@ class HeroSlideForm(forms.ModelForm):
                     f"Poster image must be at least 1200px wide. Uploaded image is {width}px wide."
                 )
                 
+        return poster
+
+
+class SecondarySlideForm(forms.ModelForm):
+    class Meta:
+        model = SecondarySlide
+        fields = ["title", "image", "video", "poster", "display_order", "is_active"]
+
+    def clean_image(self):
+        image = self.cleaned_data.get("image")
+        if image:
+            # Any aspect ratio is accepted here — the homepage banner is a fixed
+            # 9:3 box and crops the image to fit (object-fit: cover), so we only
+            # guard against low-resolution uploads rather than rejecting on ratio.
+            from django.core.files.images import get_image_dimensions
+            width, height = get_image_dimensions(image)
+
+            if width < 1200:
+                raise forms.ValidationError(
+                    f"Banner image must be at least 1200px wide for good quality. Uploaded image is {width}px wide."
+                )
+
+        return image
+
+    def clean_poster(self):
+        poster = self.cleaned_data.get("poster")
+        if poster:
+            # Same as clean_image: any ratio accepted, cropped to 9:3 on display.
+            from django.core.files.images import get_image_dimensions
+            width, height = get_image_dimensions(poster)
+
+            if width < 1200:
+                raise forms.ValidationError(
+                    f"Poster image must be at least 1200px wide. Uploaded image is {width}px wide."
+                )
+
         return poster
 
 

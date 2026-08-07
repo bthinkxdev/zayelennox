@@ -10,7 +10,7 @@ from django.http import HttpRequest
 
 from cart.exceptions import CartItemNotFoundError, InsufficientStockError
 from cart.models import Cart, CartItem
-from cart.selectors import get_cart_for_request, get_cart_summary
+from cart.selectors import get_buy_now_cart_for_request, get_cart_for_request, get_cart_summary
 from catalog.models import Product, ProductVariant
 from catalog.selectors import get_variant_price
 from core.selectors import get_default_currency
@@ -55,13 +55,90 @@ def get_or_create_cart(*, request: HttpRequest) -> Cart:
         return Cart.objects.create(
             customer_profile=request.user.customer_profile,
             currency=currency,
+            is_buy_now=False,
         )
     cart = Cart.objects.create(
         session_key=request.session.session_key,
         currency=currency,
+        is_buy_now=False,
     )
     request.session["guest_cart_id"] = cart.pk
     return cart
+
+
+@transaction.atomic
+def get_or_create_buy_now_cart(*, request: HttpRequest) -> Cart:
+    """
+    Return the isolated single-item "Buy Now" cart for the request, creating one when missing.
+
+    This is a distinct ``Cart`` row from the persistent cart returned by
+    ``get_or_create_cart`` — Buy Now must never read from or write to the
+    customer's real cart, and vice versa. Deliberately does NOT set
+    ``request.session["guest_cart_id"]``, since that key is reserved for the
+    persistent guest cart merged on login (``merge_carts``).
+    """
+    if not request.session.session_key:
+        request.session.create()
+
+    existing = get_buy_now_cart_for_request(request=request)
+    if existing:
+        return existing
+
+    currency = get_default_currency()
+    if currency is None:
+        raise RuntimeError("No default currency configured.")
+
+    if request.user.is_authenticated and hasattr(request.user, "customer_profile"):
+        return Cart.objects.create(
+            customer_profile=request.user.customer_profile,
+            currency=currency,
+            is_buy_now=True,
+        )
+    return Cart.objects.create(
+        session_key=request.session.session_key,
+        currency=currency,
+        is_buy_now=True,
+    )
+
+
+@transaction.atomic
+def clear_cart(*, cart: Cart) -> None:
+    """Remove all line items from a cart without deleting the cart row itself."""
+    CartItem.objects.filter(cart=cart).delete()
+
+
+@transaction.atomic
+def set_buy_now_item(
+    *,
+    cart: Cart,
+    product: Product,
+    variant: Optional[ProductVariant] = None,
+    quantity: int = 1,
+) -> CartItem:
+    """
+    Replace the contents of a Buy Now cart with exactly one line item.
+
+    Buy Now always represents a single, current purchase intent — any item,
+    coupon, or delivery-charge state left over from a previous Buy Now click
+    is cleared first, so each click is a fresh, isolated selection
+    independent of both past Buy Now attempts and the persistent cart.
+    """
+    clear_cart(cart=cart)
+    if cart.coupon_code or cart.coupon_discount or cart.delivery_charge or cart.destination_city_id:
+        cart.coupon_code = ""
+        cart.coupon_discount = Decimal("0.00")
+        cart.delivery_charge = Decimal("0.00")
+        cart.destination_city = None
+        cart.save(
+            update_fields=[
+                "coupon_code",
+                "coupon_discount",
+                "delivery_charge",
+                "destination_city",
+                "updated_at",
+            ]
+        )
+    return add_to_cart(cart=cart, product=product, variant=variant, quantity=quantity, overwrite=True)
 
 
 @transaction.atomic
@@ -242,7 +319,7 @@ def toggle_wishlist(*, request: HttpRequest, product_id: int) -> bool:
 @transaction.atomic
 def merge_carts(*, guest_cart: Cart, user_profile) -> None:
     """Merge the guest cart items into the user's profile cart."""
-    user_cart = Cart.objects.filter(customer_profile=user_profile).first()
+    user_cart = Cart.objects.filter(customer_profile=user_profile, is_buy_now=False).first()
 
     if not user_cart:
         guest_cart.customer_profile = user_profile

@@ -11,7 +11,7 @@ from catalog.selectors import (
     get_recent_approved_reviews,
     get_root_categories,
 )
-from cms.selectors import get_hero_slides
+from cms.selectors import get_hero_slides, get_secondary_slides
 
 
 def build_section_context(
@@ -34,6 +34,7 @@ def build_section_context(
 
     builders = {
         "hero_slider": _hero_slider,
+        "secondary_banner": _secondary_banner,
         "shop_by_occasion": _empty,
         "shop_by_recipient": _empty,
         "shop_by_category": _shop_by_category,
@@ -65,6 +66,26 @@ def _rails(product_rails: dict[str, list] | None, key: str) -> list:
 def _hero_slider(config: dict[str, Any]) -> dict[str, Any]:
     """Prefer uploaded photo/video slides; fall back to legacy URL-based config."""
     slides = get_hero_slides()
+    if slides:
+        return {"slides": slides}
+
+    legacy_slides = config.get("slides") or []
+    fallback = [
+        {
+            "type": "image",
+            "src": slide.get("image") or slide.get("src") or "",
+            "poster": slide.get("poster") or "",
+            "title": slide.get("title") or "",
+        }
+        for slide in legacy_slides
+        if isinstance(slide, dict) and (slide.get("image") or slide.get("src"))
+    ]
+    return {"slides": fallback}
+
+
+def _secondary_banner(config: dict[str, Any]) -> dict[str, Any]:
+    """Prefer uploaded photo/video slides; fall back to legacy URL-based config."""
+    slides = get_secondary_slides()
     if slides:
         return {"slides": slides}
 

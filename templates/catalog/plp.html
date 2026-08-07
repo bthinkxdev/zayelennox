@@ -6,7 +6,7 @@
 {% block content %}
 <div class="container page-container plp-page jm-page">
   <div class="plp-toolbar jm-plp-toolbar">
-    <div class="jm-plp-toolbar__copy">
+    <div class="jm-plp-toolbar__copy" id="plp-toolbar-copy">
       <h1 class="section-title jm-page-title mb-0">{% if active_category %}{{ active_category.name }}{% else %}{% trans "Shop All" %}{% endif %}</h1>
       {% if plp.total_count %}<p class="section-subtitle jm-plp-count">{{ plp.total_count }} {% trans "products" %}</p>{% endif %}
     </div>

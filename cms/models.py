@@ -13,6 +13,7 @@ class HomepageSectionType(models.TextChoices):
     """Every homepage block type; add one enum value + one partial to extend."""
 
     HERO_SLIDER = "hero_slider", "Hero Slider"
+    SECONDARY_BANNER = "secondary_banner", "Secondary Banner"
     SHOP_BY_CATEGORY = "shop_by_category", "Shop by Category"
     FEATURED_PRODUCTS = "featured_products", "Featured Products"
     NEW_ARRIVALS = "new_arrivals", "New Arrivals"
@@ -123,6 +124,69 @@ class HeroSlide(TimeStampedModel):
 
     def __str__(self) -> str:
         return self.title or f"Hero slide #{self.pk}"
+
+    @property
+    def media_type(self) -> str:
+        return "video" if self.video else "image"
+
+    @property
+    def media_src(self) -> str:
+        if self.video:
+            return self.video.url
+        if self.image:
+            return self.image.url
+        return ""
+
+    @property
+    def poster_src(self) -> str:
+        return self.poster.url if self.poster else ""
+
+
+class SecondarySlide(TimeStampedModel):
+    """A single secondary banner slide (9:3 ratio) backed by an uploaded photo or video file."""
+
+    title = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="Title",
+        help_text="Shown over the banner when set. Also used as media alt text.",
+    )
+    image = models.ImageField(
+        upload_to="cms/secondary/images/",
+        blank=True,
+        verbose_name="Photo",
+        help_text="Photo slide. Ignored when a video is uploaded. Note: All banners should have the same resolution (9:3 ratio).",
+    )
+    video = models.FileField(
+        upload_to="cms/secondary/videos/",
+        blank=True,
+        verbose_name="Video",
+        validators=[FileExtensionValidator(["mp4", "webm", "ogg", "mov"])],
+        help_text="Video slide (mp4/webm). Takes priority over the photo.",
+    )
+    poster = models.ImageField(
+        upload_to="cms/secondary/posters/",
+        blank=True,
+        verbose_name="Video poster",
+        help_text="Still image shown while the video loads.",
+    )
+    display_order = models.PositiveIntegerField(
+        default=0, db_index=True, verbose_name="Display order"
+    )
+    is_active = models.BooleanField(default=True, db_index=True, verbose_name="Is active")
+
+    class Meta:
+        ordering = ["display_order", "id"]
+        verbose_name = "Secondary slide"
+        verbose_name_plural = "Secondary slides"
+        indexes = [
+            models.Index(
+                fields=["is_active", "display_order"], name="cms_secondary_active_ord_idx"
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.title or f"Secondary slide #{self.pk}"
 
     @property
     def media_type(self) -> str:

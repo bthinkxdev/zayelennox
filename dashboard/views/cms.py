@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
-from cms.models import BlogPost, FAQItem, HeroSlide, HomepageSection, Page, PolicyDocument
+from cms.models import (
+    BlogPost,
+    FAQItem,
+    HeroSlide,
+    HomepageSection,
+    Page,
+    PolicyDocument,
+    SecondarySlide,
+)
 from dashboard import forms
 from dashboard.views.base import (
     DashboardCreateView,
@@ -84,6 +92,43 @@ class HeroSlideDeleteView(DashboardDeleteView):
     nav_section = "heroslides"
     url_basename = "heroslide"
     singular_name = "Hero Slide"
+
+
+class SecondarySlideListView(DashboardListView):
+    model = SecondarySlide
+    nav_section = "secondaryslides"
+    url_basename = "secondaryslide"
+    singular_name = "Secondary Slide"
+    plural_name = "Secondary Slides"
+    columns = [
+        {"label": "Image", "name": "image", "type": "image"},
+        {"label": "Title", "name": "title"},
+        {"label": "Order", "name": "display_order"},
+        {"label": "Active", "name": "is_active", "type": "bool"},
+    ]
+
+
+class SecondarySlideCreateView(DashboardCreateView):
+    model = SecondarySlide
+    form_class = forms.SecondarySlideForm
+    nav_section = "secondaryslides"
+    url_basename = "secondaryslide"
+    singular_name = "Secondary Slide"
+
+
+class SecondarySlideUpdateView(DashboardUpdateView):
+    model = SecondarySlide
+    form_class = forms.SecondarySlideForm
+    nav_section = "secondaryslides"
+    url_basename = "secondaryslide"
+    singular_name = "Secondary Slide"
+
+
+class SecondarySlideDeleteView(DashboardDeleteView):
+    model = SecondarySlide
+    nav_section = "secondaryslides"
+    url_basename = "secondaryslide"
+    singular_name = "Secondary Slide"
 
 
 class BlogPostListView(DashboardListView):

@@ -56,7 +56,7 @@ def get_product_display_price(*, product: Product) -> Decimal:
 def _primary_image_prefetch() -> Prefetch:
     """
     Prefetch images ordered by primary status and display order.
-    
+
     Used by homepage rails, PLP, and search dropdowns.
     Returns all images ordered with the primary one first.
     Templates must use `.0` to get the best available image.
@@ -68,6 +68,20 @@ def _primary_image_prefetch() -> Prefetch:
     )
 
 
+def _variant_list_prefetch() -> Prefetch:
+    """
+    Prefetch variants ordered the same way as the PDP, exposed as `product.variant_list`.
+
+    Used anywhere `catalog/partials/product_card.html` is rendered so the
+    add-to-cart variant picker modal has the same option data as the PDP.
+    """
+    return Prefetch(
+        "variants",
+        queryset=ProductVariant.objects.order_by("variant_type", "name"),
+        to_attr="variant_list",
+    )
+
+
 def _homepage_rail_queryset(*, filters: Q) -> QuerySet[Product]:
     """Base queryset for a single homepage rail with shared optimizations."""
     approved = Q(reviews__moderation_status=ModerationStatus.APPROVED)
@@ -75,7 +89,7 @@ def _homepage_rail_queryset(*, filters: Q) -> QuerySet[Product]:
         Product.objects.filter(is_active=True)
         .filter(filters)
         .select_related("category", "brand")
-        .prefetch_related(_primary_image_prefetch())
+        .prefetch_related(_primary_image_prefetch(), _variant_list_prefetch())
         .only(*PLP_CARD_FIELDS)
         .annotate(
             average_rating=Avg("reviews__rating", filter=approved),
@@ -196,7 +210,7 @@ def get_plp_products(
     queryset = (
         Product.objects.filter(is_active=True)
         .select_related("category", "brand")
-        .prefetch_related(_primary_image_prefetch())
+        .prefetch_related(_primary_image_prefetch(), _variant_list_prefetch())
         .only(*PLP_CARD_FIELDS)
         .annotate(
             average_rating=Avg(
@@ -392,7 +406,7 @@ def get_recently_viewed(
     products = (
         Product.objects.filter(id__in=product_ids, is_active=True)
         .select_related("category", "brand")
-        .prefetch_related(_primary_image_prefetch())
+        .prefetch_related(_primary_image_prefetch(), _variant_list_prefetch())
         .only(*PLP_CARD_FIELDS)
     )
     product_map = {product.id: product for product in products}
@@ -454,10 +468,16 @@ def get_search_suggestions(*, query: str, limit: int = 8) -> dict[str, list]:
 
     brands = list(Brand.objects.filter(name__icontains=clean_query)[:5])
 
+    categories = list(
+        Category.objects.filter(is_active=True, name__icontains=clean_query)
+        .select_related("parent")
+        .order_by("name")[:5]
+    )
+
     return {
         "products": products,
         "brands": brands,
-        "categories": [],
+        "categories": categories,
         "equipment_types": [],
     }
 
@@ -507,7 +527,7 @@ def get_products_for_section_config(*, config: dict) -> list[Product]:
     limit = config.get("limit", HOMEPAGE_RAIL_LIMIT)
     return list(
         qs.select_related("category", "brand")
-        .prefetch_related(_primary_image_prefetch())
+        .prefetch_related(_primary_image_prefetch(), _variant_list_prefetch())
         .only(*PLP_CARD_FIELDS)
         .order_by("-created_at")[:limit]
     )
@@ -640,10 +660,10 @@ def get_related_products(*, product: Product, user: Optional[Any] = None, limit:
     products = list(
         Product.objects.filter(pk__in=explicit_ids, is_active=True)
         .select_related("category", "brand")
-        .prefetch_related(_primary_image_prefetch())
+        .prefetch_related(_primary_image_prefetch(), _variant_list_prefetch())
         .only(*PLP_CARD_FIELDS)
     )
-    
+
     #fallback to same category
     if len(products) < limit:
         needed = limit - len(products)
@@ -652,11 +672,11 @@ def get_related_products(*, product: Product, user: Optional[Any] = None, limit:
             Product.objects.filter(category=product.category, is_active=True)
             .exclude(pk__in=exclude_ids)
             .select_related("category", "brand")
-            .prefetch_related(_primary_image_prefetch())
+            .prefetch_related(_primary_image_prefetch(), _variant_list_prefetch())
             .only(*PLP_CARD_FIELDS)[:needed]
         )
         products.extend(list(cat_products))
-        
+
     #general active products fallback if still not enough
     if len(products) < limit:
         needed = limit - len(products)
@@ -665,7 +685,7 @@ def get_related_products(*, product: Product, user: Optional[Any] = None, limit:
             Product.objects.filter(is_active=True)
             .exclude(pk__in=exclude_ids)
             .select_related("category", "brand")
-            .prefetch_related(_primary_image_prefetch())
+            .prefetch_related(_primary_image_prefetch(), _variant_list_prefetch())
             .only(*PLP_CARD_FIELDS)[:needed]
         )
         products.extend(list(fallback_products))

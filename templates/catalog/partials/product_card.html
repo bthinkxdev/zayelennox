@@ -5,6 +5,7 @@
          data-product-url="{% url 'catalog:pdp' slug=product.slug %}"
          data-product-price="{% money_label product.display_price|default:product.base_price display_currency %}"
          data-product-stock="{% if product.is_in_stock %}{% trans 'In Stock' %}{% else %}{% trans 'Out of Stock' %}{% endif %}"
+         data-in-stock="{% if product.is_in_stock %}true{% else %}false{% endif %}"
          data-product-badge="{% if product.is_featured %}{% trans 'Featured' %}{% elif product.is_bestseller %}{% trans 'Bestseller' %}{% elif product.is_new_arrival %}{% trans 'New' %}{% endif %}"
          {% with img=product.primary_images.0 %}
          data-product-image="{% if img and img.image %}{{ img.image.url }}{% else %}{% static 'img/product-placeholder.svg' %}{% endif %}"
@@ -109,10 +110,24 @@
       {% csrf_token %}
       <input type="hidden" name="product_id" value="{{ product.pk }}">
       <input type="hidden" name="quantity" value="1">
-      <button type="submit" class="jm-product-card__atc" {% if not product.is_in_stock %}disabled{% endif %}>
+      <button type="submit" class="jm-product-card__atc"
+              {% if product.variant_list %}data-jm-variant-atc{% endif %}
+              {% if not product.is_in_stock %}disabled{% endif %}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
         <span>{% if product.is_in_stock %}{% trans "Add to Cart" %}{% else %}{% trans "Unavailable" %}{% endif %}</span>
       </button>
+      {% if product.variant_list %}
+      <template class="jm-variant-options-template"
+                data-price-url="{% url 'catalog:variant-price' product_id=product.pk %}"
+                data-currency-symbol="{{ display_currency.symbol }}">
+        <option value="">{% trans "Standard" %}</option>
+        {% for v in product.variant_list %}
+        <option value="{{ v.pk }}" data-price-delta="{{ v.price_delta|default:0 }}">
+          {{ v.name }}{% if v.price_delta %} (+{% money_label v.price_delta display_currency %}){% endif %}
+        </option>
+        {% endfor %}
+      </template>
+      {% endif %}
     </form>
     {% if cart_product_ids and product.pk in cart_product_ids %}
     <a href="{% url 'cart:page' %}" class="btn btn-outline-floward jm-product-card__atc jm-product-card__atc--in-cart mt-auto jm-dynamic-view-cart">

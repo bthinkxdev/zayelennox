@@ -256,6 +256,22 @@
     });
   }
 
+  // Submitting the header search form with an empty query (search button
+  // click, or pressing Enter with no suggestion highlighted) used to fall
+  // through to a plain GET and land on the "shop all" PLP page
+  // (/shop/?category=&q=). An empty search should just stay put instead.
+  document.querySelectorAll('form.jm-search').forEach(function (form) {
+    form.addEventListener('submit', function (event) {
+      var qInput = form.querySelector('input[name="q"]');
+      if (!qInput || !qInput.value.trim()) {
+        event.preventDefault();
+        if (qInput) {
+          qInput.focus();
+        }
+      }
+    });
+  });
+
   document.body.addEventListener('htmx:beforeRequest', function (event) {
     if (event.detail.elt && event.detail.elt.id === 'site-search-input') {
       var results = document.getElementById('search-suggestions');
@@ -638,8 +654,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (productId) productId.value = card.dataset.productId || '';
 
     var inCart = card.dataset.inCart === 'true';
+    var inStock = card.dataset.inStock === 'true';
     var qvCartForm = document.getElementById('jm-qv-cart');
     var qvViewCart = document.getElementById('jm-qv-view-cart');
+    var qvAddBtn = document.getElementById('jm-qv-add-btn');
+
+    if (qvAddBtn) {
+      qvAddBtn.disabled = !inStock;
+      qvAddBtn.textContent = inStock
+        ? (qvAddBtn.dataset.labelInStock || qvAddBtn.textContent)
+        : (qvAddBtn.dataset.labelOutStock || qvAddBtn.textContent);
+    }
+
     if (qvCartForm && qvViewCart) {
       if (inCart) {
         qvCartForm.classList.add('d-none');
@@ -649,6 +675,66 @@ document.addEventListener('DOMContentLoaded', () => {
         qvViewCart.classList.add('d-none');
       }
     }
+
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  }
+
+  function formatMoney(symbol, amount) {
+    var value = parseFloat(amount);
+    if (isNaN(value)) return '';
+    return (symbol ? symbol + ' ' : '') + value.toFixed(2).replace(/\.00$/, '');
+  }
+
+  function updateVariantModalPrice(select) {
+    var priceUrl = select.getAttribute('data-price-url');
+    var symbol = select.getAttribute('data-currency-symbol') || '';
+    var vid = select.value;
+
+    var variantIdInput = document.getElementById('jm-vm-variant-id');
+    if (variantIdInput) variantIdInput.value = vid;
+
+    if (!priceUrl) return;
+
+    var url = priceUrl + '?quantity=1' + (vid ? '&variant_id=' + vid : '');
+    fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var priceEl = document.getElementById('jm-vm-price');
+        if (priceEl) priceEl.textContent = formatMoney(symbol, data.price);
+      });
+  }
+
+  function openVariantModal(card, triggerBtn) {
+    var modalEl = document.getElementById('jmVariantModal');
+    if (!modalEl || !window.bootstrap) return;
+
+    var form = triggerBtn.closest('form');
+    var template = form ? form.querySelector('.jm-variant-options-template') : null;
+    if (!template) return;
+
+    var select = document.getElementById('jm-vm-variant-select');
+    var img = document.getElementById('jm-vm-image');
+    var title = document.getElementById('jmVariantModalTitle');
+    var productIdInput = document.getElementById('jm-vm-product-id');
+    var variantIdInput = document.getElementById('jm-vm-variant-id');
+    var submitBtn = document.getElementById('jm-vm-submit');
+
+    if (select) {
+      select.innerHTML = template.innerHTML;
+      select.setAttribute('data-price-url', template.getAttribute('data-price-url') || '');
+      select.setAttribute('data-currency-symbol', template.getAttribute('data-currency-symbol') || '');
+      select.value = '';
+    }
+    if (img) {
+      img.src = card.dataset.productImage || '';
+      img.alt = card.dataset.productName || '';
+    }
+    if (title) title.textContent = card.dataset.productName || '';
+    if (productIdInput) productIdInput.value = card.dataset.productId || '';
+    if (variantIdInput) variantIdInput.value = '';
+    if (submitBtn) submitBtn.disabled = card.dataset.inStock === 'false';
+
+    if (select) updateVariantModalPrice(select);
 
     bootstrap.Modal.getOrCreateInstance(modalEl).show();
   }
@@ -680,47 +766,32 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function initSearchCategoryDropdown() {
-    var root = document.querySelector('.jm-search__cat');
-    if (!root || root.dataset.jmCatReady === '1') return;
-    root.dataset.jmCatReady = '1';
-
-    var hidden = document.getElementById('jm-search-category');
-    var label = root.querySelector('.jm-search__cat-label');
-    var items = root.querySelectorAll('[data-jm-search-cat]');
-    var toggle = root.querySelector('[data-bs-toggle="dropdown"]');
-
-    items.forEach(function (item) {
-      item.addEventListener('click', function (event) {
-        event.preventDefault();
-        var value = item.getAttribute('value') || '';
-        var text = (item.textContent || '').trim();
-        if (hidden) hidden.value = value;
-        if (label) label.textContent = text;
-        items.forEach(function (el) {
-          var active = el === item;
-          el.classList.toggle('is-active', active);
-          el.setAttribute('aria-selected', active ? 'true' : 'false');
-        });
-        if (toggle && window.bootstrap && bootstrap.Dropdown) {
-          var instance = bootstrap.Dropdown.getInstance(toggle);
-          if (instance) instance.hide();
-        }
-      });
-    });
-  }
-
   document.addEventListener('click', function (event) {
     var qvBtn = event.target.closest('[data-jm-quick-view]');
     if (qvBtn) {
       var card = qvBtn.closest('.jm-product-card');
       if (card) openQuickView(card);
+      return;
+    }
+
+    var variantBtn = event.target.closest('[data-jm-variant-atc]');
+    if (variantBtn) {
+      var variantCard = variantBtn.closest('.jm-product-card');
+      if (variantCard) {
+        event.preventDefault();
+        openVariantModal(variantCard, variantBtn);
+      }
+    }
+  });
+
+  document.addEventListener('change', function (event) {
+    if (event.target && event.target.id === 'jm-vm-variant-select') {
+      updateVariantModalPrice(event.target);
     }
   });
 
   document.addEventListener('DOMContentLoaded', function () {
     initRailArrows(document);
-    initSearchCategoryDropdown();
   });
 
   document.body.addEventListener('htmx:afterSwap', function () {

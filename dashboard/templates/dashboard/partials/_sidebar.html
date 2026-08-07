@@ -98,6 +98,12 @@
       </a>
     </li>
     <li>
+      <a class="nav-link {% if nav_section == 'secondaryslides' %}active{% endif %}"
+        href="{% url 'dashboard:secondaryslide-list' %}">
+        <i class="ti ti-photo-plus"></i><span class="nav-text">Secondary Slides</span>
+      </a>
+    </li>
+    <li>
       <a class="nav-link {% if nav_section == 'blog' %}active{% endif %}" href="{% url 'dashboard:blogpost-list' %}">
         <i class="ti ti-article"></i><span class="nav-text">Blog</span>
       </a>

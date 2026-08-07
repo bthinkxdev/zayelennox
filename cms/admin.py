@@ -12,6 +12,7 @@ from cms.models import (
     HomepageSection,
     Page,
     PolicyDocument,
+    SecondarySlide,
 )
 
 
@@ -46,6 +47,21 @@ class HeroSlideAdmin(admin.ModelAdmin):
 
     @admin.display(description="Media")
     def media_type(self, obj: HeroSlide) -> str:
+        return obj.media_type
+
+
+@admin.register(SecondarySlide)
+class SecondarySlideAdmin(admin.ModelAdmin):
+    """Upload photo or video secondary banner slides (9:3 ratio); ordering via list_editable display_order."""
+
+    list_display = ("__str__", "media_type", "display_order", "is_active", "updated_at")
+    list_filter = ("is_active",)
+    list_editable = ("display_order", "is_active")
+    ordering = ("display_order", "id")
+    fields = ("title", "image", "video", "poster", "display_order", "is_active")
+
+    @admin.display(description="Media")
+    def media_type(self, obj: SecondarySlide) -> str:
         return obj.media_type
 
 
