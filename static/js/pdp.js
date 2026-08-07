@@ -1,10 +1,18 @@
 (function () {
-  var variantSelect = document.getElementById('variant-select');
-  if (variantSelect) {
-    variantSelect.addEventListener('change', function () {
-      var url = this.getAttribute('data-price-url');
-      var vid = this.value;
-      
+  var variantOptions = document.getElementById('pdp-variant-options');
+  if (variantOptions) {
+    variantOptions.addEventListener('click', function (event) {
+      var btn = event.target.closest('.jm-variant-option');
+      if (!btn || !variantOptions.contains(btn) || btn.disabled) return;
+
+      variantOptions.querySelectorAll('.jm-variant-option').forEach(function (b) {
+        b.classList.remove('is-selected');
+      });
+      btn.classList.add('is-selected');
+
+      var url = variantOptions.getAttribute('data-price-url');
+      var vid = btn.getAttribute('data-variant-id') || '';
+
       document.querySelectorAll('.pdp-variant-id-input').forEach(function(input) {
         input.value = vid;
       });
@@ -19,7 +27,7 @@
           var el = document.getElementById('pdp-price');
           var elSticky = document.getElementById('pdp-sticky-price');
           var retailContainer = document.getElementById('pdp-retail-price-container');
-          var symbol = variantSelect.getAttribute('data-currency-symbol') || '';
+          var symbol = variantOptions.getAttribute('data-currency-symbol') || '';
           var elPriceValue = document.getElementById('pdp-price-value');
           
           if (elPriceValue) {
@@ -48,7 +56,7 @@
             var viewGroup = document.getElementById('pdp-view-cart-group');
             var stickyAdd = document.getElementById('sticky-buy-form');
             var stickyView = document.getElementById('pdp-sticky-view-cart-btn');
-            
+
             if (data.is_in_cart) {
               if (addGroup) addGroup.classList.add('d-none');
               if (viewGroup) viewGroup.classList.remove('d-none');
@@ -61,6 +69,52 @@
               if (stickyView) stickyView.classList.add('d-none');
             }
           }
+
+          var inStock = data.is_in_stock === 'true';
+          var stock = parseInt(data.stock_quantity, 10);
+          if (isNaN(stock)) stock = 0;
+
+          var stockEl = document.querySelector('.jm-pdp-buybox__stock');
+          if (stockEl) {
+            stockEl.classList.toggle('is-in', inStock);
+            stockEl.classList.toggle('is-out', !inStock);
+            if (inStock) {
+              stockEl.textContent = 'In stock' + (stock ? ' · ' + stock : '');
+            } else {
+              stockEl.textContent = 'Out of stock';
+            }
+          }
+
+          var qtyStepperWrap = document.querySelector('.jm-pdp-qty');
+          if (qtyStepperWrap) qtyStepperWrap.classList.toggle('d-none', !inStock);
+
+          if (qtyInput) {
+            qtyInput.setAttribute('max', stock || 1);
+            if (inStock && parseInt(qtyInput.value, 10) > stock) {
+              qtyInput.value = stock || 1;
+              document.querySelectorAll('.pdp-qty-input').forEach(function (i) { i.value = qtyInput.value; });
+            }
+          }
+
+          var qtyLimitMsg = document.getElementById('pdp-qty-limit-msg');
+          if (qtyLimitMsg) {
+            var atLimit = inStock && qtyInput && parseInt(qtyInput.value, 10) >= stock;
+            qtyLimitMsg.classList.toggle('d-none', !atLimit);
+            qtyLimitMsg.textContent = 'Only ' + (stock || 1) + ' items available in stock.';
+          }
+
+          document.querySelectorAll(
+            '#buy-form button[type="submit"], #buy-now-form button[type="submit"], ' +
+            '#sticky-buy-form button[type="submit"], #sticky-buy-now-form button[type="submit"]'
+          ).forEach(function (btn) {
+            btn.disabled = !inStock;
+          });
+
+          var addLabelBtn = document.querySelector('#buy-form button[type="submit"]');
+          if (addLabelBtn) addLabelBtn.textContent = inStock ? 'Add to Cart' : 'Unavailable';
+
+          var stickyAddLabelBtn = document.querySelector('#sticky-buy-form button[type="submit"]');
+          if (stickyAddLabelBtn) stickyAddLabelBtn.textContent = inStock ? 'Add' : 'Unavailable';
         });
     });
   }

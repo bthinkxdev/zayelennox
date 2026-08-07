@@ -35,15 +35,15 @@
           <span id="pdp-price-value">{% money_label price_data.price display_currency %}</span>
         </p>
         <div class="jm-pdp-buybox__stock-wrap">
-          <p class="jm-pdp-buybox__stock {% if product.is_in_stock %}is-in{% else %}is-out{% endif %}">
-            {% if product.is_in_stock %}
-            {% trans "In stock" %}{% if product.stock_quantity %} · {{ product.stock_quantity }}{% endif %}
+          <p class="jm-pdp-buybox__stock {% if price_data.is_in_stock == "true" %}is-in{% else %}is-out{% endif %}">
+            {% if price_data.is_in_stock == "true" %}
+            {% trans "In stock" %}{% if resolved_stock %} · {{ resolved_stock }}{% endif %}
             {% else %}
             {% trans "Out of stock" %}
             {% endif %}
           </p>
-          {% if product.is_in_stock %}
-          <div id="pdp-qty-limit-msg" class="text-danger small mt-1 {% if not cart_item or cart_item.quantity < product.stock_quantity %}d-none{% endif %}">{% trans "Only" %} {{ product.stock_quantity|default:1 }} {% trans "items available in stock." %}</div>
+          {% if price_data.is_in_stock == "true" %}
+          <div id="pdp-qty-limit-msg" class="text-danger small mt-1 {% if not cart_item or cart_item.quantity < resolved_stock %}d-none{% endif %}">{% trans "Only" %} {{ resolved_stock|default:1 }} {% trans "items available in stock." %}</div>
           {% endif %}
         </div>
       </div>
@@ -52,18 +52,35 @@
 
         {% if product.variant_list %}
         <div class="jm-pdp-field">
-          <label class="jm-pdp-field__label" for="variant-select">{% trans "Option" %}</label>
-          <select id="variant-select" 
-                  class="form-select jm-pdp-select"
-                  data-price-url="{% url 'catalog:variant-price' product_id=product.pk %}"
-                  data-currency-symbol="{{ display_currency.symbol }}">
-            <option value="">{% trans "Standard" %}</option>
+          <label class="jm-pdp-field__label">{% trans "Option" %}</label>
+          <div id="pdp-variant-options" class="jm-vm__options jm-pdp-variant-options"
+               data-price-url="{% url 'catalog:variant-price' product_id=product.pk %}"
+               data-currency-symbol="{{ display_currency.symbol }}">
             {% for v in product.variant_list %}
-            <option value="{{ v.pk }}" data-price-delta="{{ v.price_delta|default:0 }}">
-              {{ v.name }}{% if v.price_delta %} (+{% money_label v.price_delta display_currency %}){% endif %}
-            </option>
+            {% with v_price=product.base_price|decimal_add:v.price_delta v_mrp=product.mrp|decimal_add:v.price_delta %}
+            {% with v_discount=v_mrp|discount_percent:v_price %}
+            <button type="button"
+                    class="jm-variant-option{% if v.stock_quantity <= 0 %} jm-variant-option--oos{% endif %}{% if v.pk == selected_variant_id %} is-selected{% endif %}"
+                    data-variant-id="{{ v.pk }}"
+                    data-variant-name="{{ v.name }}"
+                    data-variant-type="{{ v.variant_type }}"
+                    data-price="{{ v_price }}"
+                    data-mrp="{{ v_mrp }}"
+                    data-discount="{{ v_discount }}"
+                    data-stock="{{ v.stock_quantity }}"
+                    data-in-stock="{% if v.stock_quantity > 0 %}true{% else %}false{% endif %}"
+                    {% if v.stock_quantity <= 0 %}disabled{% endif %}>
+              <span class="jm-variant-option__name">{{ v.name }}</span>
+              {% if v_discount > 0 %}<span class="jm-variant-option__discount">{{ v_discount }}% {% trans "OFF" %}</span>{% endif %}
+              <span class="jm-variant-option__price">
+                {% money_label v_price display_currency %}{% if v_discount > 0 %}<span class="jm-variant-option__mrp">{% money_label v_mrp display_currency %}</span>{% endif %}
+              </span>
+              {% if v.stock_quantity <= 0 %}<span class="jm-variant-option__oos-label">{% trans "Out of stock" %}</span>{% endif %}
+            </button>
+            {% endwith %}
+            {% endwith %}
             {% endfor %}
-          </select>
+          </div>
         </div>
         {% endif %}
 
@@ -80,13 +97,13 @@
 
         <div id="pdp-add-to-cart-group"
           class="jm-pdp-buybox__row {% if is_in_cart %}d-none{% endif %}">
-          {% if product.is_in_stock %}
+          {% if price_data.is_in_stock == "true" %}
           <div class="qty-stepper jm-pdp-qty" aria-label="{% trans 'Quantity' %}">
             <button class="qty-stepper__btn" type="button"
               onclick="let inp = document.getElementById('pdp-qty'); let msg = document.getElementById('pdp-qty-limit-msg'); if(inp.value > 1) { inp.value = parseInt(inp.value) - 1; document.querySelectorAll('.pdp-qty-input').forEach(i => i.value = inp.value); } if(msg) msg.classList.add('d-none');"
               aria-label="{% trans 'Decrease quantity' %}">&minus;</button>
             <input type="number" id="pdp-qty" class="qty-stepper__value pdp-qty-input"
-              value="{{ cart_item.quantity|default:1 }}" min="1" max="{{ product.stock_quantity|default:1 }}" readonly aria-label="{% trans 'Quantity' %}">
+              value="{{ cart_item.quantity|default:1 }}" min="1" max="{{ resolved_stock|default:1 }}" readonly aria-label="{% trans 'Quantity' %}">
             <button class="qty-stepper__btn" type="button"
               onclick="let inp = document.getElementById('pdp-qty'); let max = parseInt(inp.getAttribute('max'), 10) || 1; let msg = document.getElementById('pdp-qty-limit-msg'); if(parseInt(inp.value, 10) < max) { inp.value = parseInt(inp.value, 10) + 1; document.querySelectorAll('.pdp-qty-input').forEach(i => i.value = inp.value); } if(msg) msg.classList.toggle('d-none', parseInt(inp.value, 10) < max);"
               aria-label="{% trans 'Increase quantity' %}">&plus;</button>
@@ -99,8 +116,8 @@
             <input type="hidden" name="product_id" value="{{ product.pk }}">
             <input type="hidden" name="quantity" class="pdp-qty-input" value="{{ cart_item.quantity|default:1 }}">
             <input type="hidden" name="variant_id" class="pdp-variant-id-input" value="{{ selected_variant_id }}">
-            <button type="submit" class="btn btn-outline-floward w-100 jm-pdp-btn" {% if not product.is_in_stock %}disabled{% endif %}>
-              {% if product.is_in_stock %}{% trans "Add to Cart" %}{% else %}{% trans "Unavailable" %}{% endif %}
+            <button type="submit" class="btn btn-outline-floward w-100 jm-pdp-btn" {% if price_data.is_in_stock != "true" %}disabled{% endif %}>
+              {% if price_data.is_in_stock == "true" %}{% trans "Add to Cart" %}{% else %}{% trans "Unavailable" %}{% endif %}
             </button>
           </form>
 
@@ -156,7 +173,7 @@
             <input type="hidden" name="product_id" value="{{ product.pk }}">
             <input type="hidden" name="quantity" class="pdp-qty-input" value="{{ cart_item.quantity|default:1 }}">
             <input type="hidden" name="variant_id" class="pdp-variant-id-input" value="{{ selected_variant_id }}">
-            <button type="submit" name="buy_now" value="true" class="btn btn-floward w-100 jm-pdp-btn jm-pdp-btn--primary" {% if not product.is_in_stock %}disabled{% endif %}>
+            <button type="submit" name="buy_now" value="true" class="btn btn-floward w-100 jm-pdp-btn jm-pdp-btn--primary" {% if price_data.is_in_stock != "true" %}disabled{% endif %}>
               {% trans "Buy Now" %}
             </button>
           </form>
@@ -177,7 +194,7 @@
         <input type="hidden" name="product_id" value="{{ product.pk }}">
         <input type="hidden" name="quantity" class="pdp-qty-input" value="{{ cart_item.quantity|default:1 }}">
         <input type="hidden" name="variant_id" class="pdp-variant-id-input" value="{{ selected_variant_id }}">
-        <button type="submit" class="btn btn-outline-floward jm-pdp-sticky__btn" {% if not product.is_in_stock %}disabled{% endif %}>{% if product.is_in_stock %}{% trans "Add" %}{% else %}{% trans "Unavailable" %}{% endif %}</button>
+        <button type="submit" class="btn btn-outline-floward jm-pdp-sticky__btn" {% if price_data.is_in_stock != "true" %}disabled{% endif %}>{% if price_data.is_in_stock == "true" %}{% trans "Add" %}{% else %}{% trans "Unavailable" %}{% endif %}</button>
       </form>
 
       <div id="pdp-sticky-view-cart-btn" class="jm-pdp-sticky__atc {% if not is_in_cart %}d-none{% endif %}">
@@ -191,7 +208,7 @@
         <input type="hidden" name="product_id" value="{{ product.pk }}">
         <input type="hidden" name="quantity" class="pdp-qty-input" value="{{ cart_item.quantity|default:1 }}">
         <input type="hidden" name="variant_id" class="pdp-variant-id-input" value="{{ selected_variant_id }}">
-        <button type="submit" name="buy_now" value="true" class="btn btn-floward jm-pdp-sticky__btn" {% if not product.is_in_stock %}disabled{% endif %}>{% trans "Buy Now" %}</button>
+        <button type="submit" name="buy_now" value="true" class="btn btn-floward jm-pdp-sticky__btn" {% if price_data.is_in_stock != "true" %}disabled{% endif %}>{% trans "Buy Now" %}</button>
       </form>
     </div>
 
@@ -335,7 +352,7 @@
       const qtyInput = elt.querySelector(".pdp-qty-input");
       if (qtyInput) {
         const qty = parseInt(qtyInput.value, 10);
-        const maxStock = parseInt("{{ product.stock_quantity|default:0 }}", 10);
+        const maxStock = parseInt("{{ resolved_stock|default:0 }}", 10);
         if (maxStock > 0 && qty > maxStock) {
           e.preventDefault();
           e.stopImmediatePropagation();

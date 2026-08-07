@@ -294,9 +294,9 @@
     <h5 class="offcanvas-title" id="cartOffcanvasLabel">{% trans "Your Cart" %}</h5>
     <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="{% trans 'Close' %}"></button>
   </div>
-  <div class="offcanvas-body" id="cart-drawer-body" 
+  <div class="offcanvas-body" id="cart-drawer-body"
       hx-get="{% url 'cart:drawer' %}"
-      hx-trigger="cartItemAdded from:body, cartUpdated from:body" 
+      hx-trigger="load, cartItemAdded from:body, cartUpdated from:body"
       hx-swap="innerHTML">
     <p class="text-muted small mb-0">{% trans "Your cart items will appear here." %}</p>
   </div>
@@ -335,34 +335,36 @@
   </div>
 </div>
 
-<div class="modal fade" id="jmVariantModal" tabindex="-1" aria-labelledby="jmVariantModalTitle" aria-hidden="true">
+<div class="modal fade" id="jmVariantModal" tabindex="-1" aria-labelledby="jmVariantModalHeading" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content jm-qv">
       <button type="button" class="btn-close jm-qv__close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
-      <div class="jm-qv__grid">
-        <div class="jm-qv__media">
-          <img id="jm-vm-image" src="" alt="">
+      <div class="jm-vm__body">
+        <h3 class="jm-qv__title mb-1" id="jmVariantModalHeading">{% trans "Select variant" %}</h3>
+        <p class="jm-vm__subtitle" id="jm-vm-subtitle"></p>
+
+        <div class="jm-vm__options" id="jm-vm-options"></div>
+
+        <hr class="jm-vm__divider">
+
+        <h4 class="jm-vm__summary-title" id="jmVariantModalTitle"></h4>
+        <div class="jm-vm__summary-price">
+          <span class="jm-vm__summary-discount" id="jm-vm-discount"></span>
+          <span class="jm-vm__summary-current" id="jm-vm-price"></span>
+          <span class="jm-vm__summary-mrp" id="jm-vm-mrp"></span>
         </div>
-        <div class="jm-qv__body">
-          <h3 class="jm-qv__title" id="jmVariantModalTitle"></h3>
-          <p class="jm-qv__price" id="jm-vm-price"></p>
-          <div class="jm-pdp-field jm-variant-modal__field">
-            <label class="jm-pdp-field__label" for="jm-vm-variant-select">{% trans "Option" %}</label>
-            <select id="jm-vm-variant-select" class="form-select jm-pdp-select"></select>
-          </div>
-          <div class="jm-qv__actions">
-            <form id="jm-vm-cart-form" method="post" action="{% url 'cart:add' %}"
-                  hx-post="{% url 'cart:add' %}" hx-target="#cart-drawer-body" hx-swap="innerHTML">
-              {% csrf_token %}
-              <input type="hidden" name="product_id" id="jm-vm-product-id" value="">
-              <input type="hidden" name="variant_id" id="jm-vm-variant-id" value="">
-              <input type="hidden" name="quantity" value="1">
-              <button type="submit" id="jm-vm-submit" class="btn btn-floward" data-bs-dismiss="modal">
-                {% trans "Add to Cart" %}
-              </button>
-            </form>
-          </div>
-        </div>
+        <p class="jm-vm__summary-stock" id="jm-vm-stock"></p>
+
+        <form id="jm-vm-cart-form" method="post" action="{% url 'cart:add' %}"
+              hx-post="{% url 'cart:add' %}" hx-target="#cart-drawer-body" hx-swap="innerHTML">
+          {% csrf_token %}
+          <input type="hidden" name="product_id" id="jm-vm-product-id" value="">
+          <input type="hidden" name="variant_id" id="jm-vm-variant-id" value="">
+          <input type="hidden" name="quantity" value="1">
+          <button type="submit" id="jm-vm-submit" class="btn btn-floward w-100" data-bs-dismiss="modal">
+            {% trans "Add to Cart" %}
+          </button>
+        </form>
       </div>
     </div>
   </div>

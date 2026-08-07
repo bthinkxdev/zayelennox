@@ -455,9 +455,11 @@ def edit_profile_view(request: HttpRequest) -> HttpResponse:
         initial.update({
             "address_line1": address.line1,
             "address_line2": address.line2,
-            "city_id": address.city_id,
+            "city_name": address.city_name,
+            "state_name": address.state_name,
+            "pincode": address.pincode,
         })
-        
+
     if request.method == "POST":
         form = CustomerProfileEditForm(request.POST, initial=initial)
         if form.is_valid():
@@ -467,21 +469,24 @@ def edit_profile_view(request: HttpRequest) -> HttpResponse:
                 request.user.first_name = parts[0]
                 request.user.last_name = parts[1] if len(parts) > 1 else ""
                 request.user.save(update_fields=["first_name", "last_name"])
-            
+
             profile.phone = form.cleaned_data["phone"]
             profile.save(update_fields=["phone", "updated_at"])
-            
+
             line1 = form.cleaned_data["address_line1"]
             if line1:
-                city_id = form.cleaned_data.get("city_id")
                 line2 = form.cleaned_data.get("address_line2", "")
-                
+                city_name = form.cleaned_data.get("city_name", "")
+                state_name = form.cleaned_data.get("state_name", "")
+                pincode = form.cleaned_data.get("pincode", "")
+
                 if address:
                     address.line1 = line1
                     address.line2 = line2
-                    if city_id:
-                        address.city_id = int(city_id)
-                    address.save(update_fields=["line1", "line2", "city_id", "updated_at"])
+                    address.city_name = city_name
+                    address.state_name = state_name
+                    address.pincode = pincode
+                    address.save(update_fields=["line1", "line2", "city_name", "state_name", "pincode", "updated_at"])
                 else:
                     from accounts.models import Address
                     from accounts.services import set_default_address
@@ -489,11 +494,13 @@ def edit_profile_view(request: HttpRequest) -> HttpResponse:
                         customer_profile=profile,
                         line1=line1,
                         line2=line2,
-                        city_id=int(city_id) if city_id else None,
+                        city_name=city_name,
+                        state_name=state_name,
+                        pincode=pincode,
                         label="Default Address"
                     )
                     set_default_address(customer_profile=profile, address_id=new_addr.pk)
-                    
+
             from django.contrib import messages
             messages.success(request, "Profile updated successfully.")
             return redirect("accounts:dashboard")
@@ -795,6 +802,32 @@ def email_otp_request_view(request: HttpRequest) -> HttpResponse:
     return redirect(f"/accounts/verify-email-otp/?{query_params}")
 
 
+@require_POST
+def email_otp_resend_view(request: HttpRequest) -> HttpResponse:
+    """Resend the login OTP while staying on the verify-OTP page (AJAX).
+
+    Deliberately skips the image CAPTCHA: the user already cleared it once to
+    reach this page, and request_email_otp() already enforces its own
+    per-email rate limit (see OTP_RATE_LIMIT_MAX / _WINDOW in services.py),
+    so this endpoint can't be used to spam OTP emails without a CAPTCHA gate.
+    """
+    data = _json_body(request) or request.POST.dict()
+    email = (data.get("email") or "").strip()
+    purpose = data.get("purpose") or OTPPurpose.LOGIN
+
+    if not email:
+        return _error_response("Email is required.", status=400)
+
+    try:
+        request_email_otp(email=email, purpose=purpose)
+    except OTPRateLimitError as exc:
+        return _error_response(str(exc), status=429)
+    except Exception as exc:
+        return _error_response(f"Error generating OTP: {str(exc)}", status=400)
+
+    return _success_response({"message": "A new verification code has been sent to your email."})
+
+
 @require_http_methods(["GET", "POST"])
 def email_otp_verify_view(request: HttpRequest) -> HttpResponse:
     """Verify email 4-digit OTP for customer login."""
@@ -803,12 +836,27 @@ def email_otp_verify_view(request: HttpRequest) -> HttpResponse:
     next_url = request.GET.get("next") or request.POST.get("next", "")
 
     if request.method == "GET":
+        # If the user is already authenticated (e.g. they hit the back button
+        # after a successful OTP login), don't show the OTP form again -
+        # send them onward instead.
+        if request.user.is_authenticated:
+            from django.utils.http import url_has_allowed_host_and_scheme
+            if next_url and url_has_allowed_host_and_scheme(url=next_url, allowed_hosts={request.get_host()}):
+                return redirect(next_url)
+            return redirect("cms:homepage")
+
         form = EmailOTPVerifyForm(initial={"email": email})
-        return render(
-            request, 
-            "accounts/email_otp_verify.html", 
+        response = render(
+            request,
+            "accounts/email_otp_verify.html",
             {"form": form, "email": email, "purpose": purpose, "next": next_url}
         )
+        # Prevent the browser from serving this page out of the back/forward
+        # cache after login succeeds and navigates away - force a fresh
+        # request so the is_authenticated check above can run again.
+        response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response["Pragma"] = "no-cache"
+        return response
 
     data = _json_body(request) or request.POST.dict()
     form = EmailOTPVerifyForm(data)
@@ -838,9 +886,18 @@ def email_otp_verify_view(request: HttpRequest) -> HttpResponse:
 
     if next_url:
         from django.utils.http import url_has_allowed_host_and_scheme
-        if url_has_allowed_host_and_scheme(url=next_url, allowed_hosts={request.get_host()}):
+        from urllib.parse import urlparse
+        # Guard against next_url looping back into the login/OTP/register flow
+        # itself (e.g. a stale "next" captured while already on this page),
+        # which would otherwise strand the user on the OTP form post-login.
+        parsed_next = urlparse(next_url)
+        loops_into_auth_flow = any(
+            path in parsed_next.path
+            for path in ("/accounts/login/", "/accounts/verify-email-otp/", "/accounts/register/")
+        )
+        if not loops_into_auth_flow and url_has_allowed_host_and_scheme(url=next_url, allowed_hosts={request.get_host()}):
             return redirect(next_url)
-    return redirect("accounts:dashboard")
+    return redirect("cms:homepage")
 
 
 @require_http_methods(["GET"])

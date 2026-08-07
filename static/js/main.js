@@ -685,23 +685,73 @@ document.addEventListener('DOMContentLoaded', () => {
     return (symbol ? symbol + ' ' : '') + value.toFixed(2).replace(/\.00$/, '');
   }
 
-  function updateVariantModalPrice(select) {
-    var priceUrl = select.getAttribute('data-price-url');
-    var symbol = select.getAttribute('data-currency-symbol') || '';
-    var vid = select.value;
-
+  // Renders the selected-variant summary (name, price, discount, stock) in
+  // the variant picker modal and syncs the hidden variant_id/submit state.
+  function renderVariantSummary(opts) {
+    var titleEl = document.getElementById('jmVariantModalTitle');
+    var subtitleEl = document.getElementById('jm-vm-subtitle');
+    var priceEl = document.getElementById('jm-vm-price');
+    var mrpEl = document.getElementById('jm-vm-mrp');
+    var discountEl = document.getElementById('jm-vm-discount');
+    var stockEl = document.getElementById('jm-vm-stock');
+    var submitBtn = document.getElementById('jm-vm-submit');
     var variantIdInput = document.getElementById('jm-vm-variant-id');
-    if (variantIdInput) variantIdInput.value = vid;
 
-    if (!priceUrl) return;
+    if (titleEl) titleEl.textContent = opts.productName || '';
 
-    var url = priceUrl + '?quantity=1' + (vid ? '&variant_id=' + vid : '');
-    fetch(url)
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        var priceEl = document.getElementById('jm-vm-price');
-        if (priceEl) priceEl.textContent = formatMoney(symbol, data.price);
-      });
+    if (subtitleEl) {
+      var typeLabel = opts.variantType
+        ? opts.variantType.charAt(0).toUpperCase() + opts.variantType.slice(1)
+        : 'Option';
+      subtitleEl.innerHTML = '';
+      subtitleEl.appendChild(document.createTextNode(typeLabel + ': '));
+      var strong = document.createElement('strong');
+      strong.textContent = opts.variantName || '';
+      subtitleEl.appendChild(strong);
+    }
+
+    if (priceEl) priceEl.textContent = formatMoney(opts.symbol, opts.price);
+
+    if (mrpEl) mrpEl.textContent = opts.discount > 0 ? formatMoney(opts.symbol, opts.mrp) : '';
+    if (discountEl) discountEl.textContent = opts.discount > 0 ? (opts.discount + '% OFF') : '';
+
+    if (stockEl) {
+      stockEl.classList.remove('is-low', 'is-ok');
+      if (!opts.inStock) {
+        stockEl.textContent = 'Out of stock';
+        stockEl.classList.add('is-low');
+      } else if (opts.stock > 0 && opts.stock <= 5) {
+        stockEl.textContent = 'Only ' + opts.stock + ' left';
+        stockEl.classList.add('is-low');
+      } else {
+        stockEl.textContent = 'In Stock';
+        stockEl.classList.add('is-ok');
+      }
+    }
+
+    if (variantIdInput) variantIdInput.value = opts.variantId || '';
+    if (submitBtn) submitBtn.disabled = !opts.inStock;
+  }
+
+  function selectVariantOption(optionsContainer, btn) {
+    if (!btn || btn.disabled) return;
+    optionsContainer.querySelectorAll('.jm-variant-option').forEach(function (b) {
+      b.classList.remove('is-selected');
+    });
+    btn.classList.add('is-selected');
+
+    renderVariantSummary({
+      variantId: btn.getAttribute('data-variant-id') || '',
+      variantName: btn.getAttribute('data-variant-name') || '',
+      variantType: btn.getAttribute('data-variant-type') || '',
+      price: btn.getAttribute('data-price') || '0',
+      mrp: btn.getAttribute('data-mrp') || '0',
+      discount: parseInt(btn.getAttribute('data-discount') || '0', 10),
+      stock: parseInt(btn.getAttribute('data-stock') || '0', 10),
+      inStock: btn.getAttribute('data-in-stock') === 'true',
+      symbol: optionsContainer.getAttribute('data-currency-symbol') || '',
+      productName: optionsContainer.getAttribute('data-product-name') || ''
+    });
   }
 
   function openVariantModal(card, triggerBtn) {
@@ -712,29 +762,45 @@ document.addEventListener('DOMContentLoaded', () => {
     var template = form ? form.querySelector('.jm-variant-options-template') : null;
     if (!template) return;
 
-    var select = document.getElementById('jm-vm-variant-select');
-    var img = document.getElementById('jm-vm-image');
-    var title = document.getElementById('jmVariantModalTitle');
+    var optionsContainer = document.getElementById('jm-vm-options');
     var productIdInput = document.getElementById('jm-vm-product-id');
-    var variantIdInput = document.getElementById('jm-vm-variant-id');
-    var submitBtn = document.getElementById('jm-vm-submit');
 
-    if (select) {
-      select.innerHTML = template.innerHTML;
-      select.setAttribute('data-price-url', template.getAttribute('data-price-url') || '');
-      select.setAttribute('data-currency-symbol', template.getAttribute('data-currency-symbol') || '');
-      select.value = '';
+    if (optionsContainer) {
+      optionsContainer.setAttribute('data-currency-symbol', template.getAttribute('data-currency-symbol') || '');
+      optionsContainer.setAttribute('data-product-name', template.getAttribute('data-product-name') || card.dataset.productName || '');
+      optionsContainer.innerHTML = '';
+      optionsContainer.appendChild(template.content.cloneNode(true));
     }
-    if (img) {
-      img.src = card.dataset.productImage || '';
-      img.alt = card.dataset.productName || '';
-    }
-    if (title) title.textContent = card.dataset.productName || '';
     if (productIdInput) productIdInput.value = card.dataset.productId || '';
-    if (variantIdInput) variantIdInput.value = '';
-    if (submitBtn) submitBtn.disabled = card.dataset.inStock === 'false';
 
-    if (select) updateVariantModalPrice(select);
+    if (optionsContainer) {
+      // Default to the cheapest in-stock option (falling back to the
+      // cheapest overall if none are in stock), matching the "From <price>"
+      // shown on the card and the PDP's default variant.
+      var optionButtons = optionsContainer.querySelectorAll('.jm-variant-option');
+      var defaultBtn = null;
+      var bestPrice = Infinity;
+      for (var i = 0; i < optionButtons.length; i++) {
+        if (optionButtons[i].getAttribute('data-in-stock') === 'true') {
+          var price = parseFloat(optionButtons[i].getAttribute('data-price')) || 0;
+          if (price < bestPrice) {
+            bestPrice = price;
+            defaultBtn = optionButtons[i];
+          }
+        }
+      }
+      if (!defaultBtn) {
+        bestPrice = Infinity;
+        for (var j = 0; j < optionButtons.length; j++) {
+          var anyPrice = parseFloat(optionButtons[j].getAttribute('data-price')) || 0;
+          if (anyPrice < bestPrice) {
+            bestPrice = anyPrice;
+            defaultBtn = optionButtons[j];
+          }
+        }
+      }
+      if (defaultBtn) selectVariantOption(optionsContainer, defaultBtn);
+    }
 
     bootstrap.Modal.getOrCreateInstance(modalEl).show();
   }
@@ -744,27 +810,84 @@ document.addEventListener('DOMContentLoaded', () => {
     svg.setAttribute('fill', filled ? 'currentColor' : 'none');
   }
 
+  // Remember the last known add/remove per product so we can correct stale
+  // wish-heart buttons on pages restored from the back/forward cache (see
+  // resyncWishlistButtonsFromStorage below). Keyed per-product-id rather
+  // than as one big blob so concurrent tabs can't clobber each other.
+  var WISHLIST_LS_PREFIX = 'jm:wishlist:';
+
+  function setWishlistLocalState(productId, added) {
+    try {
+      localStorage.setItem(WISHLIST_LS_PREFIX + productId, added ? '1' : '0');
+    } catch (e) {
+      // localStorage unavailable (private browsing etc.) - safe to ignore,
+      // this is only a best-effort correction for the bfcache case.
+    }
+  }
+
+  function getWishlistLocalState(productId) {
+    try {
+      var v = localStorage.getItem(WISHLIST_LS_PREFIX + productId);
+      return v === null ? null : v === '1';
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function applyWishButtonState(btn, active) {
+    btn.classList.toggle('is-active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    setWishFilled(btn.querySelector('svg'), active);
+  }
+
   function syncWishlistChrome(detail) {
     var added = !!(detail && detail.added);
     var productId = detail && detail.product_id != null ? String(detail.product_id) : '';
     if (!productId) return;
 
+    setWishlistLocalState(productId, added);
+
     document.querySelectorAll('.jm-product-card__wish').forEach(function (btn) {
       var form = btn.closest('form');
       var input = form ? form.querySelector('input[name="product_id"]') : null;
       if (!input || String(input.value) !== productId) return;
-      btn.classList.toggle('is-active', added);
-      btn.setAttribute('aria-pressed', added ? 'true' : 'false');
-      setWishFilled(btn.querySelector('svg'), added);
+      applyWishButtonState(btn, added);
     });
 
     document.querySelectorAll('[data-jm-wish-btn]').forEach(function (btn) {
       if (String(btn.getAttribute('data-product-id') || '') !== productId) return;
-      btn.classList.toggle('is-active', added);
-      btn.setAttribute('aria-pressed', added ? 'true' : 'false');
-      setWishFilled(btn.querySelector('svg'), added);
+      applyWishButtonState(btn, added);
     });
   }
+
+  
+  function resyncWishlistButtonsFromStorage() {
+    document.querySelectorAll('.jm-product-card__wish').forEach(function (btn) {
+      var form = btn.closest('form');
+      var input = form ? form.querySelector('input[name="product_id"]') : null;
+      var productId = input ? input.value : '';
+      if (!productId) return;
+      var stored = getWishlistLocalState(productId);
+      if (stored !== null) {
+        applyWishButtonState(btn, stored);
+      }
+    });
+
+    document.querySelectorAll('[data-jm-wish-btn]').forEach(function (btn) {
+      var productId = btn.getAttribute('data-product-id') || '';
+      if (!productId) return;
+      var stored = getWishlistLocalState(productId);
+      if (stored !== null) {
+        applyWishButtonState(btn, stored);
+      }
+    });
+  }
+
+  window.addEventListener('pageshow', function (event) {
+    if (event.persisted) {
+      resyncWishlistButtonsFromStorage();
+    }
+  });
 
   document.addEventListener('click', function (event) {
     var qvBtn = event.target.closest('[data-jm-quick-view]');
@@ -781,12 +904,15 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         openVariantModal(variantCard, variantBtn);
       }
+      return;
     }
-  });
 
-  document.addEventListener('change', function (event) {
-    if (event.target && event.target.id === 'jm-vm-variant-select') {
-      updateVariantModalPrice(event.target);
+    var variantOptionBtn = event.target.closest('.jm-variant-option');
+    if (variantOptionBtn) {
+      var optionsContainer = document.getElementById('jm-vm-options');
+      if (optionsContainer && optionsContainer.contains(variantOptionBtn)) {
+        selectVariantOption(optionsContainer, variantOptionBtn);
+      }
     }
   });
 
@@ -817,7 +943,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 gridItem.remove();
                 var gridInner = document.querySelector('.product-grid-inner');
                 if (gridInner && gridInner.children.length === 0) {
-                  window.location.reload();
+                  // Swap in the empty-wishlist state in place instead of a
+                  // full page reload, so there's no navigation/flash at all.
+                  var emptyTemplate = document.getElementById('wishlist-empty-template');
+                  if (emptyTemplate && emptyTemplate.content) {
+                    gridInner.replaceWith(emptyTemplate.content.cloneNode(true));
+                  } else {
+                    window.location.reload();
+                  }
                 }
               }, 300);
             }
@@ -891,11 +1024,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  window.addEventListener('pageshow', function (event) {
-    if (event.persisted) {
-      window.location.reload();
-    }
-  });
+  // Note: we deliberately do NOT force a full page.reload() here when a page
+  // is restored from the back/forward cache (event.persisted). Doing so
+  // causes a visible flash of the stale cached page followed by a reload on
+  // every browser back/forward navigation site-wide. The header/nav cart and
+  // wishlist count badges already refresh themselves via
+  // hx-trigger="... pageshow from:window", and resyncWishlistButtonsFromStorage
+  // (registered above) corrects any stale wish-heart button state on product
+  // cards - so a full reload is never needed here.
 })();
 
 /* Desert Star: sticky header offset + mobile trust auto-slide */

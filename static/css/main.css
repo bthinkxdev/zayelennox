@@ -4605,6 +4605,14 @@ body.mobile-search-open .jm-wa-float {
   line-height: 1.2;
 }
 
+.jm-product-card__from {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--jm-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .jm-product-card__cart {
   position: relative;
   z-index: 2;
@@ -5112,6 +5120,146 @@ body.mobile-search-open .jm-wa-float {
 
 .jm-variant-modal__field {
   margin-bottom: 1.25rem;
+}
+
+/* Variant picker modal (add-to-cart from PLP/homepage cards) - no image,
+   variants shown as selectable option cards instead of a <select>. */
+.jm-vm__body {
+  padding: 2rem 1.75rem;
+}
+
+.jm-vm__subtitle {
+  font-size: 0.8125rem;
+  color: var(--jm-slate);
+  margin: 0 0 1rem;
+}
+
+.jm-vm__subtitle strong {
+  color: var(--jm-ink);
+  font-weight: 700;
+}
+
+.jm-vm__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-bottom: 1.5rem;
+}
+
+.jm-variant-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  min-width: 92px;
+  padding: 0.6rem 0.85rem;
+  border: 1.5px solid var(--jm-border);
+  border-radius: var(--jm-radius);
+  background: var(--jm-white);
+  cursor: pointer;
+  transition: border-color var(--jm-transition), box-shadow var(--jm-transition);
+  text-align: left;
+}
+
+.jm-variant-option:hover:not(:disabled) {
+  border-color: var(--jm-accent);
+}
+
+.jm-variant-option.is-selected {
+  border-color: var(--jm-accent);
+  box-shadow: 0 0 0 1px var(--jm-accent);
+  background: var(--jm-accent-soft);
+}
+
+.jm-variant-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  background: var(--jm-surface);
+}
+
+.jm-variant-option__name {
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: var(--jm-ink);
+}
+
+.jm-variant-option__discount {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--jm-success);
+}
+
+.jm-variant-option__price {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--jm-ink);
+}
+
+.jm-variant-option__mrp {
+  font-size: 0.75rem;
+  color: var(--jm-muted);
+  text-decoration: line-through;
+  margin-left: 0.25rem;
+}
+
+.jm-variant-option__oos-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--jm-muted);
+}
+
+.jm-vm__divider {
+  border: none;
+  border-top: 1px solid var(--jm-border);
+  margin: 0 0 1.25rem;
+}
+
+.jm-vm__summary-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--jm-ink);
+  margin: 0 0 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.jm-vm__summary-price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.jm-vm__summary-discount {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--jm-success);
+}
+
+.jm-vm__summary-current {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--jm-ink);
+}
+
+.jm-vm__summary-mrp {
+  font-size: 0.9rem;
+  color: var(--jm-muted);
+  text-decoration: line-through;
+}
+
+.jm-vm__summary-stock {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  margin-bottom: 1.25rem;
+}
+
+.jm-vm__summary-stock.is-low {
+  color: #dc2626;
+}
+
+.jm-vm__summary-stock.is-ok {
+  color: var(--jm-success);
 }
 
 @media (max-width: 767.98px) {

@@ -60,11 +60,28 @@
               {% endif %}
             </div>
             
+            <div class="row g-2 mb-3">
+              <div class="col-md-6">
+                <label for="{{ form.city_name.id_for_label }}" class="form-label small fw-semibold">{% trans "City / Town" %}</label>
+                {{ form.city_name }}
+                {% if form.city_name.errors %}
+                <div class="text-danger small mt-1">{{ form.city_name.errors.0 }}</div>
+                {% endif %}
+              </div>
+              <div class="col-md-6">
+                <label for="{{ form.state_name.id_for_label }}" class="form-label small fw-semibold">{% trans "State" %}</label>
+                {{ form.state_name }}
+                {% if form.state_name.errors %}
+                <div class="text-danger small mt-1">{{ form.state_name.errors.0 }}</div>
+                {% endif %}
+              </div>
+            </div>
+
             <div class="mb-4">
-              <label for="{{ form.city_id.id_for_label }}" class="form-label small fw-semibold">{% trans "City" %}</label>
-              {{ form.city_id }}
-              {% if form.city_id.errors %}
-              <div class="text-danger small mt-1">{{ form.city_id.errors.0 }}</div>
+              <label for="{{ form.pincode.id_for_label }}" class="form-label small fw-semibold">{% trans "Pincode" %}</label>
+              {{ form.pincode }}
+              {% if form.pincode.errors %}
+              <div class="text-danger small mt-1">{{ form.pincode.errors.0 }}</div>
               {% endif %}
             </div>
 
@@ -77,4 +94,23 @@
     </div>
   </div>
 </div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // Letters/symbols never make it into these fields - same behavior as checkout.
+    ['{{ form.phone.id_for_label }}', '{{ form.pincode.id_for_label }}'].forEach(function (fieldId) {
+      var el = document.getElementById(fieldId);
+      if (!el) return;
+      ['input', 'keyup', 'change'].forEach(function (evtName) {
+        el.addEventListener(evtName, function (e) {
+          var cleaned = e.target.value.replace(/\D/g, '');
+          if (cleaned !== e.target.value) e.target.value = cleaned;
+        });
+      });
+      el.addEventListener('keypress', function (e) {
+        if (e.key && !/\d/.test(e.key)) e.preventDefault();
+      });
+    });
+  });
+</script>
 {% endblock %}

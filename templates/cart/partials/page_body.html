@@ -27,10 +27,10 @@
               <span class="fw-semibold flex-shrink-0">{{ display_currency.symbol }} {{ line.line_subtotal }}</span>
             </div>
             {% if line.variant %}<div class="cart-line__meta">{{ line.variant.name }}</div>{% endif %}
-            {% if not line.product.is_in_stock %}
+            {% if not line.is_in_stock %}
             <div class="text-danger small mt-1">{% trans "Out of stock" %}</div>
-            {% elif line.quantity > line.product.stock_quantity %}
-            <div class="text-danger small mt-1">{% trans "Only" %} {{ line.product.stock_quantity }} {% trans "items available in stock." %}</div>
+            {% elif line.quantity > line.available_stock %}
+            <div class="text-danger small mt-1">{% trans "Only" %} {{ line.available_stock }} {% trans "items available in stock." %}</div>
             {% elif error_item_id == line.item.pk and error %}
             <div class="text-danger small mt-1">{{ error }}</div>
             {% endif %}

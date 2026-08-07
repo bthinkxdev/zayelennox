@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import re
+
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
-from recurring.models import RecurrenceFrequency 
+from recurring.models import RecurrenceFrequency
 from accounts.models import Address
+
+# Indian mobile numbers: 10 digits, first digit 6-9 (no STD/country code).
+INDIA_PHONE_RE = re.compile(r'^[6-9]\d{9}$')
+PINCODE_RE = re.compile(r'^[1-9][0-9]{5}$')
+ONLY_DIGITS_RE = re.compile(r'^\d+$')
 
 
 class EmailLoginForm(AuthenticationForm):
@@ -212,17 +219,68 @@ class EmailOTPVerifyForm(forms.Form):
     )
 
 class CustomerProfileEditForm(forms.Form):
-    """Form to edit retail customer profile and default address."""
-    
+    """
+    Form to edit retail customer profile and default address.
+
+    """
+
     name = forms.CharField(max_length=150, label="Full name", widget=forms.TextInput(attrs={"class": "form-control"}))
     email = forms.EmailField(label="Email", required=False, widget=forms.EmailInput(attrs={"class": "form-control", "readonly": True}))
-    phone = forms.CharField(max_length=20, label="Phone number", required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
-    
+    phone = forms.CharField(
+        max_length=20,
+        label="Phone number",
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "inputmode": "numeric", "maxlength": "10", "placeholder": "10-digit mobile number"}),
+    )
+
     address_line1 = forms.CharField(max_length=255, label="Address Line 1", required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
     address_line2 = forms.CharField(max_length=255, label="Address Line 2", required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
-    city_id = forms.ChoiceField(label="City", required=False, widget=forms.Select(attrs={"class": "form-select"}))
+    city_name = forms.CharField(max_length=120, label="City / Town", required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
+    state_name = forms.CharField(max_length=120, label="State", required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
+    pincode = forms.CharField(
+        max_length=10,
+        label="Pincode",
+        required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "inputmode": "numeric", "maxlength": "6"}),
+    )
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        from delivery.models import City
-        self.fields["city_id"].choices = [("", "Select City")] + [(c.pk, c.name) for c in City.objects.filter(is_active=True)]
+    def clean_name(self):
+        name = (self.cleaned_data.get("name") or "").strip()
+        if name and ONLY_DIGITS_RE.match(name):
+            raise forms.ValidationError("Name cannot be only numbers.")
+        return name
+
+    def clean_phone(self):
+        phone = (self.cleaned_data.get("phone") or "").strip()
+        if not phone:
+            return phone
+        if not ONLY_DIGITS_RE.match(phone):
+            raise forms.ValidationError("Phone number can only contain numbers.")
+        if not INDIA_PHONE_RE.match(phone):
+            raise forms.ValidationError("Enter a valid 10-digit Indian mobile number (must start with 6-9).")
+        return phone
+
+    def clean_address_line1(self):
+        line1 = (self.cleaned_data.get("address_line1") or "").strip()
+        if line1 and ONLY_DIGITS_RE.match(line1):
+            raise forms.ValidationError("Address Line 1 cannot be only numbers.")
+        return line1
+
+    def clean_pincode(self):
+        pincode = (self.cleaned_data.get("pincode") or "").strip()
+        if pincode and not PINCODE_RE.match(pincode):
+            raise forms.ValidationError("Enter a valid 6-digit pincode.")
+        return pincode
+
+    def clean(self):
+        cleaned = super().clean()
+        # If the customer is entering/editing a default address, require the
+        # rest of it too - mirrors checkout's delivery-detail validation.
+        if cleaned.get("address_line1"):
+            if not cleaned.get("city_name"):
+                self.add_error("city_name", "City is required.")
+            if not cleaned.get("state_name"):
+                self.add_error("state_name", "State is required.")
+            if not cleaned.get("pincode"):
+                self.add_error("pincode", "Pincode is required.")
+        return cleaned

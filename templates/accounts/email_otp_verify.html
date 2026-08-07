@@ -86,6 +86,7 @@
             <a href="javascript:void(0);" id="resend-btn" class="btn btn-link btn-resend-link small fw-bold text-decoration-none d-none">
               {% trans "Resend Code" %}
             </a>
+            <div id="resend-feedback" class="small mt-2 d-none" role="status"></div>
           </div>
         </div>
       </div>
@@ -235,78 +236,108 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    var duration = 60; 
+    var duration = 60;
     var display = document.querySelector('#timer-display');
     var countdownWrapper = document.querySelector('#countdown-wrapper');
     var resendBtn = document.querySelector('#resend-btn');
-    
-    var timer = duration, minutes, seconds;
-    var interval = setInterval(function () {
-      minutes = parseInt(timer / 60, 10);
-      seconds = parseInt(timer % 60, 10);
+    var resendFeedback = document.querySelector('#resend-feedback');
+    var interval = null;
 
-      minutes = minutes < 10 ? "0" + minutes : minutes;
-      seconds = seconds < 10 ? "0" + seconds : seconds;
-
-      display.textContent = minutes + ":" + seconds;
-
-      if (--timer < 0) {
+    function startCountdown() {
+      var timer = duration, minutes, seconds;
+      countdownWrapper.classList.remove('d-none');
+      resendBtn.classList.add('d-none');
+      if (interval) {
         clearInterval(interval);
-        countdownWrapper.classList.add('d-none');
-        resendBtn.classList.remove('d-none');
       }
-    }, 1000);
+      interval = setInterval(function () {
+        minutes = parseInt(timer / 60, 10);
+        seconds = parseInt(timer % 60, 10);
+
+        minutes = minutes < 10 ? "0" + minutes : minutes;
+        seconds = seconds < 10 ? "0" + seconds : seconds;
+
+        display.textContent = minutes + ":" + seconds;
+
+        if (--timer < 0) {
+          clearInterval(interval);
+          countdownWrapper.classList.add('d-none');
+          resendBtn.classList.remove('d-none');
+        }
+      }, 1000);
+    }
+
+    function showResendFeedback(message, isError) {
+      resendFeedback.textContent = message;
+      resendFeedback.classList.remove('d-none', 'text-danger', 'text-success');
+      resendFeedback.classList.add(isError ? 'text-danger' : 'text-success');
+    }
+
+    startCountdown();
 
     resendBtn.addEventListener('click', function() {
-      var requestUrl = "{% url 'accounts:login-email-otp' %}";
-      if ("{{ next }}") {
-        requestUrl += "?next=" + encodeURIComponent("{{ next }}");
+      if (resendBtn.classList.contains('disabled')) {
+        return;
       }
+      resendBtn.classList.add('disabled');
+      resendFeedback.classList.add('d-none');
 
-      var form = document.createElement('form');
-      form.method = 'POST';
-      form.action = requestUrl;
-      
-      var csrfInput = document.createElement('input');
-      csrfInput.type = 'hidden';
-      csrfInput.name = 'csrfmiddlewaretoken';
-      csrfInput.value = '{{ csrf_token }}';
-      form.appendChild(csrfInput);
-
-      var emailInput = document.createElement('input');
-      emailInput.type = 'hidden';
-      emailInput.name = 'email';
-      emailInput.value = '{{ email }}';
-      form.appendChild(emailInput);
-
-      var pendingName = "{{ request.session.pending_customer_name|escapejs }}";
-      var nameInput = document.createElement('input');
-      nameInput.type = 'hidden';
-      nameInput.name = 'name';
-      nameInput.value = pendingName;
-      form.appendChild(nameInput);
-
-      if ("{{ next }}") {
-        var nextInput = document.createElement('input');
-        nextInput.type = 'hidden';
-        nextInput.name = 'next';
-        nextInput.value = '{{ next }}';
-        form.appendChild(nextInput);
-      }
-
-      document.body.appendChild(form);
-      form.submit();
+      fetch("{% url 'accounts:resend-email-otp' %}", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+          email: '{{ email|escapejs }}',
+          purpose: '{{ purpose|escapejs }}'
+        })
+      })
+        .then(function(res) {
+          return res.json().then(function(payload) {
+            return { ok: res.ok, payload: payload };
+          });
+        })
+        .then(function(result) {
+          resendBtn.classList.remove('disabled');
+          if (result.ok && result.payload.success) {
+            showResendFeedback(result.payload.message || "{% trans 'A new code has been sent to your email.' %}", false);
+            // Clear whatever was previously typed - the old code is now invalid.
+            if (hiddenOtpInput) {
+              hiddenOtpInput.value = '';
+            }
+            digitFields.forEach(function(field) {
+              field.value = '';
+              field.classList.remove('filled');
+            });
+            if (digitFields.length > 0) {
+              digitFields[0].focus();
+            }
+            startCountdown();
+          } else {
+            showResendFeedback(result.payload.message || "{% trans 'Could not resend the code. Please try again.' %}", true);
+            resendBtn.classList.remove('d-none');
+          }
+        })
+        .catch(function() {
+          resendBtn.classList.remove('disabled');
+          showResendFeedback("{% trans 'Could not resend the code. Please try again.' %}", true);
+        });
     });
 
     var hiddenOtpInput = document.querySelector('#id_otp_code');
     var digitFields = document.querySelectorAll('.otp-digit-field');
     var otpForm = document.querySelector('#otp-verify-form');
+    var hasOtpError = {% if form.non_field_errors or form.otp_code.errors %}true{% else %}false{% endif %};
 
-    if (digitFields.length > 0) {
-      digitFields[0].focus();
-    }
-
-    if (hiddenOtpInput && hiddenOtpInput.value) {
+    if (hasOtpError && hiddenOtpInput) {
+      hiddenOtpInput.value = '';
+      digitFields.forEach(function(field) {
+        field.value = '';
+        field.classList.remove('filled');
+      });
+    } else if (hiddenOtpInput && hiddenOtpInput.value) {
       var val = hiddenOtpInput.value.trim().substring(0, 4);
       for (var i = 0; i < val.length; i++) {
         if (digitFields[i]) {
@@ -314,6 +345,10 @@
           digitFields[i].classList.add('filled');
         }
       }
+    }
+
+    if (digitFields.length > 0) {
+      digitFields[0].focus();
     }
 
     function updateHiddenInput() {

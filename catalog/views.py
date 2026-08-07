@@ -185,15 +185,34 @@ def pdp_view(request: HttpRequest, slug: str) -> HttpResponse:
     from cart.selectors import get_cart_for_request
 
     cart = get_cart_for_request(request=request)
-    variant_id = request.GET.get("variant_id")
-    if variant_id and variant_id.isdigit():
-        cart_item = CartItem.objects.filter(cart=cart, product=product, variant_id=int(variant_id)).first() if cart else None
+    requested_variant_id = request.GET.get("variant_id")
+
+    # Once a product has variants, it's only sellable through one of them
+    
+    variant_list = list(getattr(product, "variant_list", None) or [])
+    resolved_variant_id: int | None = None
+    if requested_variant_id and requested_variant_id.isdigit():
+        candidate_id = int(requested_variant_id)
+        if any(v.pk == candidate_id for v in variant_list):
+            resolved_variant_id = candidate_id
+
+    if resolved_variant_id is None and variant_list:
+        in_stock_variants = [v for v in variant_list if v.stock_quantity > 0]
+        variant_pool = in_stock_variants or variant_list
+        default_variant = min(variant_pool, key=lambda v: v.price_delta)
+        resolved_variant_id = default_variant.pk
+
+    if resolved_variant_id is not None:
+        cart_item = CartItem.objects.filter(cart=cart, product=product, variant_id=resolved_variant_id).first() if cart else None
     else:
         cart_item = CartItem.objects.filter(cart=cart, product=product, variant__isnull=True).first() if cart else None
     is_in_cart = cart_item is not None
 
     quantity = cart_item.quantity if cart_item else 1
-    price_data = get_variant_price(product_id=product.pk, user=request.user, quantity=quantity)
+    price_data = get_variant_price(
+        product_id=product.pk, variant_id=resolved_variant_id, user=request.user, quantity=quantity
+    )
+    resolved_stock = int(price_data.get("stock_quantity", product.stock_quantity))
 
     reviews = getattr(product, "approved_reviews", [])
     review_count = len(reviews)
@@ -232,7 +251,8 @@ def pdp_view(request: HttpRequest, slug: str) -> HttpResponse:
             "whatsapp_number": site_settings.whatsapp_number,
             "is_in_cart": is_in_cart,
             "cart_item": cart_item,
-            "selected_variant_id": variant_id if variant_id and variant_id.isdigit() else "",
+            "selected_variant_id": resolved_variant_id or "",
+            "resolved_stock": resolved_stock,
             "is_in_wishlist": is_in_wishlist,
             "related_products": get_related_products(product=product, user=request.user),
             "has_delivered_order": has_delivered_order,

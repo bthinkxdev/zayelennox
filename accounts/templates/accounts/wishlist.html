@@ -8,7 +8,7 @@
   <h1 class="section-title jm-page-title">{% trans "My Wishlist" %}</h1>
 
   {% if items %}
-  <div class="row product-grid-inner g-3 justify-content-start">
+  <div class="row product-grid-inner g-3 justify-content-start" id="wishlist-grid">
     {% for item in items %}
     <div class="col-6 col-md-auto product-grid-item">
       <div class="wishlist-card h-100" style="width: 100%; max-width: 250px;">
@@ -18,10 +18,17 @@
     {% endfor %}
   </div>
   {% else %}
-  <div class="card border-0 p-4 text-center mx-auto" style="max-width: 500px;">
+  <div class="card border-0 p-4 text-center mx-auto" id="wishlist-empty-state" style="max-width: 500px;">
     <p class="mb-3 text-muted">{% trans "Your wishlist is empty." %}</p>
     <a href="{% url 'cms:homepage' %}" class="btn btn-floward">{% trans "Choose Products" %}</a>
   </div>
   {% endif %}
+
+  <template id="wishlist-empty-template">
+    <div class="card border-0 p-4 text-center mx-auto" id="wishlist-empty-state" style="max-width: 500px;">
+      <p class="mb-3 text-muted">{% trans "Your wishlist is empty." %}</p>
+      <a href="{% url 'cms:homepage' %}" class="btn btn-floward">{% trans "Choose Products" %}</a>
+    </div>
+  </template>
 </div>
 {% endblock %}

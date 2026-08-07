@@ -29,6 +29,7 @@ PLP_CARD_FIELDS: tuple[str, ...] = (
     "slug",
     "sku",
     "base_price",
+    "mrp",
     "color",
     "is_featured",
     "is_bestseller",
@@ -550,10 +551,16 @@ def get_variant_price(
     *, product_id: int, variant_id: int | None = None, user: Optional[Any] = None, quantity: int = 1
 ) -> dict[str, str]:
     """
-    Return computed price for a product/variant combination.
+    Return computed price + stock for a product/variant combination.
+
+    Once a product has variants, they're the only sellable units - the
+    product's own stock_quantity is a reference value only. If variant_id
+    doesn't resolve to a real variant on a product that has variants, the
+    result comes back not-in-stock (mirrors Product.is_in_stock /
+    CartSummaryLine.available_stock, which apply the same rule).
 
     Applies active flash sale pricing via marketing selector when applicable.
-    Query guarantee: 1–2 SELECTs on product/variant + 0–1 on flash sale.
+    Query guarantee: 2–3 SELECTs on product/variant(s) + 0–1 on flash sale.
     """
 
     product = Product.objects.get(pk=product_id, is_active=True)
@@ -561,11 +568,20 @@ def get_variant_price(
     #calculate retail price first
     retail_price = product.base_price
     resolved_variant_id = None
+    resolved_stock = product.stock_quantity
+    has_variants = ProductVariant.objects.filter(product=product).exists()
+
     if variant_id:
         variant = ProductVariant.objects.filter(pk=variant_id, product=product).first()
         if variant:
             retail_price = product.base_price + variant.price_delta
             resolved_variant_id = variant.pk
+            resolved_stock = variant.stock_quantity
+
+    if has_variants and resolved_variant_id is None:
+        # Product has variants but none was resolved (no variant_id passed,
+        # or an invalid one) - nothing is actually sellable in this state.
+        resolved_stock = 0
 
     from marketing.selectors import get_active_flash_sale_price
 
@@ -578,6 +594,8 @@ def get_variant_price(
         "retail_price": str(display_price),
         "variant_id": str(resolved_variant_id) if resolved_variant_id else "",
         "is_flash_sale": str(sale["is_flash_sale"]).lower(),
+        "stock_quantity": str(resolved_stock),
+        "is_in_stock": str(resolved_stock > 0).lower(),
     }
     if sale["is_flash_sale"]:
         result["original_price"] = str(sale["original_price"])

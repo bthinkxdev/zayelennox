@@ -246,7 +246,15 @@ class Product(TimeStampedModel):
 
     @property
     def is_in_stock(self) -> bool:
-        """True when aggregate product stock is available."""
+        """
+        True when the product can currently be sold.
+
+        """
+        variants = getattr(self, "variant_list", None)
+        if variants is None:
+            variants = list(self.variants.all())
+        if variants:
+            return any(v.stock_quantity > 0 for v in variants)
         return self.stock_quantity > 0
 
     @property

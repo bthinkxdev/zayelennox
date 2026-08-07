@@ -7,7 +7,7 @@ import re
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from django.http import Http404, HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
@@ -21,6 +21,73 @@ from checkout.services import create_checkout_session, place_order, update_check
 
 from payments.registry import PAYMENT_GATEWAYS
 from payments.services import process_payment
+
+# Indian mobile numbers: 10 digits, first digit 6-9 (no STD/country code).
+INDIA_PHONE_RE = re.compile(r'^[6-9]\d{9}$')
+PINCODE_RE = re.compile(r'^[1-9][0-9]{5}$')
+ONLY_DIGITS_RE = re.compile(r'^\d+$')
+
+
+def _validate_delivery_fields(
+    *,
+    name: str,
+    phone: str,
+    address_line1: str,
+    city_name: str,
+    state_name: str,
+    pincode: str,
+    email: str | None = None,
+    require_email: bool = False,
+) -> dict[str, list[str]]:
+    """
+    Shared delivery-detail validation for checkout (guest, authenticated new
+    address, and editing an existing saved address).
+
+    """
+    errors: dict[str, list[str]] = {}
+
+    name = (name or "").strip()
+    if not name:
+        errors["guest_name"] = ["Name is required."]
+    elif ONLY_DIGITS_RE.match(name):
+        errors["guest_name"] = ["Name cannot be only numbers."]
+
+    if require_email:
+        email = (email or "").strip()
+        if not email:
+            errors["guest_email"] = ["Email is required."]
+        else:
+            try:
+                validate_email(email)
+            except ValidationError:
+                errors["guest_email"] = ["Enter a valid email address."]
+
+    phone = (phone or "").strip()
+    if not phone:
+        errors["guest_phone"] = ["Phone is required."]
+    elif not ONLY_DIGITS_RE.match(phone):
+        errors["guest_phone"] = ["Phone number can only contain numbers."]
+    elif not INDIA_PHONE_RE.match(phone):
+        errors["guest_phone"] = ["Enter a valid 10-digit Indian mobile number (must start with 6-9)."]
+
+    address_line1 = (address_line1 or "").strip()
+    if not address_line1:
+        errors["guest_address_line1"] = ["Address Line 1 is required."]
+    elif ONLY_DIGITS_RE.match(address_line1):
+        errors["guest_address_line1"] = ["Address Line 1 cannot be only numbers."]
+
+    if not (city_name or "").strip():
+        errors["guest_city_name"] = ["City is required."]
+    if not (state_name or "").strip():
+        errors["guest_state_name"] = ["State is required."]
+
+    pincode = (pincode or "").strip()
+    if not pincode:
+        errors["guest_pincode"] = ["Pincode is required."]
+    elif not PINCODE_RE.match(pincode):
+        errors["guest_pincode"] = ["Enter a valid 6-digit pincode."]
+
+    return errors
 
 
 def _is_buy_now_request(request: HttpRequest) -> bool:
@@ -72,12 +139,9 @@ def checkout_view(request: HttpRequest) -> HttpResponse:
 
     addresses = []
     if profile:
-        from accounts.models import Address
-        dashboard_address = profile.default_address
-        if not dashboard_address:
-            dashboard_address = Address.objects.select_related("city").filter(customer_profile=profile).first()
-        if dashboard_address:
-            addresses = [dashboard_address]
+        # Show every saved address as a choice, not just the default/first one
+        # (get_saved_addresses already orders default-first, then newest).
+        addresses = get_saved_addresses(customer_profile=profile)["results"]
 
     selected_gateway_key = None
     if session.order:
@@ -161,33 +225,16 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
             guest_state_name = request.POST.get("guest_state_name", "").strip()
             guest_pincode = request.POST.get("guest_pincode", "").strip()
 
-            errors = {}
-            if not guest_name:
-                errors["guest_name"] = ["Name is required."]
-
-            if not guest_email:
-                errors["guest_email"] = ["Email is required."]
-            else:
-                try:
-                    validate_email(guest_email)
-                except ValidationError:
-                    errors["guest_email"] = ["Enter a valid email address."]
-
-            if not guest_phone:
-                errors["guest_phone"] = ["Phone is required."]
-            else:
-                if not re.match(r'^\+?\d+$', guest_phone):
-                    errors["guest_phone"] = ["Phone number can only contain numbers."]
-                elif not re.match(r'^\+?\d{10,15}$', guest_phone):
-                    errors["guest_phone"] = ["Enter a valid phone number."]
-
-            if not guest_address_line1: errors["guest_address_line1"] = ["Address Line 1 is required."]
-            if not guest_city_name: errors["guest_city_name"] = ["City is required."]
-            if not guest_state_name: errors["guest_state_name"] = ["State is required."]
-            if not guest_pincode:
-                errors["guest_pincode"] = ["Pincode is required."]
-            elif not re.match(r'^[1-9][0-9]{5}$', guest_pincode):
-                errors["guest_pincode"] = ["Enter a valid 6-digit pincode."]
+            errors = _validate_delivery_fields(
+                name=guest_name,
+                phone=guest_phone,
+                address_line1=guest_address_line1,
+                city_name=guest_city_name,
+                state_name=guest_state_name,
+                pincode=guest_pincode,
+                email=guest_email,
+                require_email=True,
+            )
 
             if errors:
                 return render(
@@ -236,20 +283,22 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
             session.customer_profile = profile
             session.save(update_fields=["customer_profile", "updated_at"])
         else:
+            guest_name = request.POST.get("guest_name", "").strip()
+            guest_phone = request.POST.get("guest_phone", "").strip()
             guest_address_line1 = request.POST.get("guest_address_line1", "").strip()
             guest_address_line2 = request.POST.get("guest_address_line2", "").strip()
             guest_city_name = request.POST.get("guest_city_name", "").strip()
             guest_state_name = request.POST.get("guest_state_name", "").strip()
             guest_pincode = request.POST.get("guest_pincode", "").strip()
 
-            errors = {}
-            if not guest_address_line1: errors["guest_address_line1"] = ["Address Line 1 is required."]
-            if not guest_city_name: errors["guest_city_name"] = ["City is required."]
-            if not guest_state_name: errors["guest_state_name"] = ["State is required."]
-            if not guest_pincode:
-                errors["guest_pincode"] = ["Pincode is required."]
-            elif not re.match(r'^[1-9][0-9]{5}$', guest_pincode):
-                errors["guest_pincode"] = ["Enter a valid 6-digit pincode."]
+            errors = _validate_delivery_fields(
+                name=guest_name,
+                phone=guest_phone,
+                address_line1=guest_address_line1,
+                city_name=guest_city_name,
+                state_name=guest_state_name,
+                pincode=guest_pincode,
+            )
 
             if errors:
                 return render(
@@ -260,6 +309,14 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
                 )
 
             from accounts.models import Address
+
+            if guest_name and request.user.first_name != guest_name:
+                request.user.first_name = guest_name
+                request.user.save(update_fields=["first_name"])
+            if guest_phone and profile.phone != guest_phone:
+                profile.phone = guest_phone
+                profile.save(update_fields=["phone", "updated_at"])
+
             address = Address.objects.filter(
                 customer_profile=profile,
                 line1=guest_address_line1,
@@ -284,7 +341,7 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
             if profile.default_address is None:
                 from accounts.services import set_default_address
                 set_default_address(customer_profile=profile, address_id=address.pk)
-                
+
             update_checkout_session(checkout_session=session, address=address)
 
     from cart.selectors import get_cart_summary
@@ -350,6 +407,82 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
         response["HX-Redirect"] = confirmation_url
         return response
     return redirect(confirmation_url)
+
+
+@login_required
+@require_POST
+def checkout_address_update_view(request: HttpRequest, address_id: int) -> HttpResponse:
+    """
+    Update an existing saved address's delivery details from the checkout
+    page's "Edit" modal (AJAX, JSON in/out).
+
+    """
+    from accounts.services import ensure_customer_profile_for_user
+
+    profile = ensure_customer_profile_for_user(user=request.user)
+    address = get_address_by_id(address_id=address_id, customer_profile=profile)
+    if not address:
+        return JsonResponse(
+            {"success": False, "errors": {"__all__": ["Address not found."]}},
+            status=404,
+        )
+
+    data = request.POST
+    name = data.get("name", "").strip()
+    phone = data.get("phone", "").strip()
+    address_line1 = data.get("address_line1", "").strip()
+    address_line2 = data.get("address_line2", "").strip()
+    city_name = data.get("city_name", "").strip()
+    state_name = data.get("state_name", "").strip()
+    pincode = data.get("pincode", "").strip()
+
+    errors = _validate_delivery_fields(
+        name=name,
+        phone=phone,
+        address_line1=address_line1,
+        city_name=city_name,
+        state_name=state_name,
+        pincode=pincode,
+    )
+    if errors:
+        return JsonResponse({"success": False, "errors": errors}, status=400)
+
+    if name and request.user.first_name != name:
+        request.user.first_name = name
+        request.user.save(update_fields=["first_name"])
+    if phone and profile.phone != phone:
+        profile.phone = phone
+        profile.save(update_fields=["phone", "updated_at"])
+
+    address.line1 = address_line1
+    address.line2 = address_line2
+    address.city_name = city_name
+    address.state_name = state_name
+    address.pincode = pincode
+    address.save(update_fields=["line1", "line2", "city_name", "state_name", "pincode", "updated_at"])
+
+    display_city = address.city_name or (address.city.name if address.city_id else "")
+    display = f"{address.label} — {address.line1}, {display_city}"
+    if address.pincode:
+        display += f" - {address.pincode}"
+
+    return JsonResponse(
+        {
+            "success": True,
+            "address": {
+                "id": address.pk,
+                "label": address.label,
+                "line1": address.line1,
+                "line2": address.line2,
+                "city_name": address.city_name,
+                "state_name": address.state_name,
+                "pincode": address.pincode,
+                "display": display,
+            },
+            "name": name,
+            "phone": phone,
+        }
+    )
 
 
 @require_GET

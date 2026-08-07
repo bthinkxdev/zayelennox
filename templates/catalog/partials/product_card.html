@@ -3,7 +3,7 @@
          data-product-id="{{ product.pk }}"
          data-product-name="{{ product.name }}"
          data-product-url="{% url 'catalog:pdp' slug=product.slug %}"
-         data-product-price="{% money_label product.display_price|default:product.base_price display_currency %}"
+         data-product-price="{% if product.variant_list %}{% trans 'From' %} {% endif %}{% money_label product|card_display_price display_currency %}"
          data-product-stock="{% if product.is_in_stock %}{% trans 'In Stock' %}{% else %}{% trans 'Out of Stock' %}{% endif %}"
          data-in-stock="{% if product.is_in_stock %}true{% else %}false{% endif %}"
          data-product-badge="{% if product.is_featured %}{% trans 'Featured' %}{% elif product.is_bestseller %}{% trans 'Bestseller' %}{% elif product.is_new_arrival %}{% trans 'New' %}{% endif %}"
@@ -91,14 +91,14 @@
     <div class="jm-product-card__pricing">
     {% if product.is_flash_sale %}
     <p class="product-price jm-product-card__price--sale mb-0">
-      {% money_label product.display_price|default:product.base_price display_currency %}
+      {% if product.variant_list %}</span> {% endif %}{% money_label product|card_display_price display_currency %}
     </p>
     <p class="jm-product-card__was mb-0">
-      <span class="text-decoration-line-through">{% money_label product.original_price|default:product.base_price display_currency %}</span>
+      <span class="text-decoration-line-through">{% money_label product|card_original_price display_currency %}</span>
     </p>
     {% else %}
     <p class="product-price mb-0">
-      {% money_label product.display_price|default:product.base_price display_currency %}
+      {% if product.variant_list %} {% endif %}{% money_label product|card_display_price display_currency %}
     </p>
     {% endif %}
     </div>
@@ -119,12 +119,30 @@
       {% if product.variant_list %}
       <template class="jm-variant-options-template"
                 data-price-url="{% url 'catalog:variant-price' product_id=product.pk %}"
-                data-currency-symbol="{{ display_currency.symbol }}">
-        <option value="">{% trans "Standard" %}</option>
+                data-currency-symbol="{{ display_currency.symbol }}"
+                data-product-name="{{ product.name }}">
         {% for v in product.variant_list %}
-        <option value="{{ v.pk }}" data-price-delta="{{ v.price_delta|default:0 }}">
-          {{ v.name }}{% if v.price_delta %} (+{% money_label v.price_delta display_currency %}){% endif %}
-        </option>
+        {% with v_price=product.base_price|decimal_add:v.price_delta v_mrp=product.mrp|decimal_add:v.price_delta %}
+        {% with v_discount=v_mrp|discount_percent:v_price %}
+        <button type="button" class="jm-variant-option{% if v.stock_quantity <= 0 %} jm-variant-option--oos{% endif %}"
+                data-variant-id="{{ v.pk }}"
+                data-variant-name="{{ v.name }}"
+                data-variant-type="{{ v.variant_type }}"
+                data-price="{{ v_price }}"
+                data-mrp="{{ v_mrp }}"
+                data-discount="{{ v_discount }}"
+                data-stock="{{ v.stock_quantity }}"
+                data-in-stock="{% if v.stock_quantity > 0 %}true{% else %}false{% endif %}"
+                {% if v.stock_quantity <= 0 %}disabled{% endif %}>
+          <span class="jm-variant-option__name">{{ v.name }}</span>
+          {% if v_discount > 0 %}<span class="jm-variant-option__discount">{{ v_discount }}% {% trans "OFF" %}</span>{% endif %}
+          <span class="jm-variant-option__price">
+            {% money_label v_price display_currency %}{% if v_discount > 0 %}<span class="jm-variant-option__mrp">{% money_label v_mrp display_currency %}</span>{% endif %}
+          </span>
+          {% if v.stock_quantity <= 0 %}<span class="jm-variant-option__oos-label">{% trans "Out of stock" %}</span>{% endif %}
+        </button>
+        {% endwith %}
+        {% endwith %}
         {% endfor %}
       </template>
       {% endif %}

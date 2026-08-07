@@ -28,24 +28,42 @@
           <h2>{% trans "Delivery Address" %}</h2>
 
           {% if addresses %}
-          <div class="mb-4">
+          <div class="mb-4" id="saved-address-list">
             <label class="form-label small fw-bold">{% trans "Choose a saved address:" %}</label>
             {% for address in addresses %}
-            <div class="form-check mb-2">
-              <input class="form-check-input" type="radio" name="address_id" value="{{ address.pk }}"
-                id="addr-{{ address.pk }}" {% if forloop.first %}checked{% endif %}>
-              <label class="form-check-label small" for="addr-{{ address.pk }}">{{ address.label }} — {{ address.line1 }}, {{ address.display_city }}{% if address.pincode %} - {{ address.pincode }}{% endif %}</label>
+            <div class="form-check mb-2 d-flex align-items-start justify-content-between gap-2">
+              <div class="flex-grow-1">
+                <input class="form-check-input jm-saved-address-radio" type="radio" name="address_id" value="{{ address.pk }}"
+                  id="addr-{{ address.pk }}" {% if forloop.first %}checked{% endif %}>
+                <label class="form-check-label small" for="addr-{{ address.pk }}" id="addr-{{ address.pk }}-label">{{ address.label }} — {{ address.line1 }}, {{ address.display_city }}{% if address.pincode %} - {{ address.pincode }}{% endif %}</label>
+              </div>
+              <button type="button" class="btn btn-link btn-sm p-0 small flex-shrink-0 jm-edit-address-btn"
+                data-update-url="{% url 'checkout:address-update' address_id=address.pk %}"
+                data-address-id="{{ address.pk }}"
+                data-name="{{ request.user.first_name|default:'' }}"
+                data-phone="{{ checkout_session.customer_profile.phone|default:'' }}"
+                data-line1="{{ address.line1|default:'' }}"
+                data-line2="{{ address.line2|default:'' }}"
+                data-city="{{ address.city_name|default:'' }}"
+                data-state="{{ address.state_name|default:'' }}"
+                data-pincode="{{ address.pincode|default:'' }}"
+                data-label-text="{{ address.label|default:'' }}">
+                {% trans "Edit" %}
+              </button>
             </div>
             {% endfor %}
           </div>
 
           <div class="text-center my-3"><span class="bg-white px-2 small text-muted">{% trans "— OR —" %}</span></div>
+
+          <button type="button" id="toggle-new-address-btn" class="btn btn-outline-dark btn-sm mb-3">
+            {% trans "+ Add a new address" %}
+          </button>
           {% endif %}
 
-          <div id="new-address-form-fields" class="mt-2">
+          <div id="new-address-form-fields" class="mt-2{% if addresses %} d-none{% endif %}">
             <label class="form-label small fw-bold mb-3">{% trans "Enter Delivery Details:" %}</label>
 
-            {% if not request.user.is_authenticated %}
             <div class="row g-2 mb-3">
               <div class="col-md-6">
                 <label class="form-label small">{% trans "Full Name" %} <span class="text-danger">*</span></label>
@@ -53,15 +71,16 @@
                 <div id="error-guest_name" class="text-danger small mt-1"></div>
               </div>
               <div class="col-md-6">
-                <label class="form-label small">{% trans "Email Address" %} <span class="text-danger">*</span></label>
-                <input type="email" name="guest_email" class="form-control form-control-sm" value="{{ checkout_session.customer_profile.user.email|default:'' }}">
-                <div id="error-guest_email" class="text-danger small mt-1"></div>
+                <label class="form-label small">{% trans "Phone Number" %} <span class="text-danger">*</span></label>
+                <input type="tel" inputmode="numeric" maxlength="10" name="guest_phone" class="form-control form-control-sm" placeholder="{% trans '10-digit mobile number' %}" value="{{ checkout_session.customer_profile.phone|default:'' }}">
+                <div id="error-guest_phone" class="text-danger small mt-1"></div>
               </div>
             </div>
+            {% if not request.user.is_authenticated %}
             <div class="mb-3">
-              <label class="form-label small">{% trans "Phone Number" %} <span class="text-danger">*</span></label>
-              <input type="tel" name="guest_phone" class="form-control form-control-sm" value="{{ checkout_session.customer_profile.phone|default:'' }}">
-              <div id="error-guest_phone" class="text-danger small mt-1"></div>
+              <label class="form-label small">{% trans "Email Address" %} <span class="text-danger">*</span></label>
+              <input type="email" name="guest_email" class="form-control form-control-sm" value="{{ checkout_session.customer_profile.user.email|default:'' }}">
+              <div id="error-guest_email" class="text-danger small mt-1"></div>
             </div>
             {% endif %}
 
@@ -134,6 +153,64 @@
         </div>
 
       </form>
+
+      <div class="modal fade" id="editAddressModal" tabindex="-1" aria-labelledby="editAddressModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="editAddressModalLabel">{% trans "Edit Delivery Details" %}</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+            </div>
+            <div class="modal-body">
+              <div id="edit-address-alert" class="alert alert-danger small d-none" role="alert"></div>
+
+              <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label small">{% trans "Full Name" %} <span class="text-danger">*</span></label>
+                  <input type="text" id="edit-name" class="form-control form-control-sm">
+                  <div id="edit-error-guest_name" class="text-danger small mt-1"></div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small">{% trans "Phone Number" %} <span class="text-danger">*</span></label>
+                  <input type="tel" inputmode="numeric" maxlength="10" id="edit-phone" class="form-control form-control-sm" placeholder="{% trans '10-digit mobile number' %}">
+                  <div id="edit-error-guest_phone" class="text-danger small mt-1"></div>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label small">{% trans "Address Line 1" %} <span class="text-danger">*</span></label>
+                <input type="text" id="edit-line1" class="form-control form-control-sm">
+                <div id="edit-error-guest_address_line1" class="text-danger small mt-1"></div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label small">{% trans "Address Line 2 (Optional)" %}</label>
+                <input type="text" id="edit-line2" class="form-control form-control-sm">
+              </div>
+              <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label small">{% trans "City / Town" %} <span class="text-danger">*</span></label>
+                  <input type="text" id="edit-city" class="form-control form-control-sm">
+                  <div id="edit-error-guest_city_name" class="text-danger small mt-1"></div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label small">{% trans "State" %} <span class="text-danger">*</span></label>
+                  <input type="text" id="edit-state" class="form-control form-control-sm">
+                  <div id="edit-error-guest_state_name" class="text-danger small mt-1"></div>
+                </div>
+              </div>
+              <div class="mb-2">
+                <label class="form-label small">{% trans "Pincode" %} <span class="text-danger">*</span></label>
+                <input type="text" inputmode="numeric" maxlength="6" id="edit-pincode" class="form-control form-control-sm" style="max-width: 160px;">
+                <div id="edit-error-guest_pincode" class="text-danger small mt-1"></div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-dark btn-sm" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+              <button type="button" id="edit-address-save-btn" class="btn btn-floward btn-sm">{% trans "Save Changes" %}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div id="checkout-result" class="mt-3"></div>
     </div>
 
@@ -172,10 +249,10 @@
               {% endif %}
               <div class="text-muted" style="font-size: 0.75rem;">{% trans "Qty:" %} {{ line.quantity }} &times; {{ display_currency.symbol }} {{ line.unit_price_at_add }}</div>
               
-              {% if not line.product.is_in_stock %}
+              {% if not line.is_in_stock %}
               <div class="text-danger fw-semibold mt-1" style="font-size: 0.75rem;">{% trans "Out of stock" %}</div>
-              {% elif line.quantity > line.product.stock_quantity %}
-              <div class="text-danger fw-semibold mt-1" style="font-size: 0.75rem;">{% trans "Only" %} {{ line.product.stock_quantity }} {% trans "items available in stock." %}</div>
+              {% elif line.quantity > line.available_stock %}
+              <div class="text-danger fw-semibold mt-1" style="font-size: 0.75rem;">{% trans "Only" %} {{ line.available_stock }} {% trans "items available in stock." %}</div>
               {% endif %}
             </div>
           </div>
@@ -256,20 +333,402 @@
       });
     }
 
+    // ---- New delivery address validation --------------------------------
+    // Indian mobile numbers: 10 digits, first digit 6-9 (no STD/country code).
+    var INDIA_PHONE_RE = /^[6-9]\d{9}$/;
+    var PINCODE_RE = /^[1-9][0-9]{5}$/;
+    var ONLY_DIGITS_RE = /^\d+$/;
+
     var phoneInput = document.querySelector('input[name="guest_phone"]');
+    var pincodeInputEl = document.getElementById('checkout-pincode');
+
+    function digitsOnly(el) {
+      // Strip anything that isn't a digit as the user types - letters and
+      // symbols never make it into the field at all.
+      var cleaned = el.value.replace(/\D/g, '');
+      if (cleaned !== el.value) {
+        el.value = cleaned;
+      }
+      return cleaned;
+    }
+
+    function setFieldError(name, message) {
+      var el = document.getElementById('error-' + name);
+      if (el) el.innerText = message || '';
+    }
+
     if (phoneInput) {
-      phoneInput.addEventListener('input', function(e) {
-        var val = e.target.value;
-        var errorDiv = document.getElementById('error-guest_phone');
-        if (val.length === 0) {
-          errorDiv.innerText = '';
+      ['input', 'keyup', 'change'].forEach(function(evtName) {
+        phoneInput.addEventListener(evtName, function(e) {
+          var val = digitsOnly(e.target);
+          if (val.length === 0) {
+            setFieldError('guest_phone', '');
+          } else if (val.length < 10) {
+            setFieldError('guest_phone', "{% trans 'Enter a 10-digit Indian mobile number.' %}");
+          } else if (!INDIA_PHONE_RE.test(val)) {
+            setFieldError('guest_phone', "{% trans 'Enter a valid Indian mobile number (must start with 6-9).' %}");
+          } else {
+            setFieldError('guest_phone', '');
+          }
+        });
+      });
+      // Block non-digit keystrokes outright (belt-and-braces alongside the
+      // input-event stripping above, and stops paste-then-strip flicker).
+      phoneInput.addEventListener('keypress', function(e) {
+        if (e.key && !/\d/.test(e.key)) {
+          e.preventDefault();
+        }
+      });
+    }
+
+    if (pincodeInputEl) {
+      ['input', 'keyup', 'change'].forEach(function(evtName) {
+        pincodeInputEl.addEventListener(evtName, function(e) {
+          var val = digitsOnly(e.target);
+          if (val.length === 0) {
+            setFieldError('guest_pincode', '');
+          } else if (val.length < 6 || !PINCODE_RE.test(val)) {
+            setFieldError('guest_pincode', "{% trans 'Enter a valid 6-digit pincode.' %}");
+          } else {
+            setFieldError('guest_pincode', '');
+          }
+        });
+      });
+      pincodeInputEl.addEventListener('keypress', function(e) {
+        if (e.key && !/\d/.test(e.key)) {
+          e.preventDefault();
+        }
+      });
+    }
+
+    // Required-field validation for the "enter new address" section. Skipped
+    // entirely when the shopper has a saved address selected (address_id),
+    // since the backend then ignores these fields and uses that address.
+    function validateNewAddressFields() {
+      var savedAddressChecked = document.querySelector('input[name="address_id"]:checked');
+      if (savedAddressChecked) {
+        return true;
+      }
+
+      var isAuthenticated = {% if request.user.is_authenticated %}true{% else %}false{% endif %};
+      var ok = true;
+      var firstInvalid = null;
+
+      function fail(name, message) {
+        setFieldError(name, message);
+        ok = false;
+        if (!firstInvalid) {
+          firstInvalid = document.querySelector('[name="' + name + '"]');
+        }
+      }
+
+      var nameVal = (document.querySelector('input[name="guest_name"]') || {}).value || '';
+      if (!nameVal.trim()) {
+        fail('guest_name', "{% trans 'Full name is required.' %}");
+      } else if (ONLY_DIGITS_RE.test(nameVal.trim())) {
+        fail('guest_name', "{% trans 'Name cannot be only numbers.' %}");
+      } else {
+        setFieldError('guest_name', '');
+      }
+
+      if (!isAuthenticated) {
+        var emailInput = document.querySelector('input[name="guest_email"]');
+        var emailVal = emailInput ? emailInput.value.trim() : '';
+        if (!emailVal) {
+          fail('guest_email', "{% trans 'Email is required.' %}");
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+          fail('guest_email', "{% trans 'Enter a valid email address.' %}");
+        } else {
+          setFieldError('guest_email', '');
+        }
+      }
+
+      var phoneVal = phoneInput ? digitsOnly(phoneInput) : '';
+      if (!phoneVal) {
+        fail('guest_phone', "{% trans 'Phone number is required.' %}");
+      } else if (!INDIA_PHONE_RE.test(phoneVal)) {
+        fail('guest_phone', "{% trans 'Enter a valid 10-digit Indian mobile number.' %}");
+      } else {
+        setFieldError('guest_phone', '');
+      }
+
+      var line1Val = (document.querySelector('input[name="guest_address_line1"]') || {}).value || '';
+      if (!line1Val.trim()) {
+        fail('guest_address_line1', "{% trans 'Address line 1 is required.' %}");
+      } else if (ONLY_DIGITS_RE.test(line1Val.trim())) {
+        fail('guest_address_line1', "{% trans 'Address line 1 cannot be only numbers.' %}");
+      } else {
+        setFieldError('guest_address_line1', '');
+      }
+
+      var cityVal = (document.querySelector('input[name="guest_city_name"]') || {}).value || '';
+      if (!cityVal.trim()) {
+        fail('guest_city_name', "{% trans 'City is required.' %}");
+      } else {
+        setFieldError('guest_city_name', '');
+      }
+
+      var stateVal = (document.querySelector('input[name="guest_state_name"]') || {}).value || '';
+      if (!stateVal.trim()) {
+        fail('guest_state_name', "{% trans 'State is required.' %}");
+      } else {
+        setFieldError('guest_state_name', '');
+      }
+
+      var pincodeVal = pincodeInputEl ? digitsOnly(pincodeInputEl) : '';
+      if (!pincodeVal) {
+        fail('guest_pincode', "{% trans 'Pincode is required.' %}");
+      } else if (!PINCODE_RE.test(pincodeVal)) {
+        fail('guest_pincode', "{% trans 'Enter a valid 6-digit pincode.' %}");
+      } else {
+        setFieldError('guest_pincode', '');
+      }
+
+      if (!ok && firstInvalid) {
+        firstInvalid.focus();
+      }
+      return ok;
+    }
+
+    if (checkoutForm) {
+      checkoutForm.addEventListener('htmx:beforeRequest', function(event) {
+        if (!validateNewAddressFields()) {
+          event.preventDefault();
+        }
+      });
+    }
+
+    // ---- Add a new address toggle + saved-address selection -------------
+    var toggleNewAddressBtn = document.getElementById('toggle-new-address-btn');
+    var newAddressFields = document.getElementById('new-address-form-fields');
+    var savedAddressRadios = document.querySelectorAll('.jm-saved-address-radio');
+
+    function showNewAddressForm() {
+      if (!newAddressFields) return;
+      newAddressFields.classList.remove('d-none');
+      if (toggleNewAddressBtn) {
+        toggleNewAddressBtn.textContent = "{% trans '− Use a saved address instead' %}";
+      }
+      var firstField = newAddressFields.querySelector('input[name="guest_name"]');
+      if (firstField) firstField.focus();
+    }
+
+    function hideNewAddressForm() {
+      if (!newAddressFields) return;
+      newAddressFields.classList.add('d-none');
+      if (toggleNewAddressBtn) {
+        toggleNewAddressBtn.textContent = "{% trans '+ Add a new address' %}";
+      }
+    }
+
+    if (toggleNewAddressBtn && newAddressFields) {
+      toggleNewAddressBtn.addEventListener('click', function () {
+        if (newAddressFields.classList.contains('d-none')) {
+          // Switching to "new address" mode - no saved address should stay
+          // selected, otherwise the backend (and validateNewAddressFields)
+          // will just use that saved address and ignore what's typed here.
+          savedAddressRadios.forEach(function (r) { r.checked = false; });
+          showNewAddressForm();
+        } else {
+          if (savedAddressRadios.length > 0) {
+            savedAddressRadios[0].checked = true;
+          }
+          hideNewAddressForm();
+        }
+      });
+    }
+
+    savedAddressRadios.forEach(function (radio) {
+      radio.addEventListener('change', function () {
+        if (radio.checked) {
+          hideNewAddressForm();
+        }
+      });
+    });
+
+    // ---- Edit an existing saved address (modal) --------------------------
+    var editModalEl = document.getElementById('editAddressModal');
+    var editModal = (editModalEl && window.bootstrap) ? new bootstrap.Modal(editModalEl) : null;
+    var editAlert = document.getElementById('edit-address-alert');
+    var editFields = {
+      name: document.getElementById('edit-name'),
+      phone: document.getElementById('edit-phone'),
+      line1: document.getElementById('edit-line1'),
+      line2: document.getElementById('edit-line2'),
+      city: document.getElementById('edit-city'),
+      state: document.getElementById('edit-state'),
+      pincode: document.getElementById('edit-pincode')
+    };
+    var editSaveBtn = document.getElementById('edit-address-save-btn');
+    var editUpdateUrl = '';
+    var editAddressId = '';
+
+    function setEditFieldError(key, message) {
+      var el = document.getElementById('edit-error-guest_' + key);
+      if (el) el.innerText = message || '';
+    }
+
+    function clearEditErrors() {
+      ['name', 'phone', 'address_line1', 'city_name', 'state_name', 'pincode'].forEach(function (key) {
+        var el = document.getElementById('edit-error-guest_' + key);
+        if (el) el.innerText = '';
+      });
+      if (editAlert) {
+        editAlert.classList.add('d-none');
+        editAlert.textContent = '';
+      }
+    }
+
+    if (editFields.phone) {
+      ['input', 'keyup', 'change'].forEach(function (evtName) {
+        editFields.phone.addEventListener(evtName, function (e) { digitsOnly(e.target); });
+      });
+      editFields.phone.addEventListener('keypress', function (e) {
+        if (e.key && !/\d/.test(e.key)) e.preventDefault();
+      });
+    }
+    if (editFields.pincode) {
+      ['input', 'keyup', 'change'].forEach(function (evtName) {
+        editFields.pincode.addEventListener(evtName, function (e) { digitsOnly(e.target); });
+      });
+      editFields.pincode.addEventListener('keypress', function (e) {
+        if (e.key && !/\d/.test(e.key)) e.preventDefault();
+      });
+    }
+
+    document.querySelectorAll('.jm-edit-address-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        editUpdateUrl = btn.getAttribute('data-update-url') || '';
+        editAddressId = btn.getAttribute('data-address-id') || '';
+        editFields.name.value = btn.getAttribute('data-name') || '';
+        editFields.phone.value = btn.getAttribute('data-phone') || '';
+        editFields.line1.value = btn.getAttribute('data-line1') || '';
+        editFields.line2.value = btn.getAttribute('data-line2') || '';
+        editFields.city.value = btn.getAttribute('data-city') || '';
+        editFields.state.value = btn.getAttribute('data-state') || '';
+        editFields.pincode.value = btn.getAttribute('data-pincode') || '';
+        clearEditErrors();
+        if (editModal) editModal.show();
+      });
+    });
+
+    function validateEditFields() {
+      var ok = true;
+      var name = editFields.name.value.trim();
+      if (!name) {
+        setEditFieldError('name', "{% trans 'Full name is required.' %}");
+        ok = false;
+      } else if (ONLY_DIGITS_RE.test(name)) {
+        setEditFieldError('name', "{% trans 'Name cannot be only numbers.' %}");
+        ok = false;
+      }
+
+      var phone = digitsOnly(editFields.phone);
+      if (!phone) {
+        setEditFieldError('phone', "{% trans 'Phone number is required.' %}");
+        ok = false;
+      } else if (!INDIA_PHONE_RE.test(phone)) {
+        setEditFieldError('phone', "{% trans 'Enter a valid 10-digit Indian mobile number.' %}");
+        ok = false;
+      }
+
+      var line1 = editFields.line1.value.trim();
+      if (!line1) {
+        setEditFieldError('address_line1', "{% trans 'Address line 1 is required.' %}");
+        ok = false;
+      } else if (ONLY_DIGITS_RE.test(line1)) {
+        setEditFieldError('address_line1', "{% trans 'Address line 1 cannot be only numbers.' %}");
+        ok = false;
+      }
+
+      if (!editFields.city.value.trim()) {
+        setEditFieldError('city_name', "{% trans 'City is required.' %}");
+        ok = false;
+      }
+      if (!editFields.state.value.trim()) {
+        setEditFieldError('state_name', "{% trans 'State is required.' %}");
+        ok = false;
+      }
+
+      var pincode = digitsOnly(editFields.pincode);
+      if (!pincode) {
+        setEditFieldError('pincode', "{% trans 'Pincode is required.' %}");
+        ok = false;
+      } else if (!PINCODE_RE.test(pincode)) {
+        setEditFieldError('pincode', "{% trans 'Enter a valid 6-digit pincode.' %}");
+        ok = false;
+      }
+
+      return ok;
+    }
+
+    if (editSaveBtn) {
+      editSaveBtn.addEventListener('click', function () {
+        clearEditErrors();
+        if (!validateEditFields() || !editUpdateUrl) {
           return;
         }
-        if (!/^\+?\d*$/.test(val)) {
-          errorDiv.innerText = "Phone number can only contain numbers.";
-        } else {
-          errorDiv.innerText = "";
-        }
+
+        editSaveBtn.disabled = true;
+        var originalLabel = editSaveBtn.textContent;
+        editSaveBtn.textContent = "{% trans 'Saving...' %}";
+
+        var body = new URLSearchParams();
+        body.set('name', editFields.name.value.trim());
+        body.set('phone', digitsOnly(editFields.phone));
+        body.set('address_line1', editFields.line1.value.trim());
+        body.set('address_line2', editFields.line2.value.trim());
+        body.set('city_name', editFields.city.value.trim());
+        body.set('state_name', editFields.state.value.trim());
+        body.set('pincode', digitsOnly(editFields.pincode));
+
+        fetch(editUpdateUrl, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: body.toString()
+        })
+          .then(function (res) {
+            return res.json().then(function (payload) { return { ok: res.ok, payload: payload }; });
+          })
+          .then(function (result) {
+            editSaveBtn.disabled = false;
+            editSaveBtn.textContent = originalLabel;
+
+            if (result.ok && result.payload.success) {
+              var addr = result.payload.address;
+              var label = document.getElementById('addr-' + editAddressId + '-label');
+              if (label && addr) {
+                label.textContent = addr.display;
+              }
+              if (editModal) editModal.hide();
+            } else if (result.payload.errors) {
+              var errs = result.payload.errors;
+              Object.keys(errs).forEach(function (key) {
+                var el = document.getElementById('edit-error-' + key);
+                if (el) {
+                  el.innerText = errs[key].join(', ');
+                } else if (editAlert) {
+                  editAlert.classList.remove('d-none');
+                  editAlert.textContent = errs[key].join(', ');
+                }
+              });
+            } else if (editAlert) {
+              editAlert.classList.remove('d-none');
+              editAlert.textContent = "{% trans 'Could not save changes. Please try again.' %}";
+            }
+          })
+          .catch(function () {
+            editSaveBtn.disabled = false;
+            editSaveBtn.textContent = originalLabel;
+            if (editAlert) {
+              editAlert.classList.remove('d-none');
+              editAlert.textContent = "{% trans 'Could not save changes. Please try again.' %}";
+            }
+          });
       });
     }
 

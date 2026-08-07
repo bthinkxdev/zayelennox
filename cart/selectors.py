@@ -86,6 +86,21 @@ class CartSummaryLine:
     unit_price_at_add: Decimal
     line_subtotal: Decimal
 
+    @property
+    def available_stock(self) -> int:
+        """
+        Stock actually available for this specific line.
+
+        """
+        if self.variant is not None:
+            return self.variant.stock_quantity
+        return self.product.stock_quantity
+
+    @property
+    def is_in_stock(self) -> bool:
+        """Whether this line (its variant, if any) is currently sellable."""
+        return self.available_stock > 0
+
 
 @dataclass
 class CartSummary:
@@ -209,17 +224,20 @@ def get_cart_summary(*, cart: Cart) -> CartSummary:
         line_subtotal = unit_price * item.quantity
         subtotal += line_subtotal
         item_count += item.quantity
-        lines.append(
-            CartSummaryLine(
-                item=item,
-                product=item.product,
-                variant=item.variant,
-                quantity=item.quantity,
-                unit_price_at_add=unit_price,
-                line_subtotal=line_subtotal,
-            )
+        line = CartSummaryLine(
+            item=item,
+            product=item.product,
+            variant=item.variant,
+            quantity=item.quantity,
+            unit_price_at_add=unit_price,
+            line_subtotal=line_subtotal,
         )
-        if not item.product.is_in_stock or item.quantity > item.product.stock_quantity:
+        lines.append(line)
+        # Checks the specific variant's stock when this line has one, instead
+        # of the parent product's stock_quantity (which is only meaningful
+        # for products that don't have variants at all - see
+        # CartSummaryLine.available_stock / Product.is_in_stock).
+        if not line.is_in_stock or item.quantity > line.available_stock:
             has_stock_issues = True
 
     delivery_charge = cart.delivery_charge
