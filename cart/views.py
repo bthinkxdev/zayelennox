@@ -10,7 +10,7 @@ from django.utils.translation import gettext as _
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
-from cart.exceptions import CartItemNotFoundError, InsufficientStockError
+from cart.exceptions import CartItemNotFoundError, InsufficientStockError, VariantRequiredError
 from cart.forms import CartCouponForm, CartQuantityForm
 from cart.selectors import get_cart_count, get_cart_for_request, get_cart_summary, get_wishlist_count
 from cart.services import (
@@ -147,7 +147,7 @@ def cart_add_view(request: HttpRequest) -> HttpResponse:
                 variant=variant,
                 quantity=quantity,
             )
-        except InsufficientStockError as exc:
+        except (InsufficientStockError, VariantRequiredError) as exc:
             from django.contrib import messages
             messages.error(request, str(exc))
             return redirect(request.META.get("HTTP_REFERER", "/"))
@@ -169,7 +169,7 @@ def cart_add_view(request: HttpRequest) -> HttpResponse:
             quantity=quantity,
             overwrite=True,
         )
-    except InsufficientStockError as exc:
+    except (InsufficientStockError, VariantRequiredError) as exc:
         from django.contrib import messages
         messages.error(request, str(exc))
         if request.headers.get("HX-Request"):

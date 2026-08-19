@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load i18n %}
 
-{% block title %}{% trans "Checkout" %} | PRAYAI HERBS{% endblock %}
+{% block title %}{% trans "Checkout" %} | ZAYE LENNOX{% endblock %}
 
 {% block content %}
 <div class="container page-container checkout-page jm-page" hx-get="{% url 'checkout:checkout' %}{% if buy_now_mode %}?buy_now=1{% endif %}" hx-trigger="cartUpdated from:body" hx-select=".checkout-page" hx-swap="outerHTML">
@@ -338,6 +338,9 @@
     var INDIA_PHONE_RE = /^[6-9]\d{9}$/;
     var PINCODE_RE = /^[1-9][0-9]{5}$/;
     var ONLY_DIGITS_RE = /^\d+$/;
+    // Requires at least one letter - rejects strings that are only digits
+    // and strings that are only special characters/punctuation.
+    var HAS_LETTER_RE = /[A-Za-z]/;
 
     var phoneInput = document.querySelector('input[name="guest_phone"]');
     var pincodeInputEl = document.getElementById('checkout-pincode');
@@ -425,8 +428,8 @@
       var nameVal = (document.querySelector('input[name="guest_name"]') || {}).value || '';
       if (!nameVal.trim()) {
         fail('guest_name', "{% trans 'Full name is required.' %}");
-      } else if (ONLY_DIGITS_RE.test(nameVal.trim())) {
-        fail('guest_name', "{% trans 'Name cannot be only numbers.' %}");
+      } else if (!HAS_LETTER_RE.test(nameVal.trim())) {
+        fail('guest_name', "{% trans 'Name must contain letters.' %}");
       } else {
         setFieldError('guest_name', '');
       }
@@ -455,8 +458,8 @@
       var line1Val = (document.querySelector('input[name="guest_address_line1"]') || {}).value || '';
       if (!line1Val.trim()) {
         fail('guest_address_line1', "{% trans 'Address line 1 is required.' %}");
-      } else if (ONLY_DIGITS_RE.test(line1Val.trim())) {
-        fail('guest_address_line1', "{% trans 'Address line 1 cannot be only numbers.' %}");
+      } else if (!HAS_LETTER_RE.test(line1Val.trim())) {
+        fail('guest_address_line1', "{% trans 'Address line 1 must contain letters.' %}");
       } else {
         setFieldError('guest_address_line1', '');
       }
@@ -464,6 +467,8 @@
       var cityVal = (document.querySelector('input[name="guest_city_name"]') || {}).value || '';
       if (!cityVal.trim()) {
         fail('guest_city_name', "{% trans 'City is required.' %}");
+      } else if (!HAS_LETTER_RE.test(cityVal.trim())) {
+        fail('guest_city_name', "{% trans 'City must contain letters.' %}");
       } else {
         setFieldError('guest_city_name', '');
       }
@@ -471,6 +476,8 @@
       var stateVal = (document.querySelector('input[name="guest_state_name"]') || {}).value || '';
       if (!stateVal.trim()) {
         fail('guest_state_name', "{% trans 'State is required.' %}");
+      } else if (!HAS_LETTER_RE.test(stateVal.trim())) {
+        fail('guest_state_name', "{% trans 'State must contain letters.' %}");
       } else {
         setFieldError('guest_state_name', '');
       }
@@ -618,8 +625,8 @@
       if (!name) {
         setEditFieldError('name', "{% trans 'Full name is required.' %}");
         ok = false;
-      } else if (ONLY_DIGITS_RE.test(name)) {
-        setEditFieldError('name', "{% trans 'Name cannot be only numbers.' %}");
+      } else if (!HAS_LETTER_RE.test(name)) {
+        setEditFieldError('name', "{% trans 'Name must contain letters.' %}");
         ok = false;
       }
 
@@ -636,17 +643,26 @@
       if (!line1) {
         setEditFieldError('address_line1', "{% trans 'Address line 1 is required.' %}");
         ok = false;
-      } else if (ONLY_DIGITS_RE.test(line1)) {
-        setEditFieldError('address_line1', "{% trans 'Address line 1 cannot be only numbers.' %}");
+      } else if (!HAS_LETTER_RE.test(line1)) {
+        setEditFieldError('address_line1', "{% trans 'Address line 1 must contain letters.' %}");
         ok = false;
       }
 
-      if (!editFields.city.value.trim()) {
+      var cityName = editFields.city.value.trim();
+      if (!cityName) {
         setEditFieldError('city_name', "{% trans 'City is required.' %}");
         ok = false;
+      } else if (!HAS_LETTER_RE.test(cityName)) {
+        setEditFieldError('city_name', "{% trans 'City must contain letters.' %}");
+        ok = false;
       }
-      if (!editFields.state.value.trim()) {
+
+      var stateName = editFields.state.value.trim();
+      if (!stateName) {
         setEditFieldError('state_name', "{% trans 'State is required.' %}");
+        ok = false;
+      } else if (!HAS_LETTER_RE.test(stateName)) {
+        setEditFieldError('state_name', "{% trans 'State must contain letters.' %}");
         ok = false;
       }
 

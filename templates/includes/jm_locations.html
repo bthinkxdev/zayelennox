@@ -4,11 +4,9 @@
   <div class="jm-locations__block">
     <strong class="jm-locations__label">{% trans "Store location" %}</strong>
     <p class="jm-locations__body">
-      PRAYAI HERBS L.L.C - S.P.C<br>
-      Ghayathi, Industrial Area<br>
-      Municipal Affairs, Block 6, Plot 13<br>
-      Abu Dhabi, UAE<br>
-      <a href="tel:+971503131065">+971 50 313 1065</a>
+      {{ site_settings.site_name }} <br>
+      {{ store_address|linebreaksbr }}{% if store_phone %}<br>
+      <a href="tel:{{ store_phone|cut:' ' }}">{{ store_phone }}</a>{% endif %}
     </p>
   </div>
 

@@ -16,7 +16,7 @@
     {% if searchable %}
     <form method="get" class="d-flex gap-2 mb-3" role="search">
       <input type="text" name="q" value="{{ search_query }}" class="form-control" style="max-width: 320px;"
-             placeholder="Search {{ plural_name|lower }}..." />
+             placeholder="{{ search_placeholder }}" />
       <button type="submit" class="btn btn-outline-secondary"><i class="ti ti-search"></i></button>
       {% if search_query %}<a href="?" class="btn btn-link">Clear</a>{% endif %}
     </form>

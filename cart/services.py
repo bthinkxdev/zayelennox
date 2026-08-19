@@ -8,7 +8,7 @@ from typing import Any, Optional
 from django.db import transaction
 from django.http import HttpRequest
 
-from cart.exceptions import CartItemNotFoundError, InsufficientStockError
+from cart.exceptions import CartItemNotFoundError, InsufficientStockError, VariantRequiredError
 from cart.models import Cart, CartItem
 from cart.selectors import get_buy_now_cart_for_request, get_cart_for_request, get_cart_summary
 from catalog.models import Product, ProductVariant
@@ -152,7 +152,18 @@ def add_to_cart(
 ) -> CartItem:
     """
     Add or increment a cart line, or overwrite exactly.
+
+    Raises:
+        VariantRequiredError: The product has variants but none was resolved
+            (missing/invalid variant_id) - it can't be sold against its own
+            stock_quantity once variants exist.
+        InsufficientStockError: Requested quantity exceeds available stock.
     """
+    if variant is None and product.variants.exists():
+        raise VariantRequiredError(
+            "Please select an option (e.g. size or color) before adding this product to your cart."
+        )
+
     user = (
         cart.customer_profile.user
         if (cart.customer_profile and cart.customer_profile.user_id)

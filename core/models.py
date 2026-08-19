@@ -195,7 +195,7 @@ class SiteSettings(TimeStampedModel):
     and template slugs are stored here.
     """
 
-    site_name = models.CharField(max_length=120, default="DESERT STAR MOBILE PHONES")
+    site_name = models.CharField(max_length=120, default="ZAYE LENNOX")
     logo = models.ImageField(upload_to="site/", blank=True, null=True, verbose_name="Logo")
     primary_color = models.CharField(max_length=7, default="#0369A1")
     secondary_color = models.CharField(max_length=7, default="#0B1220")

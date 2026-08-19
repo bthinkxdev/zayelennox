@@ -56,7 +56,7 @@ def dispatch_order_status_notification(
     }
     
     body = status_messages.get(new_status, f"Your order status changed from {old_status} to {new_status}.")
-    body += "\n\nBest regards,\nThe Desert Star Team"
+    body += "\n\nBest regards,\nThe ZAYE LENNOX Team"
 
     if profile.notify_via_email and user.email:
         send_email(email=user.email, subject=title, message=body)
@@ -100,7 +100,7 @@ def dispatch_order_confirmation_notification(*, order_id: int) -> None:
         f"Your order {order.order_number} containing {product_names} has been successfully received.\n"
         f"We will notify you once the status changes.\n\n"
         f"Best regards,\n"
-        f"The Desert Star Team"
+        f"The ZAYE LENNOX Team"
     )
 
     if profile.notify_via_email and user.email:
@@ -108,7 +108,7 @@ def dispatch_order_confirmation_notification(*, order_id: int) -> None:
 
     if profile.phone:
         if profile.notify_via_sms:
-            send_sms(phone=profile.phone, message=f"Desert Star: Order {order.order_number} confirmed. Thank you!")
+            send_sms(phone=profile.phone, message=f"ZAYE LENNOX: Order {order.order_number} confirmed. Thank you!")
         if profile.notify_via_whatsapp:
             send_whatsapp(phone=profile.phone, message=body)
 

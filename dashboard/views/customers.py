@@ -18,7 +18,8 @@ class CustomerListView(DashboardListView):
     url_basename = "customer"
     singular_name = "Customer"
     plural_name = "Customers"
-    search_fields = ["user__email", "user__username", "phone"]
+    search_fields = ["user__first_name", "user__last_name", "user__email", "user__username", "phone"]
+    search_placeholder = "Search by name, email, or phone..."
     select_related = ["user"]
     can_create = False
     can_delete = False

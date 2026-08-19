@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.conf import settings
 from django.http import HttpRequest
 
 from cart.selectors import get_cart_count, get_wishlist_count, get_wishlist_product_ids, get_cart_product_ids
@@ -78,6 +79,8 @@ def storefront(request: HttpRequest) -> dict[str, Any]:
 
     return {
         "site_settings": get_site_settings(),
+        "store_address": settings.STORE_ADDRESS,
+        "store_phone": settings.STORE_PHONE,
         "category_tree": get_category_tree(),
         "current_search_category": _resolve_current_category(request),
         "cart_count": get_cart_count(request=request),

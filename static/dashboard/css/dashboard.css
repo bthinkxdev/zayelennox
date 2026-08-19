@@ -643,3 +643,22 @@ a {
 .repeater input[type="file"] {
   font-size: 0.78rem;
 }
+
+/* Bootstrap's .form-control is width:100%, which in an auto-layout table
+   gives the column almost no intrinsic width to work with - inputs end up
+   squeezed down to a couple of characters (e.g. "magenta" renders as "ma").
+   Give each variant column a real minimum width so text is fully visible;
+   .table-responsive above then scrolls horizontally once the columns no
+   longer fit, instead of the browser silently shrinking every input. */
+.variants-table th,
+.variants-table td {
+  min-width: 110px;
+}
+.variants-table th:nth-child(2),
+.variants-table td:nth-child(2) { min-width: 160px; } /* Type */
+.variants-table th:nth-child(3),
+.variants-table td:nth-child(3) { min-width: 160px; } /* Name */
+.variants-table th:nth-child(6),
+.variants-table td:nth-child(6) { min-width: 90px; } /* Stock */
+.variants-table th:nth-child(11),
+.variants-table td:nth-child(11) { min-width: 70px; } /* Remove */

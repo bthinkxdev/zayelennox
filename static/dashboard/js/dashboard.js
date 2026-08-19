@@ -232,6 +232,19 @@
 
       wrap.addEventListener("change", function (e) {
         var inp = e.target;
+
+        //only one image can be primary - checking one unchecks all others,
+        //like a radio button (product image formset only; matched by name
+        //suffix so this has no effect on other formsets, e.g. variants).
+        if (inp.type === "checkbox" && inp.checked && /-is_primary$/.test(inp.name || "")) {
+          var primaryCheckboxes = wrap.querySelectorAll("input[type='checkbox'][name$='-is_primary']");
+          Array.prototype.forEach.call(primaryCheckboxes, function (cb) {
+            if (cb !== inp) {
+              cb.checked = false;
+            }
+          });
+        }
+
         if (inp.type === "file" && inp.files && inp.files[0]) {
           var fileUrl = URL.createObjectURL(inp.files[0]);
 
@@ -277,10 +290,78 @@
     });
   }
 
+  // ---- Product form: base stock field follows the variants table --------
+  // A product's own stock_quantity stops being used once it has variants
+  // (sales route through each variant's own stock instead - see
+  // Product.is_in_stock in catalog/models.py). Keep the base Inventory
+  // field read-only while variant rows exist, so the vendor isn't asked to
+  // enter stock twice, and hand control straight back the moment the last
+  // variant is removed so the field can't be left stale/unreachable.
+  function initVariantStockToggle() {
+    var variantsWrap = document.querySelector('[data-formset="variants"]');
+    var stockInput = document.getElementById("id_stock_quantity");
+    var note = document.querySelector("[data-stock-quantity-variant-note]");
+    if (!variantsWrap || !stockInput || !note) return;
+
+    var body = variantsWrap.querySelector("[data-formset-body]");
+    if (!body) return;
+
+    //the formset always renders one blank "extra" row (extra=1) even for a
+    //brand-new product with zero real variants, so merely counting rows in
+    //the DOM treats every new product as having variants. A row only
+    //represents a real variant once it's an existing saved row (has an id)
+    //or the vendor has actually started typing a type/name into it.
+    function rowHasData(row) {
+      var idInput = row.querySelector("input[name$='-id']");
+      var typeInput = row.querySelector("input[name$='-variant_type']");
+      var nameInput = row.querySelector("input[name$='-name']");
+      return !!(
+        (idInput && idInput.value) ||
+        (typeInput && typeInput.value.trim()) ||
+        (nameInput && nameInput.value.trim())
+      );
+    }
+
+    function hasLiveVariantData() {
+      var rows = body.querySelectorAll("tr");
+      for (var i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        if (row.style.display === "none") continue;
+        if (rowHasData(row)) return true;
+      }
+      return false;
+    }
+
+    function refresh() {
+      var hasVariants = hasLiveVariantData();
+      stockInput.readOnly = hasVariants;
+      stockInput.classList.toggle("bg-light", hasVariants);
+      note.classList.toggle("d-none", !hasVariants);
+    }
+
+    refresh();
+    //rows get added/removed (or hidden via style.display) by initFormsets -
+    //observe rather than hook its handlers directly, so this keeps working
+    //regardless of how a row's add/remove is implemented.
+    var observer = new MutationObserver(refresh);
+    observer.observe(body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["style"],
+    });
+    //typing into type/name doesn't mutate the DOM (only the input's .value
+    //property changes, not its value="" attribute), so the observer above
+    //won't see it - listen for that directly too.
+    body.addEventListener("input", refresh);
+    body.addEventListener("change", refresh);
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initSidebar();
     initFormValidation();
     initCharts();
     initFormsets();
+    initVariantStockToggle();
   });
 })();

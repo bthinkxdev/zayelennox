@@ -68,7 +68,7 @@
             {% endfor %}
           </datalist>
           <div class="table-responsive">
-            <table class="table repeater align-middle mb-0">
+            <table class="table repeater variants-table align-middle mb-0">
               <thead>
                 <tr>
                   <th class="d-none"></th>
@@ -462,7 +462,12 @@
             <h3 class="panel-title">Inventory</h3>
           </div>
           <div class="card-body">
-            {% include "dashboard/partials/_field.html" with field=form.stock_quantity %}
+            <div data-stock-quantity-field>
+              {% include "dashboard/partials/_field.html" with field=form.stock_quantity %}
+              <div class="form-text text-warning d-none" data-stock-quantity-variant-note>
+                <i class="ti ti-info-circle me-1"></i>Stock is tracked per variant in the Variants table above — this field is unused while the product has variants.
+              </div>
+            </div>
             {% include "dashboard/partials/_field.html" with field=form.low_stock_threshold %}
           </div>
         </div>

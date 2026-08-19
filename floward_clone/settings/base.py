@@ -251,6 +251,12 @@ EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=15)
 
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
 
+STORE_ADDRESS = env(
+    "STORE_ADDRESS",
+    default="HILL VIEW, MUDAVANMUGHAL\nPOOJAPPURA P O, TRIVANDRUM\nKerala, India",
+)
+STORE_PHONE = env("STORE_PHONE", default="+91 9999999999")
+
 # Shiprocket
 SHIPROCKET_EMAIL = env("SHIPROCKET_EMAIL", default="")
 SHIPROCKET_PASSWORD = env("SHIPROCKET_PASSWORD", default="")

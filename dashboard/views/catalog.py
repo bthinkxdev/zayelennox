@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from django.contrib import messages
-from django.db.models import F
+from django.db.models import Case, Count, F, IntegerField, Min, Max, Q, When
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
@@ -34,15 +34,42 @@ class ProductListView(DashboardListView):
 
     def get_queryset(self):
         qs = super().get_queryset()
+
+        # Product.stock_quantity isn't maintained once a product has
+        # variants (sales route through ProductVariant.stock_quantity - see
+        # Product.is_in_stock), so both the status filter below and the
+        # "Stock" column in the table need a variant-aware number instead
+        # of reading the stale product-level field directly. We annotate
+        # every row with the "worst-stocked variant" as effective_stock
+        # (matching "low" = any variant at/below threshold) and count how
+        # many variants are still in stock, so the template can tell "0 of
+        # 3 variants in stock" (fully out) apart from "1 of 3 low".
+        qs = qs.annotate(
+            variant_count=Count("variants", distinct=True),
+            min_variant_stock=Min("variants__stock_quantity"),
+            max_variant_stock=Max("variants__stock_quantity"),
+            effective_stock=Case(
+                When(variant_count=0, then=F("stock_quantity")),
+                default=F("min_variant_stock"),
+                output_field=IntegerField(),
+            ),
+        )
+
         status = self.request.GET.get("status", "")
         if status == "active":
             qs = qs.filter(is_active=True)
         elif status == "inactive":
             qs = qs.filter(is_active=False)
         elif status == "low":
-            qs = qs.filter(stock_quantity__lte=F("low_stock_threshold"))
+            # "Low" = the worst-stocked variant (or the product itself, if
+            # it has no variants) is at or below the threshold.
+            qs = qs.filter(effective_stock__lte=F("low_stock_threshold"))
         elif status == "out":
-            qs = qs.filter(stock_quantity=0)
+            # "Out" = every variant is at zero (mirrors Product.is_in_stock).
+            qs = qs.filter(
+                Q(variant_count=0, stock_quantity=0)
+                | Q(variant_count__gt=0, max_variant_stock=0)
+            )
         category = self.request.GET.get("category", "")
         if category.isdigit():
             qs = qs.filter(category_id=int(category))
@@ -90,10 +117,23 @@ def _render_product_form(request, product, mode):
             variants.save()
             images.instance = product
             images.save()
+            _normalize_primary_image(product)
             specifications.instance = product
             specifications.save()
             documents.instance = product
             documents.save()
+            if not product.variants.exists() and product.stock_quantity == 0:
+                # The base stock field is read-only (and easy to forget
+                # about) while a product has variants - if the vendor just
+                # removed the last variant and saved without updating it,
+                # make sure that's a deliberate choice and not a leftover
+                # stale 0 from when variants were tracking stock instead.
+                messages.warning(
+                    request,
+                    "This product has no variants and its stock quantity is 0, "
+                    "so it can't be sold. Update the Inventory stock quantity "
+                    "if that isn't intentional.",
+                )
             messages.success(request, f"Product {'created' if mode == 'create' else 'updated'}.")
             return redirect("dashboard:product-list")
     else:
@@ -135,6 +175,35 @@ def _render_product_form(request, product, mode):
     context["existing_variant_types"] = ProductVariant.objects.exclude(variant_type="").values_list("variant_type", flat=True).distinct()
     
     return render(request, "dashboard/catalog/product_form.html", context)
+
+
+def _normalize_primary_image(product):
+    """
+    Enforce exactly one primary product image after saving the images
+    formset (server-side backstop behind the "Primary" checkbox's
+    radio-like JS behavior on the product form, in case a request bypasses
+    that JS - e.g. JS disabled, or a direct POST).
+
+    - No image checked "Primary" -> default to the first image (by display
+      order, falling back to creation order for ties), matching what the
+      vendor sees as the first row.
+    - More than one image checked "Primary" -> keep only the first one
+      (same ordering) and uncheck the rest.
+    - Exactly one checked -> leave as-is.
+    """
+    images_qs = list(product.images.order_by("display_order", "pk"))
+    if not images_qs:
+        return
+
+    primary_images = [img for img in images_qs if img.is_primary]
+
+    if not primary_images:
+        images_qs[0].is_primary = True
+        images_qs[0].save(update_fields=["is_primary"])
+    elif len(primary_images) > 1:
+        for img in primary_images[1:]:
+            img.is_primary = False
+            img.save(update_fields=["is_primary"])
 
 
 def _style(form):

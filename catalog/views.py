@@ -71,8 +71,15 @@ def _parse_plp_filters(request: HttpRequest) -> dict:
 
 
 @require_GET
+@never_cache
 def plp_view(request: HttpRequest, category_slug: str | None = None) -> HttpResponse:
-    """Product listing page with HTMX partial support for the product grid."""
+    """
+    Product listing page with HTMX partial support for the product grid.
+
+    @never_cache prevents the browser from restoring this page from disk
+    cache / back-forward cache with a stale "Add to Cart"/"View Cart"
+    state on the product cards. See pdp_view below for the full rationale.
+    """
     filters = _parse_plp_filters(request)
     category = None
     if category_slug:
@@ -106,9 +113,9 @@ def plp_view(request: HttpRequest, category_slug: str | None = None) -> HttpResp
 
     active_cat = resolved_cat if resolved_cat else None
     title = (
-        resolve_meta_title(obj=active_cat, fallback="Shop All | DESERT STAR MOBILE PHONES")
+        resolve_meta_title(obj=active_cat, fallback="Shop All | ZAYE LENNOX")
         if active_cat
-        else "Shop All | DESERT STAR MOBILE PHONES"
+        else "Shop All | ZAYE LENNOX"
     )
     description = (
         f"Browse {active_cat.name} — mobiles, accessories, and more in Abu Dhabi."
@@ -119,7 +126,7 @@ def plp_view(request: HttpRequest, category_slug: str | None = None) -> HttpResp
     context = seo_context(
         request=request,
         obj=active_cat,
-        title=f"{title} | DESERT STAR MOBILE PHONES",
+        title=f"{title} | ZAYE LENNOX",
         description=description,
         canonical_url=build_plp_canonical_url(request=request, category_slug=category_slug),
     )
@@ -239,8 +246,8 @@ def pdp_view(request: HttpRequest, slug: str) -> HttpResponse:
     context = seo_context(
         request=request,
         obj=product,
-        title=f"{product.name} | DESERT STAR MOBILE PHONES",
-        description=f"{product.name} — quality mobiles and accessories from Desert Star Mobile Phones, Abu Dhabi.",
+        title=f"{product.name} | ZAYE LENNOX",
+        description=f"{product.name} — quality mobiles and accessories from ZAYE LENNOX, Abu Dhabi.",
     )
     context.update(
         {
@@ -351,7 +358,15 @@ def delivery_estimate_view(request: HttpRequest, product_id: int) -> JsonRespons
 
 
 @require_GET
+@never_cache
 def rental_list_view(request: HttpRequest) -> HttpResponse:
+    """
+    Rentals listing page.
+
+    @never_cache prevents a stale "Add to Cart"/"View Cart" state on the
+    product cards after a browser-back navigation. See pdp_view for the
+    full rationale.
+    """
     from catalog.selectors import _primary_image_prefetch, _variant_list_prefetch, PLP_CARD_FIELDS
     products = (
         Product.objects.filter(is_active=True, is_rental=True, show_rental_storefront=True)

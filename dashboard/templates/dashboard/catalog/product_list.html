@@ -83,7 +83,15 @@
           <td>{% if obj.category_id %}<span class="pill pill-gray">{{ obj.category.name }}</span>{% else %}<span class="text-secondary">—</span>{% endif %}</td>
           <td class="text-end fw-semibold">{{ currency_symbol }} {{ obj.base_price|floatformat:2 }}</td>
           <td>
-            {% if obj.stock_quantity == 0 %}
+            {% if obj.variant_count > 0 %}
+              {% if obj.max_variant_stock == 0 %}
+                <span class="pill pill-red">Out of stock</span>
+              {% elif obj.effective_stock <= obj.low_stock_threshold %}
+                <span class="pill pill-amber">{{ obj.effective_stock }} left (lowest variant)</span>
+              {% else %}
+                <span class="pill pill-green">In stock</span>
+              {% endif %}
+            {% elif obj.stock_quantity == 0 %}
               <span class="pill pill-red">Out of stock</span>
             {% elif obj.stock_quantity <= obj.low_stock_threshold %}
               <span class="pill pill-amber">{{ obj.stock_quantity }} left</span>

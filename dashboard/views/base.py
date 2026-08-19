@@ -38,6 +38,11 @@ class DashboardListView(DashboardContextMixin, ListView):
 
     columns: list[dict] = []
     search_fields: list[str] = []
+    # Override to tell the admin exactly what the search box matches on
+    # (e.g. "Search by name, email, or phone..."). Falls back to the
+    # generic "Search {plural_name}..." text when left blank, so every
+    # other list view keeps its current behavior unchanged.
+    search_placeholder: str = ""
     select_related: list[str] = []
     prefetch_related: list[str] = []
     url_basename: str = ""
@@ -73,6 +78,9 @@ class DashboardListView(DashboardContextMixin, ListView):
         context["plural_name"] = self.plural_name or self.model._meta.verbose_name_plural.title()
         context["search_query"] = self.request.GET.get("q", "")
         context["searchable"] = bool(self.search_fields)
+        context["search_placeholder"] = (
+            self.search_placeholder or f"Search {context['plural_name'].lower()}..."
+        )
         context["can_create"] = self.can_create
         context["can_view"] = self.can_view
         context["can_edit"] = self.can_edit

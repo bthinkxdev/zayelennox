@@ -33,8 +33,8 @@ def about_us_view(request: HttpRequest) -> HttpResponse:
     """Render the static About Us page."""
     context = seo_context(
         request=request,
-        title=_("About Us | PRAYAI HERBS"),
-        description=_("Learn more about PRAYAI HERBS and our mission to deliver natural herbal remedies and skincare products."),
+        title=_("About Us | ZAYE LENNOX"),
+        description=_("Learn more about ZAYE LENNOX and our mission to deliver natural herbal remedies and skincare products."),
     )
     return render(request, "core/about_us.html", context)
 
@@ -44,8 +44,8 @@ def privacy_policy_view(request: HttpRequest) -> HttpResponse:
     """Render the static Privacy Policy page."""
     context = seo_context(
         request=request,
-        title=_("Privacy Policy | PRAYAI HERBS"),
-        description=_("Read PRAYAI HERBS privacy policy to learn how we collect and use your data."),
+        title=_("Privacy Policy | ZAYE LENNOX"),
+        description=_("Read ZAYE LENNOX privacy policy to learn how we collect and use your data."),
     )
     return render(request, "core/privacy_policy.html", context)
 
@@ -60,8 +60,8 @@ def contact_us_view(request: HttpRequest) -> HttpResponse:
 
     context = seo_context(
         request=request,
-        title=_("Contact Us | PRAYAI HERBS"),
-        description=_("Get in touch with PRAYAI HERBS customer support."),
+        title=_("Contact Us | ZAYE LENNOX"),
+        description=_("Get in touch with ZAYE LENNOX customer support."),
     )
     context["form"] = form
     return render(request, "core/contact_us.html", context)
@@ -114,8 +114,8 @@ def faq_view(request: HttpRequest) -> HttpResponse:
     """Render the static FAQ page."""
     context = seo_context(
         request=request,
-        title=_("FAQ | PRAYAI HERBS"),
-        description=_("Frequently asked questions about ordering, delivery, and payments at PRAYAI HERBS."),
+        title=_("FAQ | ZAYE LENNOX"),
+        description=_("Frequently asked questions about ordering, delivery, and payments at ZAYE LENNOX."),
     )
     
     from cms.models import FAQItem
@@ -129,7 +129,7 @@ def blog_view(request: HttpRequest) -> HttpResponse:
     """Render the storefront blog page."""
     context = seo_context(
         request=request,
-        title=_("Blog | PRAYAI HERBS"),
+        title=_("Blog | ZAYE LENNOX"),
         description=_("Read our latest news and herbal wellness articles."),
     )
     from cms.models import BlogPost
@@ -145,7 +145,7 @@ def page_view(request: HttpRequest, slug: str) -> HttpResponse:
     
     context = seo_context(
         request=request,
-        title=f"{page.title} | PRAYAI HERBS",
+        title=f"{page.title} | ZAYE LENNOX",
         description=page.meta_description or page.title,
     )
     context["page"] = page

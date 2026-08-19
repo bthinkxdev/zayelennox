@@ -31,7 +31,7 @@ def send_email(*, email: str, subject: str, message: str) -> None:
     # receiving contact inquiries). Putting an unrelated address in the display-name
     # slot of the From header is a classic spoofing pattern — providers like Gmail
     # will silently spam-filter/drop such mail even though the SMTP send "succeeds".
-    display_name = site_settings.site_name or "Desert Star"
+    display_name = site_settings.site_name or "ZAYE LENNOX"
     from_email = formataddr((display_name, settings.DEFAULT_FROM_EMAIL))
 
     try:

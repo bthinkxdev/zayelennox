@@ -13,6 +13,9 @@ from accounts.models import Address
 INDIA_PHONE_RE = re.compile(r'^[6-9]\d{9}$')
 PINCODE_RE = re.compile(r'^[1-9][0-9]{5}$')
 ONLY_DIGITS_RE = re.compile(r'^\d+$')
+# Requires at least one letter — rejects strings that are only digits and
+# strings that are only special characters/punctuation (e.g. "123", "###").
+HAS_LETTER_RE = re.compile(r'[A-Za-z]')
 
 
 class EmailLoginForm(AuthenticationForm):
@@ -246,8 +249,8 @@ class CustomerProfileEditForm(forms.Form):
 
     def clean_name(self):
         name = (self.cleaned_data.get("name") or "").strip()
-        if name and ONLY_DIGITS_RE.match(name):
-            raise forms.ValidationError("Name cannot be only numbers.")
+        if name and not HAS_LETTER_RE.search(name):
+            raise forms.ValidationError("Name must contain letters.")
         return name
 
     def clean_phone(self):
@@ -262,9 +265,21 @@ class CustomerProfileEditForm(forms.Form):
 
     def clean_address_line1(self):
         line1 = (self.cleaned_data.get("address_line1") or "").strip()
-        if line1 and ONLY_DIGITS_RE.match(line1):
-            raise forms.ValidationError("Address Line 1 cannot be only numbers.")
+        if line1 and not HAS_LETTER_RE.search(line1):
+            raise forms.ValidationError("Address Line 1 must contain letters.")
         return line1
+
+    def clean_city_name(self):
+        city_name = (self.cleaned_data.get("city_name") or "").strip()
+        if city_name and not HAS_LETTER_RE.search(city_name):
+            raise forms.ValidationError("City must contain letters.")
+        return city_name
+
+    def clean_state_name(self):
+        state_name = (self.cleaned_data.get("state_name") or "").strip()
+        if state_name and not HAS_LETTER_RE.search(state_name):
+            raise forms.ValidationError("State must contain letters.")
+        return state_name
 
     def clean_pincode(self):
         pincode = (self.cleaned_data.get("pincode") or "").strip()

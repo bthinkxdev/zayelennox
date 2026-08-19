@@ -26,6 +26,9 @@ from payments.services import process_payment
 INDIA_PHONE_RE = re.compile(r'^[6-9]\d{9}$')
 PINCODE_RE = re.compile(r'^[1-9][0-9]{5}$')
 ONLY_DIGITS_RE = re.compile(r'^\d+$')
+# Requires at least one letter — rejects strings that are only digits and
+# strings that are only special characters/punctuation (e.g. "123", "###").
+HAS_LETTER_RE = re.compile(r'[A-Za-z]')
 
 
 def _validate_delivery_fields(
@@ -49,8 +52,8 @@ def _validate_delivery_fields(
     name = (name or "").strip()
     if not name:
         errors["guest_name"] = ["Name is required."]
-    elif ONLY_DIGITS_RE.match(name):
-        errors["guest_name"] = ["Name cannot be only numbers."]
+    elif not HAS_LETTER_RE.search(name):
+        errors["guest_name"] = ["Name must contain letters."]
 
     if require_email:
         email = (email or "").strip()
@@ -73,13 +76,20 @@ def _validate_delivery_fields(
     address_line1 = (address_line1 or "").strip()
     if not address_line1:
         errors["guest_address_line1"] = ["Address Line 1 is required."]
-    elif ONLY_DIGITS_RE.match(address_line1):
-        errors["guest_address_line1"] = ["Address Line 1 cannot be only numbers."]
+    elif not HAS_LETTER_RE.search(address_line1):
+        errors["guest_address_line1"] = ["Address Line 1 must contain letters."]
 
-    if not (city_name or "").strip():
+    city_name = (city_name or "").strip()
+    if not city_name:
         errors["guest_city_name"] = ["City is required."]
-    if not (state_name or "").strip():
+    elif not HAS_LETTER_RE.search(city_name):
+        errors["guest_city_name"] = ["City must contain letters."]
+
+    state_name = (state_name or "").strip()
+    if not state_name:
         errors["guest_state_name"] = ["State is required."]
+    elif not HAS_LETTER_RE.search(state_name):
+        errors["guest_state_name"] = ["State must contain letters."]
 
     pincode = (pincode or "").strip()
     if not pincode:

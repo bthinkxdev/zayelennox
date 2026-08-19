@@ -624,6 +624,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Set by openQuickView() on each open so the Quick View modal's own Add
+  // to Cart button can defer to the same variant picker the product card
+  // uses (openVariantModal) - Quick View has no variant data of its own,
+  // it just borrows the source card's hidden .jm-variant-options-template.
+  var qvActiveCard = null;
+  var qvActiveVariantBtn = null;
+
   function openQuickView(card) {
     var modalEl = document.getElementById('jmQuickViewModal');
     if (!modalEl || !window.bootstrap) return;
@@ -658,6 +665,12 @@ document.addEventListener('DOMContentLoaded', () => {
     var qvCartForm = document.getElementById('jm-qv-cart');
     var qvViewCart = document.getElementById('jm-qv-view-cart');
     var qvAddBtn = document.getElementById('jm-qv-add-btn');
+
+    // Same reference point product_card.html uses to decide whether this
+    // product needs a variant picker: the ATC button in the card's own
+    // cart form gets data-jm-variant-atc when product.variant_list exists.
+    qvActiveCard = card;
+    qvActiveVariantBtn = card.querySelector('[data-jm-variant-atc]');
 
     if (qvAddBtn) {
       qvAddBtn.disabled = !inStock;
@@ -894,6 +907,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (qvBtn) {
       var card = qvBtn.closest('.jm-product-card');
       if (card) openQuickView(card);
+      return;
+    }
+
+    // Quick View's own Add to Cart button - if the product has variants,
+    // defer to the same variant picker the product card uses instead of
+    // adding the base product directly (Quick View has no variant_id
+    // field of its own).
+    var qvAddClick = event.target.closest('#jm-qv-add-btn');
+    if (qvAddClick && qvActiveVariantBtn) {
+      event.preventDefault();
+      var qvModalEl = document.getElementById('jmQuickViewModal');
+      if (qvModalEl && window.bootstrap) {
+        bootstrap.Modal.getOrCreateInstance(qvModalEl).hide();
+      }
+      openVariantModal(qvActiveCard, qvActiveVariantBtn);
       return;
     }
 

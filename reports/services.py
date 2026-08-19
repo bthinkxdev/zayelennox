@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from decimal import Decimal
 
-from django.db.models import Count, F, Sum
+from django.db.models import Case, Count, F, IntegerField, Min, Sum, When
 from django.utils import timezone
 
 from accounts.models import CustomerProfile
@@ -82,16 +82,31 @@ def aggregate_daily_reports(*, report_date: date | None = None) -> dict[str, int
 
     InventorySnapshot.objects.filter(report_date=report_date).delete()
     low_count = 0
-    for product in Product.objects.filter(is_active=True).only(
-        "id", "stock_quantity", "low_stock_threshold"
-    ):
-        is_low = product.stock_quantity <= product.low_stock_threshold
+    # Product.stock_quantity isn't maintained once a product has variants
+    # (sales route through ProductVariant.stock_quantity - see
+    # Product.is_in_stock), so the snapshot records the worst-stocked
+    # variant for those products instead of the stale product-level field.
+    products = (
+        Product.objects.filter(is_active=True)
+        .only("id", "stock_quantity", "low_stock_threshold")
+        .annotate(
+            variant_count=Count("variants", distinct=True),
+            min_variant_stock=Min("variants__stock_quantity"),
+            effective_stock=Case(
+                When(variant_count=0, then=F("stock_quantity")),
+                default=F("min_variant_stock"),
+                output_field=IntegerField(),
+            ),
+        )
+    )
+    for product in products:
+        is_low = product.effective_stock <= product.low_stock_threshold
         if is_low:
             low_count += 1
         InventorySnapshot.objects.create(
             report_date=report_date,
             product=product,
-            stock_quantity=product.stock_quantity,
+            stock_quantity=product.effective_stock,
             low_stock_threshold=product.low_stock_threshold,
             is_low_stock=is_low,
         )

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET
 
 from catalog.selectors import get_homepage_product_rails
@@ -13,8 +14,18 @@ from core.seo import seo_context
 
 
 @require_GET
+@never_cache
 def homepage_view(request: HttpRequest) -> HttpResponse:
-    """Render the CMS-driven homepage with zero DB reads for section config."""
+    """
+    Render the CMS-driven homepage with zero DB reads for section config.
+
+    @never_cache sends Cache-Control: no-store — without it, browsers may
+    serve this page from disk cache or restore it from the back/forward
+    cache on a browser-back navigation, showing a stale "Add to Cart"
+    button on a product card whose cart state actually changed on another
+    page (e.g. the PDP) in between. See catalog.views.pdp_view for the
+    same fix applied to the product detail page.
+    """
     sections = get_active_homepage_sections()
     product_rails = get_homepage_product_rails()
     section_contexts = [
@@ -27,7 +38,7 @@ def homepage_view(request: HttpRequest) -> HttpResponse:
     ]
     context = seo_context(
         request=request,
-        title="Herbal Products & Natural Skincare | PRAYAI HERBS",
+        title="Herbal Products & Natural Skincare | ZAYE LENNOX",
         description="Browse herbal remedies, natural skincare, and wellness products available in Abu Dhabi, UAE.",
     )
     context["section_contexts"] = section_contexts

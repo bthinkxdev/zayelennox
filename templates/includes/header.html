@@ -48,10 +48,10 @@
           </svg>
         </button>
 
-        <a class="jm-logo" href="{% url 'cms:homepage' %}" aria-label="PRAYAI HERBS">
+        <a class="jm-logo" href="{% url 'cms:homepage' %}" aria-label="ZAYE LENNOX">
           <img src="{% if site_settings.logo %}{{ site_settings.logo.url }}{% else %}{% static 'dashboard/images/logo.png' %}{% endif %}"
             alt="" width="40" height="40" class="jm-logo__mark">
-          <span class="jm-logo__text">PRAYAI <span>HERBS</span></span>
+          <span class="jm-logo__text">ZAYE <span>LENNOX</span></span>
         </a>
       </div>
 
@@ -248,7 +248,7 @@
 
 {% with wa=site_settings.whatsapp_number|default:"971503131065" %}
 <a class="jm-wa-float"
-  href="https://wa.me/{{ wa|cut:'+'|cut:' '|cut:'-' }}?text={{ 'Hi PRAYAI HERBS, I have an enquiry.'|urlencode }}"
+  href="https://wa.me/{{ wa|cut:'+'|cut:' '|cut:'-' }}?text={{ 'Hi ZAYE LENNOX, I have an enquiry.'|urlencode }}"
   target="_blank" 
   rel="noopener noreferrer" 
   aria-label="{% trans 'WhatsApp enquiry' %}">
