@@ -253,9 +253,9 @@ SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
 
 STORE_ADDRESS = env(
     "STORE_ADDRESS",
-    default="HILL VIEW, MUDAVANMUGHAL\nPOOJAPPURA P O, TRIVANDRUM\nKerala, India",
+    default="Joysland Building, Paruthelipalam Jn.,\nEdappally Toll, Ernakulam, Kerala - 682024",
 )
-STORE_PHONE = env("STORE_PHONE", default="+91 9999999999")
+STORE_PHONE = env("STORE_PHONE", default="+91 9292773339")
 
 # Shiprocket
 SHIPROCKET_EMAIL = env("SHIPROCKET_EMAIL", default="")

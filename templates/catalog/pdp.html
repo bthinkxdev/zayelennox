@@ -35,13 +35,14 @@
           <span id="pdp-price-value">{% money_label price_data.price display_currency %}</span>
         </p>
         <div class="jm-pdp-buybox__stock-wrap">
-          <p class="jm-pdp-buybox__stock {% if price_data.is_in_stock == "true" %}is-in{% else %}is-out{% endif %}">
+          <p class="jm-pdp-buybox__stock {% if price_data.is_in_stock == "true" %}is-in{% else %}is-out{% endif %} {% if price_data.is_low_stock == "true" %}d-none{% endif %}">
             {% if price_data.is_in_stock == "true" %}
-            {% trans "In stock" %}{% if resolved_stock %} · {{ resolved_stock }}{% endif %}
+            {% trans "In stock" %}
             {% else %}
             {% trans "Out of stock" %}
             {% endif %}
           </p>
+          <div id="pdp-low-stock-alert" class="text-danger small mt-1 fw-semibold {% if price_data.is_low_stock != "true" %}d-none{% endif %}">{% trans "Only" %} <span id="pdp-low-stock-count">{{ resolved_stock }}</span> {% trans "left!" %}</div>
           {% if price_data.is_in_stock == "true" %}
           <div id="pdp-qty-limit-msg" class="text-danger small mt-1 {% if not cart_item or cart_item.quantity < resolved_stock %}d-none{% endif %}">{% trans "Only" %} {{ resolved_stock|default:1 }} {% trans "items available in stock." %}</div>
           {% endif %}
@@ -57,7 +58,7 @@
                data-price-url="{% url 'catalog:variant-price' product_id=product.pk %}"
                data-currency-symbol="{{ display_currency.symbol }}">
             {% for v in product.variant_list %}
-            {% with v_price=product.base_price|decimal_add:v.price_delta v_mrp=product.mrp|decimal_add:v.price_delta %}
+            {% with v_price=product.base_price|decimal_add:v.price_delta v_mrp=v.effective_mrp %}
             {% with v_discount=v_mrp|discount_percent:v_price %}
             <button type="button"
                     class="jm-variant-option{% if v.stock_quantity <= 0 %} jm-variant-option--oos{% endif %}{% if v.pk == selected_variant_id %} is-selected{% endif %}"

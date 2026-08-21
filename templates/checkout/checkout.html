@@ -108,12 +108,10 @@
 
             <div class="mb-2">
               <label class="form-label small">{% trans "Pincode" %} <span class="text-danger">*</span></label>
-              <div class="d-flex gap-2">
-                <input type="text" inputmode="numeric" maxlength="6" id="checkout-pincode" name="guest_pincode"
-                  class="form-control form-control-sm" style="max-width: 160px;"
-                  value="{{ checkout_session.address.pincode|default:'' }}">
-                <button type="button" id="check-delivery-btn" class="btn btn-sm btn-outline-dark flex-shrink-0">{% trans "Check delivery" %}</button>
-              </div>
+              <input type="text" inputmode="numeric" maxlength="6" id="checkout-pincode" name="guest_pincode"
+                class="form-control form-control-sm" style="max-width: 160px;"
+                value="{{ checkout_session.address.pincode|default:'' }}">
+              <div class="form-text small text-muted mb-0">{% trans "Type your pincode to check delivery availability and charge." %}</div>
               <div id="error-guest_pincode" class="text-danger small mt-1"></div>
               <div id="delivery-check-result" class="small mt-2"></div>
               <div id="shipping-details-panel" class="border rounded p-3 mt-2" style="display:none; background:#f8f9fa;">
@@ -748,7 +746,6 @@
       });
     }
 
-    var checkDeliveryBtn = document.getElementById('check-delivery-btn');
     var pincodeInput = document.getElementById('checkout-pincode');
     var resultBox = document.getElementById('delivery-check-result');
     var shipPanel = document.getElementById('shipping-details-panel');
@@ -791,71 +788,112 @@
       if (shipOtherList) shipOtherList.innerHTML = '';
     }
 
-    if (checkDeliveryBtn && pincodeInput && resultBox) {
-      checkDeliveryBtn.addEventListener('click', function () {
-        var pincode = pincodeInput.value.trim();
-        resultBox.className = 'small mt-2';
-        resetShippingPanel();
-        if (!/^[1-9][0-9]{5}$/.test(pincode)) {
-          resultBox.className = 'small mt-2 text-danger';
-          resultBox.textContent = "{% trans 'Enter a valid 6-digit pincode.' %}";
-          return;
-        }
-        checkDeliveryBtn.disabled = true;
-        checkDeliveryBtn.textContent = "{% trans 'Checking...' %}";
-        resultBox.textContent = '';
+    var deliveryCheckToken = 0;
+    var deliveryCheckTimer = null;
+    var lastCheckedPincode = '';
 
-        fetch("{% url 'shipping:check-serviceability' %}?pincode=" + encodeURIComponent(pincode))
-          .then(function (r) { return r.json(); })
-          .then(function (data) {
-            if (!data.ok) {
-              resultBox.className = 'small mt-2 text-muted';
-              resultBox.textContent = data.error || "{% trans 'Could not verify delivery right now.' %}";
-            } else if (data.is_serviceable) {
-              resultBox.className = 'small mt-2 text-success fw-semibold';
-              resultBox.textContent = "{% trans '✓ Delivery available to this pincode' %}";
+    function runDeliveryCheck(pincode) {
+      var requestToken = ++deliveryCheckToken;
+      resultBox.className = 'small mt-2 text-muted';
+      resultBox.textContent = "{% trans 'Checking delivery availability...' %}";
 
-              var charge = parseFloat(data.shipping_charge) || 0;
-              if (shipPanel) {
-                shipPanel.style.display = 'block';
-                if (shipCourierName) shipCourierName.textContent = data.courier_name || '—';
-                if (shipEta) {
-                  shipEta.textContent = data.estimated_delivery_days
-                    ? data.estimated_delivery_days + " {% trans 'day(s)' %}"
-                    : '—';
-                }
-                if (shipCharge) shipCharge.textContent = formatMoney(charge);
+      fetch(
+        "{% url 'shipping:check-serviceability' %}?pincode=" + encodeURIComponent(pincode) +
+        "{% if buy_now_mode %}&buy_now=1{% endif %}"
+      )
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (requestToken !== deliveryCheckToken) return; // stale response, pincode changed since
+          if (!data.ok) {
+            resultBox.className = 'small mt-2 text-muted';
+            resultBox.textContent = data.error || "{% trans 'Could not verify delivery right now.' %}";
+          } else if (data.is_serviceable) {
+            resultBox.className = 'small mt-2 text-success fw-semibold';
+            resultBox.textContent = "{% trans '✓ Delivery available to this pincode' %}";
 
-                if (data.available_couriers && data.available_couriers.length > 1 && shipOtherWrap && shipOtherList) {
-                  var others = data.available_couriers.filter(function (c) {
-                    return c.courier_name !== data.courier_name;
-                  });
-                  if (others.length) {
-                    shipOtherList.innerHTML = others.map(function (c) {
-                      var days = c.estimated_delivery_days ? (c.estimated_delivery_days + " {% trans 'day(s)' %}") : '';
-                      return '<li>' + (c.courier_name || '') + ' — ' + formatMoney(parseFloat(c.freight_charge) || 0) + (days ? ' (' + days + ')' : '') + '</li>';
-                    }).join('');
-                    shipOtherWrap.style.display = 'block';
-                  }
+            var charge = parseFloat(data.shipping_charge) || 0;
+            if (shipPanel) {
+              shipPanel.style.display = 'block';
+              if (shipCourierName) shipCourierName.textContent = data.courier_name || '—';
+              if (shipEta) {
+                shipEta.textContent = data.estimated_delivery_days
+                  ? data.estimated_delivery_days + " {% trans 'day(s)' %}"
+                  : '—';
+              }
+              if (shipCharge) shipCharge.textContent = formatMoney(charge);
+
+              if (data.available_couriers && data.available_couriers.length > 1 && shipOtherWrap && shipOtherList) {
+                var others = data.available_couriers.filter(function (c) {
+                  return c.courier_name !== data.courier_name;
+                });
+                if (others.length) {
+                  shipOtherList.innerHTML = others.map(function (c) {
+                    var days = c.estimated_delivery_days ? (c.estimated_delivery_days + " {% trans 'day(s)' %}") : '';
+                    return '<li>' + (c.courier_name || '') + ' — ' + formatMoney(parseFloat(c.freight_charge) || 0) + (days ? ' (' + days + ')' : '') + '</li>';
+                  }).join('');
+                  shipOtherWrap.style.display = 'block';
                 }
               }
-
-              updateOrderSummary(charge);
-            } else {
-              resultBox.className = 'small mt-2 text-danger fw-semibold';
-              resultBox.textContent = "{% trans 'Sorry, we cannot deliver to this pincode yet.' %}";
-              updateOrderSummary(0);
             }
-          })
-          .catch(function () {
-            resultBox.className = 'small mt-2 text-muted';
-            resultBox.textContent = "{% trans 'Could not verify delivery right now.' %}";
-          })
-          .finally(function () {
-            checkDeliveryBtn.disabled = false;
-            checkDeliveryBtn.textContent = "{% trans 'Check delivery' %}";
-          });
+
+            updateOrderSummary(charge);
+          } else {
+            resultBox.className = 'small mt-2 text-danger fw-semibold';
+            resultBox.textContent = "{% trans 'Sorry, we cannot deliver to this pincode yet.' %}";
+            updateOrderSummary(0);
+          }
+        })
+        .catch(function () {
+          if (requestToken !== deliveryCheckToken) return;
+          resultBox.className = 'small mt-2 text-muted';
+          resultBox.textContent = "{% trans 'Could not verify delivery right now.' %}";
+        });
+    }
+
+    function scheduleDeliveryCheck() {
+      if (!pincodeInput || !resultBox) return;
+      var pincode = pincodeInput.value.trim();
+
+      if (deliveryCheckTimer) {
+        clearTimeout(deliveryCheckTimer);
+        deliveryCheckTimer = null;
+      }
+
+      if (!/^[1-9][0-9]{5}$/.test(pincode)) {
+      
+        deliveryCheckToken++;
+        lastCheckedPincode = '';
+        resultBox.className = 'small mt-2';
+        resultBox.textContent = '';
+        resetShippingPanel();
+        return;
+      }
+
+      if (pincode === lastCheckedPincode) {
+        return; // already checked this exact pincode, avoid a redundant call
+      }
+
+      // Small debounce so a still-typing/paste-in-progress user doesn't fire
+      // a Shiprocket lookup per keystroke once they cross 6 digits.
+      deliveryCheckTimer = setTimeout(function () {
+        lastCheckedPincode = pincode;
+        resetShippingPanel();
+        runDeliveryCheck(pincode);
+      }, 400);
+    }
+
+    if (pincodeInput && resultBox) {
+      ['input', 'keyup', 'change', 'paste'].forEach(function (evtName) {
+        pincodeInput.addEventListener(evtName, function () {
+          // Let the keystroke land / paste resolve before reading the value.
+          setTimeout(scheduleDeliveryCheck, 0);
+        });
       });
+
+      // Auto-check on load too, in case a saved/prefilled pincode is already valid.
+      if (/^[1-9][0-9]{5}$/.test(pincodeInput.value.trim())) {
+        scheduleDeliveryCheck();
+      }
     }
   });
 </script>

@@ -588,6 +588,8 @@ def get_variant_price(
     sale = get_active_flash_sale_price(product_id=product.pk, base_price=retail_price)
     display_price = sale["price"]
 
+    is_low_stock = 0 < resolved_stock <= product.low_stock_threshold
+
     result = {
         "base_price": str(product.base_price),
         "price": str(display_price),
@@ -596,6 +598,8 @@ def get_variant_price(
         "is_flash_sale": str(sale["is_flash_sale"]).lower(),
         "stock_quantity": str(resolved_stock),
         "is_in_stock": str(resolved_stock > 0).lower(),
+        "is_low_stock": str(is_low_stock).lower(),
+        "low_stock_threshold": str(product.low_stock_threshold),
     }
     if sale["is_flash_sale"]:
         result["original_price"] = str(sale["original_price"])

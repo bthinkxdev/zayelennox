@@ -122,7 +122,7 @@
                 data-currency-symbol="{{ display_currency.symbol }}"
                 data-product-name="{{ product.name }}">
         {% for v in product.variant_list %}
-        {% with v_price=product.base_price|decimal_add:v.price_delta v_mrp=product.mrp|decimal_add:v.price_delta %}
+        {% with v_price=product.base_price|decimal_add:v.price_delta v_mrp=v.effective_mrp %}
         {% with v_discount=v_mrp|discount_percent:v_price %}
         <button type="button" class="jm-variant-option{% if v.stock_quantity <= 0 %} jm-variant-option--oos{% endif %}"
                 data-variant-id="{{ v.pk }}"

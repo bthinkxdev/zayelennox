@@ -94,8 +94,11 @@ class ProductDeleteView(DashboardDeleteView):
 
 def _render_product_form(request, product, mode):
     if request.method == "POST":
-        form = forms.ProductForm(request.POST, request.FILES, instance=product)
+
         variants = forms.ProductVariantFormSet(request.POST, instance=product, prefix="variants")
+        form = forms.ProductForm(
+            request.POST, request.FILES, instance=product, variants_formset=variants
+        )
         images = forms.ProductImageFormSet(
             request.POST, request.FILES, instance=product, prefix="images"
         )
@@ -113,8 +116,7 @@ def _render_product_form(request, product, mode):
             and documents.is_valid()
         ):
             product = form.save()
-            variants.instance = product
-            variants.save()
+            _save_variants(product, variants)
             images.instance = product
             images.save()
             _normalize_primary_image(product)
@@ -137,8 +139,8 @@ def _render_product_form(request, product, mode):
             messages.success(request, f"Product {'created' if mode == 'create' else 'updated'}.")
             return redirect("dashboard:product-list")
     else:
-        form = forms.ProductForm(instance=product)
         variants = forms.ProductVariantFormSet(instance=product, prefix="variants")
+        form = forms.ProductForm(instance=product, variants_formset=variants)
         images = forms.ProductImageFormSet(instance=product, prefix="images")
         specifications = forms.ProductSpecificationFormSet(
             instance=product, prefix="specifications"
@@ -175,6 +177,31 @@ def _render_product_form(request, product, mode):
     context["existing_variant_types"] = ProductVariant.objects.exclude(variant_type="").values_list("variant_type", flat=True).distinct()
     
     return render(request, "dashboard/catalog/product_form.html", context)
+
+
+def _save_variants(product, variants):
+    """
+    Persist the variants formset, converting each kept variant's vendor-entered
+    "price" into ProductVariant.price_delta against the product's just-saved
+    base_price.
+
+    """
+    variants.instance = product
+    active_forms = forms.get_active_variant_forms(variants)
+
+    for vform in variants.forms:
+        if variants.can_delete and vform.cleaned_data.get("DELETE"):
+            if vform.instance.pk:
+                vform.instance.delete()
+            continue
+        if vform not in active_forms:
+            continue  # blank, unused extra row
+        instance = vform.save(commit=False)
+        instance.product = product
+        price = vform.cleaned_data.get("price")
+        if price is not None:
+            instance.price_delta = price - product.base_price
+        instance.save()
 
 
 def _normalize_primary_image(product):

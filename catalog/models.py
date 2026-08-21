@@ -137,8 +137,24 @@ class Product(TimeStampedModel):
         verbose_name="Base price",
         help_text="Default price before variant deltas.",
     )
-    mrp = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="MRP")
-    purchase_price = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Purchase Price")
+    mrp = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="MRP",
+        help_text="Required for simple products. Optional when the product has variants — "
+        "each variant may carry its own MRP instead.",
+    )
+    purchase_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Purchase Price",
+        help_text="Required for simple products. Optional when the product has variants — "
+        "each variant may carry its own purchase price instead.",
+    )
     is_rental = models.BooleanField(default=False, db_index=True, verbose_name="Is Rental Eligible")
     rental_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Rental Price")
     show_rental_storefront = models.BooleanField(default=True, db_index=True, verbose_name="Show Rental in Storefront")
@@ -194,33 +210,45 @@ class Product(TimeStampedModel):
         max_digits=6,
         decimal_places=3,
         default=0.5,
+        null=True,
+        blank=True,
         validators=[MinValueValidator(0)],
         verbose_name="Weight (kg)",
-        help_text="Weight in kilograms, used for courier booking.",
+        help_text="Weight in kilograms, used for courier booking. Required unless every "
+        "variant below supplies its own weight override.",
     )
     length_cm = models.DecimalField(
         max_digits=6,
         decimal_places=2,
         default=10,
+        null=True,
+        blank=True,
         validators=[MinValueValidator(0)],
         verbose_name="Length (cm)",
-        help_text="Length in centimeters.",
+        help_text="Length in centimeters. Required unless every variant below supplies "
+        "its own length override.",
     )
     width_cm = models.DecimalField(
         max_digits=6,
         decimal_places=2,
         default=10,
+        null=True,
+        blank=True,
         validators=[MinValueValidator(0)],
         verbose_name="Width (cm)",
-        help_text="Width (breadth) in centimeters.",
+        help_text="Width (breadth) in centimeters. Required unless every variant below "
+        "supplies its own width override.",
     )
     height_cm = models.DecimalField(
         max_digits=6,
         decimal_places=2,
         default=10,
+        null=True,
+        blank=True,
         validators=[MinValueValidator(0)],
         verbose_name="Height (cm)",
-        help_text="Height in centimeters.",
+        help_text="Height in centimeters. Required unless every variant below supplies "
+        "its own height override.",
     )
 
     class Meta:
@@ -301,7 +329,26 @@ class ProductVariant(TimeStampedModel):
         decimal_places=2,
         default=0,
         verbose_name="Price delta",
-        help_text="Amount added to the product base price.",
+        help_text="Amount added to the product base price. Computed automatically from "
+        "the variant's actual price entered in the dashboard — not vendor-editable directly.",
+    )
+    mrp = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="MRP override",
+        help_text="Leave blank to fall back to the product's MRP (offset by this "
+        "variant's price difference).",
+    )
+    purchase_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Purchase price override",
+        help_text="Leave blank to fall back to the product's purchase price (offset by "
+        "this variant's price difference).",
     )
     sku_suffix = models.CharField(
         max_length=32,
@@ -360,6 +407,32 @@ class ProductVariant(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.product.sku}-{self.sku_suffix}"
+
+    @property
+    def effective_price(self):
+        """This variant's real selling price (base price + delta)."""
+        return self.product.base_price + self.price_delta
+
+    @property
+    def effective_mrp(self):
+        """
+        This variant's MRP for discount-strike display.
+
+        """
+        if self.mrp is not None:
+            return self.mrp
+        if self.product.mrp is not None:
+            return self.product.mrp + self.price_delta
+        return None
+
+    @property
+    def effective_purchase_price(self):
+        """This variant's purchase price, falling back to the product's (offset by delta)."""
+        if self.purchase_price is not None:
+            return self.purchase_price
+        if self.product.purchase_price is not None:
+            return self.product.purchase_price + self.price_delta
+        return None
 
     def get_shipping_dims(self) -> dict:
         """

@@ -73,17 +73,21 @@
           var inStock = data.is_in_stock === 'true';
           var stock = parseInt(data.stock_quantity, 10);
           if (isNaN(stock)) stock = 0;
+          var isLowStock = data.is_low_stock === 'true';
 
           var stockEl = document.querySelector('.jm-pdp-buybox__stock');
           if (stockEl) {
             stockEl.classList.toggle('is-in', inStock);
             stockEl.classList.toggle('is-out', !inStock);
-            if (inStock) {
-              stockEl.textContent = 'In stock' + (stock ? ' · ' + stock : '');
-            } else {
-              stockEl.textContent = 'Out of stock';
-            }
+            
+            stockEl.classList.toggle('d-none', isLowStock);
+            stockEl.textContent = inStock ? 'In stock' : 'Out of stock';
           }
+
+          var lowStockAlert = document.getElementById('pdp-low-stock-alert');
+          var lowStockCount = document.getElementById('pdp-low-stock-count');
+          if (lowStockAlert) lowStockAlert.classList.toggle('d-none', !isLowStock);
+          if (lowStockCount) lowStockCount.textContent = stock;
 
           var qtyStepperWrap = document.querySelector('.jm-pdp-qty');
           if (qtyStepperWrap) qtyStepperWrap.classList.toggle('d-none', !inStock);

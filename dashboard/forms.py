@@ -46,6 +46,27 @@ class SlugAutoMixin(forms.ModelForm):
         return cleaned
 
 
+_DIMENSION_FIELDS = ("weight_kg", "length_cm", "width_cm", "height_cm")
+
+
+def get_active_variant_forms(formset):
+    """
+    Forms in a product's variants formset that represent a real, kept variant —
+    i.e. not a blank unused extra row, and not marked for deletion.
+
+    """
+    active = []
+    for form in formset.forms:
+        if not hasattr(form, "cleaned_data"):
+            continue
+        if formset.can_delete and form.cleaned_data.get("DELETE"):
+            continue
+        if not form.has_changed() and not form.instance.pk:
+            continue
+        active.append(form)
+    return active
+
+
 class ProductForm(SlugAutoMixin):
     class Meta:
         model = Product
@@ -78,27 +99,82 @@ class ProductForm(SlugAutoMixin):
             "name": {"required": "Product name is required."},
             "sku": {"required": "SKU is required."},
             "category": {"required": "Category is required."},
-            "base_price": {"required": "Base price is required."},
-            "mrp": {"required": "MRP is required."},
-            "purchase_price": {"required": "Purchase price is required."},
             "stock_quantity": {"required": "Stock quantity is required."},
-            "weight_kg": {"required": "Weight is required for courier booking."},
-            "length_cm": {"required": "Length is required for courier booking."},
-            "width_cm": {"required": "Width is required for courier booking."},
-            "height_cm": {"required": "Height is required for courier booking."},
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, variants_formset=None, **kwargs):
         super().__init__(*args, **kwargs)
+       
+        self._variants_formset = variants_formset
         self.fields["slug"].required = False
-        # These fields carry model-level defaults (0.5kg / 10x10x10cm) purely so the
-        # migration didn't break existing rows. On CREATE, don't pre-fill them as if
-        # they were real values — blank the widgets so the vendor has to type an
-        # actual weight/size rather than silently accepting a placeholder default.
+        
+        for name in ("base_price", "mrp", "purchase_price", *_DIMENSION_FIELDS):
+            self.fields[name].required = False
+        
         if not self.instance.pk:
-            for name in ("weight_kg", "length_cm", "width_cm", "height_cm"):
+            for name in _DIMENSION_FIELDS:
                 self.initial[name] = None
                 self.fields[name].widget.attrs["placeholder"] = "0.00"
+
+    def _active_variant_forms(self):
+        fs = self._variants_formset
+        if fs is None:
+            return None
+        if not fs.is_valid():
+            return None
+        return get_active_variant_forms(fs)
+
+    def clean(self):
+        cleaned = super().clean()
+        active_variants = self._active_variant_forms()
+
+        if active_variants is None and self._variants_formset is not None:
+            
+            return cleaned
+
+        has_variants = bool(active_variants) if active_variants is not None else (
+            bool(self.instance.pk) and self.instance.variants.exists()
+        )
+
+        if has_variants:
+            
+            prices = []
+            for vform in active_variants:
+                price = vform.cleaned_data.get("price")
+                if price in (None, ""):
+                    vform.add_error("price", "Price is required for each variant.")
+                else:
+                    prices.append(price)
+            if prices:
+                cleaned["base_price"] = min(prices)
+
+            
+            all_variants_have_dims = active_variants and all(
+                all(vform.cleaned_data.get(f) not in (None, "") for f in _DIMENSION_FIELDS)
+                for vform in active_variants
+            )
+            if not all_variants_have_dims:
+                for f in _DIMENSION_FIELDS:
+                    if cleaned.get(f) in (None, ""):
+                        self.add_error(
+                            f,
+                            "Required unless every variant below supplies its own "
+                            "weight/length/width/height.",
+                        )
+        else:
+            
+            for field_name, label in (
+                ("base_price", "Base price"),
+                ("mrp", "MRP"),
+                ("purchase_price", "Purchase price"),
+            ):
+                if cleaned.get(field_name) in (None, ""):
+                    self.add_error(field_name, f"{label} is required.")
+            for f in _DIMENSION_FIELDS:
+                if cleaned.get(f) in (None, ""):
+                    self.add_error(f, "Required for courier booking.")
+
+        return cleaned
 
 
 class CategoryForm(SlugAutoMixin):
@@ -139,14 +215,26 @@ class ReviewForm(forms.ModelForm):
 
 
 class ProductVariantForm(forms.ModelForm):
+    
+    price = forms.DecimalField(
+        required=False,
+        min_value=0,
+        max_digits=12,
+        decimal_places=2,
+        label="Price",
+        help_text="Actual selling price for this variant — what the customer pays.",
+        widget=forms.NumberInput(attrs={"placeholder": "e.g. 499.00", "step": "0.01"}),
+    )
+
     class Meta:
         model = ProductVariant
         fields = [
             "variant_type",
             "name",
-            "price_delta",
             "sku_suffix",
             "stock_quantity",
+            "mrp",
+            "purchase_price",
             "weight_kg",
             "length_cm",
             "width_cm",
@@ -158,6 +246,8 @@ class ProductVariantForm(forms.ModelForm):
                 "class": "form-control",
                 "placeholder": "e.g. Size, Packaging, Color"
             }),
+            "mrp": forms.NumberInput(attrs={"placeholder": "Optional", "step": "0.01"}),
+            "purchase_price": forms.NumberInput(attrs={"placeholder": "Optional", "step": "0.01"}),
             "weight_kg": forms.NumberInput(attrs={"placeholder": "Product default", "step": "0.001"}),
             "length_cm": forms.NumberInput(attrs={"placeholder": "Product default", "step": "0.01"}),
             "width_cm": forms.NumberInput(attrs={"placeholder": "Product default", "step": "0.01"}),
@@ -166,15 +256,17 @@ class ProductVariantForm(forms.ModelForm):
         error_messages = {
             "variant_type": {"required": "Variant type is required."},
             "name": {"required": "Name is required."},
-            "price_delta": {"required": "Price delta is required."},
             "sku_suffix": {"required": "SKU suffix is required."},
             "stock_quantity": {"required": "Stock quantity is required."},
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for name in ("weight_kg", "length_cm", "width_cm", "height_cm"):
+        for name in ("weight_kg", "length_cm", "width_cm", "height_cm", "mrp", "purchase_price"):
             self.fields[name].required = False
+        
+        if self.instance.pk and self.instance.product_id:
+            self.initial.setdefault("price", self.instance.product.base_price + self.instance.price_delta)
 
     def has_changed(self):
         """Ignore empty extra forms even if fields have model defaults (like stock_quantity=0)."""
@@ -333,41 +425,29 @@ class HeroSlideForm(forms.ModelForm):
     def clean_image(self):
         image = self.cleaned_data.get("image")
         if image:
+            
             from django.core.files.images import get_image_dimensions
             width, height = get_image_dimensions(image)
-            
-            # Enforce approximately 2:1 aspect ratio, allowing a small tolerance limit
-            aspect_ratio = width / height
-            if not (1.95 <= aspect_ratio <= 2.05):
-                raise forms.ValidationError(
-                    f"Banner image must have approximately a 2:1 aspect ratio. "
-                    f"Uploaded image is {width}x{height}."
-                )
-            
-            #enforce a minimum resolution for quality
+
             if width < 1000:
                 raise forms.ValidationError(
                     f"Banner image must be at least 1000px wide for good quality. Uploaded image is {width}px wide."
                 )
-                
+
         return image
 
     def clean_poster(self):
         poster = self.cleaned_data.get("poster")
         if poster:
+            # Same as clean_image: any ratio accepted, cropped to 2:1 on display.
             from django.core.files.images import get_image_dimensions
             width, height = get_image_dimensions(poster)
-            
-            if width != height * 2:
-                raise forms.ValidationError(
-                    f"Poster image must have exactly a 2:1 aspect ratio. Uploaded image is {width}x{height}."
-                )
-            
+
             if width < 1200:
                 raise forms.ValidationError(
                     f"Poster image must be at least 1200px wide. Uploaded image is {width}px wide."
                 )
-                
+
         return poster
 
 

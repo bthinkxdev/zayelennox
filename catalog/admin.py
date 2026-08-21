@@ -54,6 +54,8 @@ class ProductVariantInline(admin.TabularInline):
         "variant_type",
         "name",
         "price_delta",
+        "mrp",
+        "purchase_price",
         "sku_suffix",
         "stock_quantity",
         "weight_kg",
@@ -168,7 +170,18 @@ class ProductVariantAdmin(admin.ModelAdmin):
     fieldsets = (
         (
             None,
-            {"fields": ("product", "variant_type", "name", "price_delta", "sku_suffix", "stock_quantity")},
+            {
+                "fields": (
+                    "product",
+                    "variant_type",
+                    "name",
+                    "price_delta",
+                    "mrp",
+                    "purchase_price",
+                    "sku_suffix",
+                    "stock_quantity",
+                )
+            },
         ),
         (
             "Shipping override (optional)",

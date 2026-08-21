@@ -9,7 +9,7 @@ from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
-from cart.selectors import get_cart_for_request
+from cart.selectors import get_buy_now_cart_for_request, get_cart_for_request
 from shipping.exceptions import ShiprocketAPIError
 from shipping.parcel import calculate_parcel_from_cart
 from shipping.shiprocket_client import shiprocket_client
@@ -27,7 +27,7 @@ SESSION_KEY = "shiprocket_shipping"
 @require_GET
 def check_serviceability_view(request):
     """
-    GET ?pincode=XXXXXX
+    GET ?pincode=XXXXXX[&buy_now=1]
 
     Quotes real Shiprocket courier rates for the customer's actual cart
     contents and destination pincode. On a serviceable result, stashes the
@@ -45,7 +45,12 @@ def check_serviceability_view(request):
             {"ok": False, "error": "Delivery check is not configured yet."}, status=200
         )
 
-    cart = get_cart_for_request(request=request)
+    buy_now_mode = request.GET.get("buy_now") == "1"
+    cart = (
+        get_buy_now_cart_for_request(request=request)
+        if buy_now_mode
+        else get_cart_for_request(request=request)
+    )
     if cart is None or not cart.items.exists():
         return JsonResponse({"ok": False, "error": "Your cart is empty."}, status=200)
 
