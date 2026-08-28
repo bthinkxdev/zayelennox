@@ -6,15 +6,28 @@
 {% block content %}
 <div class="row">
   <div class="col-12">
-    <form method="get" class="d-flex gap-2 mb-3 flex-wrap">
-      <input type="text" name="q" value="{{ search_query }}" class="form-control" style="max-width: 260px;" placeholder="Search order number..." />
-      <select name="status" class="form-select" style="max-width: 220px;" onchange="this.form.submit()">
-        <option value="">All statuses</option>
-        {% for value, label in statuses %}
-        <option value="{{ value }}" {% if value == current_status %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-      <button type="submit" class="btn btn-outline-secondary"><i class="ti ti-search"></i></button>
+    <form method="get" class="row g-2 align-items-center mb-3">
+      <div class="col-12 col-md" style="max-width: 340px;">
+        <div class="input-group">
+          <span class="input-group-text bg-transparent border-end-0"><i class="ti ti-search text-secondary"></i></span>
+          <input type="text" name="q" value="{{ search_query }}" class="form-control border-start-0 ps-0"
+                 placeholder="Search by order number or mobile number..." />
+          <button type="submit" class="btn btn-outline-secondary">Search</button>
+        </div>
+      </div>
+      <div class="col-6 col-md-auto">
+        <select name="status" class="form-select" style="max-width: 220px;" onchange="this.form.submit()">
+          <option value="">All statuses</option>
+          {% for value, label in statuses %}
+          <option value="{{ value }}" {% if value == current_status %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if search_query or current_status %}
+      <div class="col-12 col-md-auto d-grid d-md-block">
+        <a href="{% url 'dashboard:order-list' %}" class="btn btn-link text-secondary">Clear</a>
+      </div>
+      {% endif %}
     </form>
 
     <div class="card table-responsive">
@@ -27,10 +40,16 @@
           <tr>
             <td><a href="{% url 'dashboard:order-detail' order.pk %}">{{ order.order_number }}</a></td>
             <td>
-              {% if order.cart and not order.cart.customer_profile %}
-                Guest
+              {% if order.customer_profile %}
+                {% if order.customer_profile.user.last_login %}
+                  {{ order.customer_profile }}
+                {% else %}
+                  {{ order.customer_profile }} (Guest)
+                {% endif %}
               {% else %}
-                {{ order.customer_profile|default:"Guest" }}
+                {% with guest_name=order.delivery_address_snapshot.name %}
+                  {% if guest_name %}{{ guest_name }} (Guest){% else %}Guest{% endif %}
+                {% endwith %}
               {% endif %}
             </td>
             <td><span class="badge bg-primary-subtle text-primary">{{ order.get_order_status_display }}</span></td>

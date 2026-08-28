@@ -5,11 +5,11 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Any
 
-from django.db.models import Case, Count, F, IntegerField, Min, When
 from django.utils import timezone
 
 from accounts.models import CustomerProfile
 from catalog.models import Product
+from catalog.selectors import low_stock_products_queryset
 from orders.models import Order
 from reports.models import (
     DailyCustomerReport,
@@ -95,28 +95,13 @@ def get_top_products(*, limit: int = 5) -> list[dict[str, Any]]:
 
 def get_low_stock_products(*, limit: int = 5) -> list[dict[str, Any]]:
     """
-    Active products at or below their low-stock threshold.
-
-    Product.stock_quantity isn't maintained once a product has variants
-    (sales route through ProductVariant.stock_quantity - see
-    Product.is_in_stock), so for variant products the threshold is checked
-    against the worst-stocked variant instead of the stale product-level
-    field, and that variant's stock is what gets shown as "stock" below.
+    Active products at or below their low-stock threshold, for the dashboard
+    list widget.
     """
     products = (
-        Product.objects.filter(is_active=True)
+        low_stock_products_queryset()
         .select_related("category")
         .prefetch_related("images")
-        .annotate(
-            variant_count=Count("variants", distinct=True),
-            min_variant_stock=Min("variants__stock_quantity"),
-            effective_stock=Case(
-                When(variant_count=0, then=F("stock_quantity")),
-                default=F("min_variant_stock"),
-                output_field=IntegerField(),
-            ),
-        )
-        .filter(effective_stock__lte=F("low_stock_threshold"))
         .order_by("effective_stock")[:limit]
     )
     return [

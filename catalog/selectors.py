@@ -7,7 +7,7 @@ from typing import Any, Optional
 
 from django.core.cache import cache
 from django.core.paginator import Paginator
-from django.db.models import Avg, Count, Prefetch, Q, QuerySet
+from django.db.models import Avg, Case, Count, F, IntegerField, Min, Prefetch, Q, QuerySet, When
 
 from catalog.models import (
     ModerationStatus,
@@ -44,6 +44,27 @@ CATEGORY_TREE_CACHE_KEY = "catalog:category_tree:v1"
 CATEGORY_TREE_TTL = 300
 DEFAULT_CURRENCY_CACHE_KEY = "core:default_currency:v1"
 DEFAULT_CURRENCY_TTL = 300
+
+
+def low_stock_products_queryset() -> "QuerySet[Product]":
+    return (
+        Product.objects.filter(is_active=True)
+        .annotate(
+            variant_count=Count("variants", distinct=True),
+            min_variant_stock=Min("variants__stock_quantity"),
+            effective_stock=Case(
+                When(variant_count=0, then=F("stock_quantity")),
+                default=F("min_variant_stock"),
+                output_field=IntegerField(),
+            ),
+        )
+        .filter(effective_stock__lte=F("low_stock_threshold"))
+    )
+
+
+def get_low_stock_count() -> int:
+    """Live count of active products at or below their low-stock threshold."""
+    return low_stock_products_queryset().count()
 
 
 def get_product_display_price(*, product: Product) -> Decimal:

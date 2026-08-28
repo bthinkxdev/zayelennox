@@ -85,7 +85,7 @@
       <div class="card-header bg-transparent px-4 py-3"><h3 class="h5 mb-0">Update Status</h3></div>
       <div class="card-body p-4">
         {% if allowed_choices %}
-        <form method="post" action="{% url 'dashboard:order-transition' order.pk %}">
+        <form id="order-status-form" method="post" action="{% url 'dashboard:order-transition' order.pk %}">
           {% csrf_token %}
           <div class="mb-3">
             <label class="form-label">New status</label>
@@ -96,7 +96,7 @@
             </select>
           </div>
           <div class="mb-3">
-            <label class="form-label">Note (optional)</label>
+            <label class="form-label" data-note-label>Note (optional)</label>
             <textarea name="note" rows="2" class="form-control"></textarea>
           </div>
           <button type="submit" class="btn btn-primary w-100">Apply transition</button>

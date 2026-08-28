@@ -18,6 +18,7 @@
           <span class="input-group-text bg-transparent border-end-0"><i class="ti ti-search text-secondary"></i></span>
           <input type="text" name="q" value="{{ search_query }}" class="form-control border-start-0 ps-0"
                  placeholder="Search by name or SKU..." />
+          <button type="submit" class="btn btn-outline-secondary">Search</button>
         </div>
       </div>
       <div class="col-6 col-md-auto">
@@ -37,13 +38,27 @@
           <option value="out" {% if status_filter == "out" %}selected{% endif %}>Out of stock</option>
         </select>
       </div>
-      <div class="col-12 col-md-auto d-grid d-md-block">
-        <button type="submit" class="btn btn-outline-secondary">Filter</button>
-        {% if search_query or status_filter or category_filter %}
-        <a href="{% url 'dashboard:product-list' %}" class="btn btn-link text-secondary">Clear</a>
-        {% endif %}
+      <div class="col-6 col-md-auto">
+        <select name="sort" class="form-select" onchange="this.form.submit()">
+          <option value="">Sort: default</option>
+          <option value="top_selling" {% if sort_filter == "top_selling" %}selected{% endif %}>Top selling</option>
+        </select>
       </div>
+      {% if search_query or status_filter or category_filter or sort_filter %}
+      <div class="col-12 col-md-auto d-grid d-md-block">
+        <a href="{% url 'dashboard:product-list' %}" class="btn btn-link text-secondary">Clear</a>
+      </div>
+      {% endif %}
     </form>
+    {% if sort_filter == "top_selling" %}
+    <p class="text-secondary small mb-0 mt-2">
+      {% if top_selling_date %}
+        Sorted by revenue on {{ top_selling_date|date:"M d, Y" }}, the most recent day with sales data. Products with no sales that day aren't shown.
+      {% else %}
+        No sales data is available yet, so nothing can be ranked as top selling.
+      {% endif %}
+    </p>
+    {% endif %}
   </div>
 </div>
 

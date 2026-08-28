@@ -18,6 +18,7 @@ from dashboard.views.base import (
     DashboardListView,
     DashboardUpdateView,
 )
+from reports.models import DailyProductPerformance
 
 
 class ProductListView(DashboardListView):
@@ -73,6 +74,24 @@ class ProductListView(DashboardListView):
         category = self.request.GET.get("category", "")
         if category.isdigit():
             qs = qs.filter(category_id=int(category))
+
+        if self.request.GET.get("sort") == "top_selling":
+            self.top_selling_date = (
+                DailyProductPerformance.objects.order_by("-report_date")
+                .values_list("report_date", flat=True)
+                .first()
+            )
+            if self.top_selling_date:
+                qs = qs.filter(
+                    daily_performance_reports__report_date=self.top_selling_date
+                ).annotate(
+                    top_selling_revenue=F("daily_performance_reports__revenue"),
+                ).order_by("-top_selling_revenue")
+            else:
+                qs = qs.none()
+        else:
+            self.top_selling_date = None
+
         return qs
 
     def get_context_data(self, **kwargs):
@@ -82,6 +101,8 @@ class ProductListView(DashboardListView):
         context["categories"] = Category.objects.order_by("name")
         context["status_filter"] = self.request.GET.get("status", "")
         context["category_filter"] = self.request.GET.get("category", "")
+        context["sort_filter"] = self.request.GET.get("sort", "")
+        context["top_selling_date"] = getattr(self, "top_selling_date", None)
         return context
 
 

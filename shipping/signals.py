@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 
+from django.db import transaction
 from django.dispatch import receiver
 
 from orders.models import OrderStatus
@@ -37,5 +38,13 @@ def auto_create_shipment_on_ready(sender, order, old_status, new_status, send_no
 
     from shipping.tasks import create_shipment_for_order_task
 
-    create_shipment_for_order_task.delay(order_id=order.pk)
-    logger.info("Queued Shiprocket shipment creation for order %s", order.order_number)
+    def _dispatch_shipment_task() -> None:
+        try:
+            create_shipment_for_order_task.delay(order_id=order.pk)
+            logger.info("Queued Shiprocket shipment creation for order %s", order.order_number)
+        except Exception:
+            logger.exception(
+                "Shiprocket shipment dispatch failed for order %s", order.order_number
+            )
+
+    transaction.on_commit(_dispatch_shipment_task)

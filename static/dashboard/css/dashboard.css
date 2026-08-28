@@ -658,7 +658,7 @@ a {
 .variants-table td:nth-child(2) { min-width: 160px; } /* Type */
 .variants-table th:nth-child(3),
 .variants-table td:nth-child(3) { min-width: 160px; } /* Name */
-.variants-table th:nth-child(6),
-.variants-table td:nth-child(6) { min-width: 90px; } /* Stock */
-.variants-table th:nth-child(11),
-.variants-table td:nth-child(11) { min-width: 70px; } /* Remove */
+.variants-table th:nth-child(8),
+.variants-table td:nth-child(8) { min-width: 90px; } /* Stock */
+.variants-table th:nth-child(13),
+.variants-table td:nth-child(13) { min-width: 70px; } /* Remove */

@@ -357,11 +357,130 @@
     body.addEventListener("change", refresh);
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
+  function initPage() {
     initSidebar();
     initFormValidation();
     initCharts();
     initFormsets();
     initVariantStockToggle();
-  });
+    initProductFormPersistFiles();
+    initOrderStatusGuard();
+  }
+
+
+  function initOrderStatusGuard() {
+    var form = document.getElementById("order-status-form");
+    if (!form || form.dataset.cancelGuardBound === "1") return;
+    form.dataset.cancelGuardBound = "1";
+
+    var select = form.querySelector('select[name="new_status"]');
+    var note = form.querySelector('textarea[name="note"]');
+    var noteLabel = form.querySelector("[data-note-label]");
+    if (!select) return;
+
+    function syncNoteLabel() {
+      if (noteLabel) {
+        noteLabel.textContent = select.value === "cancelled" ? "Note (required for cancelling)" : "Note (optional)";
+      }
+    }
+    select.addEventListener("change", syncNoteLabel);
+    syncNoteLabel();
+
+    form.addEventListener("submit", function (e) {
+      if (select.value !== "cancelled") return;
+
+      if (!note || !note.value.trim()) {
+        e.preventDefault();
+        if (note) note.focus();
+        window.alert("Please add a note explaining why this order is being cancelled.");
+        return;
+      }
+
+      var confirmed = window.confirm(
+        "Cancel this order? This can't be undone here - if the customer " +
+        "still wants it, a new order would need to be created. Continue?"
+      );
+      if (!confirmed) {
+        e.preventDefault();
+      }
+    });
+  }
+
+
+  function initProductFormPersistFiles() {
+    var form = document.getElementById("product-form");
+    if (!form || form.dataset.ajaxBound === "1") return;
+    form.dataset.ajaxBound = "1";
+    form.addEventListener("submit", handleProductFormSubmit);
+  }
+
+  function handleProductFormSubmit(e) {
+    e.preventDefault();
+    var formEl = e.currentTarget;
+    var submitBtn = formEl.querySelector('button[type="submit"]');
+
+
+    var pickedFiles = [];
+    Array.prototype.forEach.call(formEl.querySelectorAll('input[type="file"]'), function (input) {
+      if (input.files && input.files[0]) {
+        pickedFiles.push({ name: input.name, file: input.files[0] });
+      }
+    });
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="ti ti-loader-2 me-1"></i>Saving...';
+    }
+
+    fetch(formEl.action, {
+      method: "POST",
+      body: new FormData(formEl),
+      credentials: "same-origin",
+    })
+      .then(function (response) {
+        return response.text().then(function (html) {
+          return { html: html, url: response.url };
+        });
+      })
+      .then(function (result) {
+        var doc = new DOMParser().parseFromString(result.html, "text/html");
+        var newForm = doc.getElementById("product-form");
+
+        if (newForm) {
+        
+          var imported = document.importNode(newForm, true);
+          formEl.parentNode.replaceChild(imported, formEl);
+
+          pickedFiles.forEach(function (entry) {
+            var input = imported.querySelector('input[type="file"][name="' + entry.name + '"]');
+            if (!input) return;
+            var dt = new DataTransfer();
+            dt.items.add(entry.file);
+            input.files = dt.files;
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+          });
+
+          initFormsets();
+          initVariantStockToggle();
+          initProductFormPersistFiles();
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        } else if (doc.getElementById("sidebar")) {
+         
+          document.title = doc.title;
+          document.body.innerHTML = doc.body.innerHTML;
+          window.history.pushState({}, doc.title, result.url);
+          initPage();
+        } else {
+         
+          window.location.href = result.url;
+        }
+      })
+      .catch(function () {
+        
+        formEl.removeEventListener("submit", handleProductFormSubmit);
+        formEl.submit();
+      });
+  }
+
+  document.addEventListener("DOMContentLoaded", initPage);
 })();

@@ -10,6 +10,7 @@ from django.core.paginator import Paginator
 from django.db.models import Count, Sum
 from django.utils import timezone
 
+from catalog.selectors import get_low_stock_count
 from orders.models import Order, OrderStatus
 from reports.models import (
     DailyCustomerReport,
@@ -108,10 +109,7 @@ def get_admin_dashboard_summary() -> dict[str, Any]:
     yesterday = today - timedelta(days=1)
 
     yesterday_report = DailySalesReport.objects.filter(report_date=yesterday).first()
-    low_stock_count = InventorySnapshot.objects.filter(
-        report_date=yesterday,
-        is_low_stock=True,
-    ).count()
+    low_stock_count = get_low_stock_count()
 
     today_orders = Order.objects.filter(created_at__date=today).exclude(
         order_status=OrderStatus.CANCELLED,

@@ -23,6 +23,21 @@ ALLOWED_STATUS_TRANSITIONS: dict[str, set[str]] = {
     OrderStatus.REFUNDED: set(),
 }
 
+HARD_BLOCKED_TRANSITIONS: dict[str, dict[str, str]] = {
+    OrderStatus.DELIVERED: {
+        OrderStatus.CANCELLED: (
+            "Delivered orders can't be cancelled. Use Refunded instead if "
+            "money needs to be returned to the customer."
+        ),
+    },
+    OrderStatus.CANCELLED: {
+        OrderStatus.DELIVERED: (
+            "Cancelled orders can't be marked Delivered. If the customer "
+            "still wants this order, create a new one."
+        ),
+    },
+}
+
 
 def generate_order_number() -> str:
     """Return a unique human-readable order number."""
@@ -48,6 +63,11 @@ def transition_order_status(
     old_status = order.order_status
     if new_status == old_status:
         return order
+
+    blocked_message = HARD_BLOCKED_TRANSITIONS.get(old_status, {}).get(new_status)
+    if blocked_message:
+       
+        raise InvalidOrderStatusTransitionError(blocked_message)
 
     if not force:
         allowed = ALLOWED_STATUS_TRANSITIONS.get(old_status, set())

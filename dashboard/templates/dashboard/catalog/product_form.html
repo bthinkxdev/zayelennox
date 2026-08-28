@@ -6,7 +6,7 @@
   images{% else %}Create a new product for your catalog{% endif %}</p>{% endblock %}
 
 {% block content %}
-<form method="post" enctype="multipart/form-data" novalidate>
+<form id="product-form" method="post" enctype="multipart/form-data" novalidate>
   {% csrf_token %}
   {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
 

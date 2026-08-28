@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.db.models import Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
@@ -25,7 +26,11 @@ def order_list(request: HttpRequest) -> HttpResponse:
         qs = qs.filter(order_status=status)
     query = request.GET.get("q", "").strip()
     if query:
-        qs = qs.filter(order_number__icontains=query)
+        qs = qs.filter(
+            Q(order_number__icontains=query)
+            | Q(customer_profile__phone__icontains=query)
+            | Q(delivery_address_snapshot__phone__icontains=query)
+        )
 
     paginator = Paginator(qs, 25)
     page_obj = paginator.get_page(request.GET.get("page"))
@@ -80,6 +85,14 @@ def order_transition(request: HttpRequest, pk: int) -> HttpResponse:
     order = get_object_or_404(Order, pk=pk)
     new_status = request.POST.get("new_status", "")
     note = request.POST.get("note", "")
+
+    if new_status == OrderStatus.CANCELLED and not note.strip():
+        messages.error(
+            request,
+            "Please add a note explaining why this order is being cancelled.",
+        )
+        return redirect("dashboard:order-detail", pk=pk)
+
     try:
         transition_order_status(
             order=order, new_status=new_status, actor=request.user, note=note, force=True
@@ -96,30 +109,29 @@ def order_transition(request: HttpRequest, pk: int) -> HttpResponse:
 @require_POST
 def order_payment_transition(request: HttpRequest, pk: int) -> HttpResponse:
     """Manually update the payment status of the latest payment transaction."""
+    from payments.exceptions import InvalidPaymentStatusTransitionError
     from payments.models import PaymentStatus
-    
+    from payments.services import transition_payment_status
+
     order = get_object_or_404(Order, pk=pk)
     new_status = request.POST.get("new_status", "")
-    
+
     # get the latest payment transaction to update
     tx = order.payment_transactions.last()
-    
-    if tx and new_status in dict(PaymentStatus.choices):
-        if new_status == PaymentStatus.SUCCESS:
-            from payments.services import confirm_payment_success
-            confirm_payment_success(payment_transaction=tx)
-            messages.success(request, f"Payment marked as {dict(PaymentStatus.choices).get(new_status)}.")
-        elif new_status == PaymentStatus.FAILED:
-            from payments.services import confirm_payment_failed
-            confirm_payment_failed(payment_transaction=tx)
-            messages.success(request, f"Payment marked as {dict(PaymentStatus.choices).get(new_status)}.")
-        else:
-            tx.status = new_status
-            tx.save(update_fields=["status", "updated_at"])
-            messages.success(request, f"Payment marked as {dict(PaymentStatus.choices).get(new_status)}.")
-    elif not tx:
+
+    if not tx:
         messages.error(request, "Could not update payment status: No payment records found.")
-        
+    elif new_status not in dict(PaymentStatus.choices):
+        messages.error(request, "Unknown payment status.")
+    else:
+        try:
+            transition_payment_status(payment_transaction=tx, new_status=new_status)
+            messages.success(
+                request, f"Payment marked as {dict(PaymentStatus.choices).get(new_status)}."
+            )
+        except InvalidPaymentStatusTransitionError as exc:
+            messages.error(request, str(exc))
+
     return redirect("dashboard:order-detail", pk=pk)
 
 

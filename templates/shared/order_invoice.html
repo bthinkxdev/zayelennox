@@ -52,7 +52,7 @@
         
         .invoice-container {
             width: 210mm;
-            min-height: 297mm;
+
             padding: 15mm;
             background: white;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
@@ -228,11 +228,26 @@
             <div class="ship-to">
                 <div class="section-title">Ship To</div>
                 <div class="customer-details">
+                    <div class="customer-name">
+                        {% if order.delivery_address_snapshot.name %}
+                            {{ order.delivery_address_snapshot.name }}
+                        {% elif order.customer_profile and order.customer_profile.user.get_full_name %}
+                            {{ order.customer_profile.user.get_full_name }}
+                        {% else %}
+                            Guest Customer
+                        {% endif %}
+                    </div>
                     {% if order.delivery_address_snapshot.line1 %}<div>{{ order.delivery_address_snapshot.line1 }}</div>{% endif %}
                     {% if order.delivery_address_snapshot.line2 %}
                         <div>{{ order.delivery_address_snapshot.line2 }}</div>
                     {% endif %}
                     <div>{{ order.delivery_address_snapshot.city }}{% if order.delivery_address_snapshot.state %}, {{ order.delivery_address_snapshot.state }}{% endif %} {{ order.delivery_address_snapshot.pincode }}</div>
+
+                    {% if order.delivery_address_snapshot.phone %}
+                        <div>{{ order.delivery_address_snapshot.phone }}</div>
+                    {% elif order.customer_profile and order.customer_profile.get_phone %}
+                        <div>{{ order.customer_profile.get_phone }}</div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -312,7 +327,14 @@
                 filename:     'Invoice_{{ order.order_number }}.pdf',
                 image:        { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                // Avoid html2pdf's classic "blank trailing page": with no
+                // pagebreak option it always falls back to pure pixel
+                // slicing (legacy mode), which is what turns a sliver of
+                // rounding error into a whole extra page. 'css' mode first
+                // checks for real break points (and page-break-inside:
+                // avoid, already set on .invoice-container) before it does.
+                pagebreak:    { mode: ['css', 'legacy'] }
             };
             
             // generate PDF and save
