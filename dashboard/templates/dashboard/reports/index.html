@@ -19,11 +19,11 @@
     <form method="get" class="d-flex gap-2 mb-3 flex-wrap align-items-end">
       <div>
         <label class="form-label small mb-1">From</label>
-        <input type="date" name="start" value="{{ start|date:'Y-m-d' }}" class="form-control" />
+        <input type="date" name="start" value="{{ start|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}" class="form-control" />
       </div>
       <div>
         <label class="form-label small mb-1">To</label>
-        <input type="date" name="end" value="{{ end|date:'Y-m-d' }}" class="form-control" />
+        <input type="date" name="end" value="{{ end|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}" class="form-control" />
       </div>
       <button type="submit" class="btn btn-outline-secondary">Apply</button>
     </form>

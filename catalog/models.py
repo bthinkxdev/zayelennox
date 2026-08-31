@@ -449,13 +449,29 @@ class ProductVariant(TimeStampedModel):
 
 
 class ProductImage(TimeStampedModel):
-    """Gallery image for a product."""
+    """
+    Gallery image for a product, or for one of its variants.
+
+    ``variant`` is left blank for a product-level image (shown by default,
+    and whenever the selected variant has no images of its own). Set it to
+    scope the image to a single variant instead - the PDP swaps to a
+    variant's own images when one is selected and it has any.
+    """
 
     product = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
         related_name="images",
         verbose_name="Product",
+    )
+    variant = models.ForeignKey(
+        "ProductVariant",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="images",
+        verbose_name="Variant",
+        help_text="Leave blank for a product-level image. Set to scope this image to one variant.",
     )
     image = models.ImageField(
         upload_to="products/images/",
@@ -474,7 +490,7 @@ class ProductImage(TimeStampedModel):
         default=False,
         db_index=True,
         verbose_name="Is primary",
-        help_text="Primary image shown on PLP cards and homepage rails.",
+        help_text="Primary image shown on PLP cards and homepage rails. For a variant image, this is the one shown first in the PDP gallery when that variant is selected.",
     )
 
     class Meta:
@@ -486,9 +502,21 @@ class ProductImage(TimeStampedModel):
                 fields=["product", "is_primary"],
                 name="cat_img_product_primary_idx",
             ),
+            models.Index(
+                fields=["variant", "display_order"],
+                name="cat_img_variant_order_idx",
+            ),
         ]
 
+    def save(self, *args, **kwargs):
+      
+        if self.variant_id and not self.product_id:
+            self.product_id = self.variant.product_id
+        super().save(*args, **kwargs)
+
     def __str__(self) -> str:
+        if self.variant_id:
+            return f"Image for {self.product.slug} ({self.variant.name})"
         return f"Image for {self.product.slug}"
 
 

@@ -55,9 +55,9 @@
         <div class="card-header panel-header">
           <div>
             <h3 class="panel-title">Variants</h3>
-            <p class="panel-sub">Size or packaging options — type each one's actual selling price. MRP, Purchase price and dimensions are optional per variant; leave them blank to fall back to the product's values above.</p>
+            <p class="panel-sub">Size or packaging options. Click a variant to set its price, stock, dimensions and its own images — leave images blank to just use the product's photos above.</p>
           </div>
-          <button type="button" class="btn btn-sm btn-outline-primary" data-formset-add><i
+          <button type="button" class="btn btn-sm btn-outline-primary" data-formset-add data-open-variant-modal><i
               class="ti ti-plus me-1"></i>Add variant</button>
         </div>
         <div class="card-body p-0">
@@ -74,101 +74,229 @@
             <table class="table repeater variants-table align-middle mb-0">
               <thead>
                 <tr>
-                  <th class="d-none"></th>
                   <th>Type</th>
                   <th>Name</th>
                   <th>Price</th>
-                  <th>MRP</th>
-                  <th>Purchase price</th>
-                  <th>SKU suffix</th>
                   <th>Stock</th>
-                  <th>Weight (kg)</th>
-                  <th>Length (cm)</th>
-                  <th>Width (cm)</th>
-                  <th>Height (cm)</th>
-                  <th class="text-center">Remove</th>
+                  <th>Images</th>
+                  <th class="text-end">Actions</th>
                 </tr>
               </thead>
               <tbody data-formset-body>
+                <tr data-variant-empty-state{% if variants.forms %} class="d-none"{% endif %}>
+                  <td colspan="6" class="text-center text-muted py-3">No variants yet — click <strong>Add variant</strong> above to create one.</td>
+                </tr>
                 {% for vform in variants %}
-                <tr>
+                <tr data-variant-row data-prefix="{{ vform.prefix }}">
                   <td class="d-none">{{ vform.id }}</td>
-                  <td>
-                    {{ vform.variant_type }}
-                    {% if vform.variant_type.errors %}<div class="text-danger small mt-1">{{ vform.variant_type.errors|join:", " }}</div>{% endif %}
-                  </td>
-                  <td>
-                    {{ vform.name }}
-                    {% if vform.name.errors %}<div class="text-danger small mt-1">{{ vform.name.errors|join:", " }}</div>{% endif %}
-                  </td>
-                  <td>
-                    {{ vform.price }}
-                    {% if vform.price.errors %}<div class="text-danger small mt-1">{{ vform.price.errors|join:", " }}</div>{% endif %}
-                  </td>
-                  <td>
-                    {{ vform.mrp }}
-                    {% if vform.mrp.errors %}<div class="text-danger small mt-1">{{ vform.mrp.errors|join:", " }}</div>{% endif %}
-                  </td>
-                  <td>
-                    {{ vform.purchase_price }}
-                    {% if vform.purchase_price.errors %}<div class="text-danger small mt-1">{{ vform.purchase_price.errors|join:", " }}</div>{% endif %}
-                  </td>
-                  <td>
-                    {{ vform.sku_suffix }}
-                    {% if vform.sku_suffix.errors %}<div class="text-danger small mt-1">{{ vform.sku_suffix.errors|join:", " }}</div>{% endif %}
-                  </td>
-                  <td>
-                    {{ vform.stock_quantity }}
-                    {% if vform.stock_quantity.errors %}<div class="text-danger small mt-1">{{ vform.stock_quantity.errors|join:", " }}</div>{% endif %}
-                  </td>
-                  <td>
-                    {{ vform.weight_kg }}
-                    {% if vform.weight_kg.errors %}<div class="text-danger small mt-1">{{ vform.weight_kg.errors|join:", " }}</div>{% endif %}
-                  </td>
-                  <td>
-                    {{ vform.length_cm }}
-                    {% if vform.length_cm.errors %}<div class="text-danger small mt-1">{{ vform.length_cm.errors|join:", " }}</div>{% endif %}
-                  </td>
-                  <td>
-                    {{ vform.width_cm }}
-                    {% if vform.width_cm.errors %}<div class="text-danger small mt-1">{{ vform.width_cm.errors|join:", " }}</div>{% endif %}
-                  </td>
-                  <td>
-                    {{ vform.height_cm }}
-                    {% if vform.height_cm.errors %}<div class="text-danger small mt-1">{{ vform.height_cm.errors|join:", " }}</div>{% endif %}
-                  </td>
-                  <td class="text-center">
+                  <td data-summary="variant_type">{{ vform.instance.variant_type }}</td>
+                  <td data-summary="name">{{ vform.instance.name }}</td>
+                  <td data-summary="price">{% if vform.instance.pk %}{{ product.base_price|add:vform.instance.price_delta|default_if_none:"" }}{% endif %}</td>
+                  <td data-summary="stock_quantity">{{ vform.instance.stock_quantity|default_if_none:"" }}</td>
+                  <td data-summary="image_count">{% if vform.instance.pk %}{{ vform.instance.images.count }} image{{ vform.instance.images.count|pluralize }}{% else %}0 images{% endif %}</td>
+                  <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-open-variant-modal><i class="ti ti-pencil me-1"></i>Edit</button>
                     {% if vform.instance.pk %}
-                    <label class="form-check d-inline-flex m-0" title="Delete on save">{{ vform.DELETE }}</label>
+                    <label class="form-check d-inline-flex m-0 ms-1" title="Delete on save">{{ vform.DELETE }}</label>
                     {% else %}
-                    <button type="button" class="btn btn-icon btn-sm btn-light text-danger" data-row-remove><i
-                        class="ti ti-trash"></i></button>
+                    <button type="button" class="btn btn-icon btn-sm btn-light text-danger" data-row-remove title="Remove"><i class="ti ti-trash"></i></button>
                     {% endif %}
+                  </td>
+                  <td class="d-none" data-variant-fields>
+                    <div data-field="variant_type">
+                      <label class="form-label">Type</label>
+                      {{ vform.variant_type }}
+                      {% if vform.variant_type.errors %}<div class="text-danger small mt-1">{{ vform.variant_type.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="name">
+                      <label class="form-label">Name</label>
+                      {{ vform.name }}
+                      {% if vform.name.errors %}<div class="text-danger small mt-1">{{ vform.name.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="price">
+                      <label class="form-label">Price</label>
+                      {{ vform.price }}
+                      {% if vform.price.errors %}<div class="text-danger small mt-1">{{ vform.price.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="mrp">
+                      <label class="form-label">MRP</label>
+                      {{ vform.mrp }}
+                      {% if vform.mrp.errors %}<div class="text-danger small mt-1">{{ vform.mrp.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="purchase_price">
+                      <label class="form-label">Purchase price</label>
+                      {{ vform.purchase_price }}
+                      {% if vform.purchase_price.errors %}<div class="text-danger small mt-1">{{ vform.purchase_price.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="sku_suffix">
+                      <label class="form-label">SKU suffix</label>
+                      {{ vform.sku_suffix }}
+                      {% if vform.sku_suffix.errors %}<div class="text-danger small mt-1">{{ vform.sku_suffix.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="stock_quantity">
+                      <label class="form-label">Stock</label>
+                      {{ vform.stock_quantity }}
+                      {% if vform.stock_quantity.errors %}<div class="text-danger small mt-1">{{ vform.stock_quantity.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="weight_kg">
+                      <label class="form-label">Weight (kg)</label>
+                      {{ vform.weight_kg }}
+                      {% if vform.weight_kg.errors %}<div class="text-danger small mt-1">{{ vform.weight_kg.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="length_cm">
+                      <label class="form-label">Length (cm)</label>
+                      {{ vform.length_cm }}
+                      {% if vform.length_cm.errors %}<div class="text-danger small mt-1">{{ vform.length_cm.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="width_cm">
+                      <label class="form-label">Width (cm)</label>
+                      {{ vform.width_cm }}
+                      {% if vform.width_cm.errors %}<div class="text-danger small mt-1">{{ vform.width_cm.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="height_cm">
+                      <label class="form-label">Height (cm)</label>
+                      {{ vform.height_cm }}
+                      {% if vform.height_cm.errors %}<div class="text-danger small mt-1">{{ vform.height_cm.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="existing_images">
+                      <label class="form-label">Existing images <span class="text-muted fw-normal">— click the star to set the primary (shown first)</span></label>
+                      <div class="variant-image-grid" data-existing-image-grid>
+                        {% if vform.instance.pk %}
+                        {% for img in vform.instance.images.all %}
+                        <div class="variant-image-grid__item{% if img.is_primary %} is-primary{% endif %}" data-existing-image>
+                          <img src="{{ img.image.url }}" alt="">
+                          <label class="variant-image-grid__remove-toggle" title="Check to remove on save">
+                            <input type="checkbox" name="{{ vform.prefix }}-delete_image_ids" value="{{ img.pk }}">
+                            <span class="variant-image-grid__remove"><i class="ti ti-trash"></i></span>
+                          </label>
+                          <label class="variant-image-grid__primary-toggle" title="Set as primary image">
+                            <input type="radio" name="{{ vform.prefix }}-primary_choice" value="existing:{{ img.pk }}" {% if img.is_primary %}checked{% endif %}>
+                            <i class="ti ti-star-filled"></i>
+                          </label>
+                        </div>
+                        {% empty %}
+                        <span class="text-muted small" data-no-images-label>No images yet.</span>
+                        {% endfor %}
+                        {% else %}
+                        <span class="text-muted small" data-no-images-label>No images yet.</span>
+                        {% endif %}
+                      </div>
+                    </div>
+                    <div data-field="new_images">
+                      <label class="form-label">Add images <span class="text-muted fw-normal">— pick again to add more.</span></label>
+                      <input type="file" name="{{ vform.prefix }}-new_images" accept="image/*" multiple class="form-control" data-variant-file-input data-primary-field-name="{{ vform.prefix }}-primary_choice">
+                      <div class="variant-image-grid" data-new-image-preview></div>
+                    </div>
                   </td>
                 </tr>
                 {% endfor %}
               </tbody>
             </table>
           </div>
-          <p class="text-muted small px-3 pt-2 mb-0">Price is required for every variant kept on save. MRP, Purchase price, and Weight/Length/Width/Height are all optional per variant — leave any of them blank to fall back to the product's values above (dimensions only fall back if left blank on <em>every</em> variant; otherwise fill in the product's default dimensions too).</p>
+          <p class="text-muted small px-3 pt-2 mb-0">Price is required for every variant kept on save. MRP, Purchase price, Weight/Length/Width/Height and Images are all optional per variant.</p>
           <template data-formset-empty>
-            <tr>
-              <td class="d-none">{{ variants.empty_form.id }}</td>
-              <td>{{ variants.empty_form.variant_type }}</td>
-              <td>{{ variants.empty_form.name }}</td>
-              <td>{{ variants.empty_form.price }}</td>
-              <td>{{ variants.empty_form.mrp }}</td>
-              <td>{{ variants.empty_form.purchase_price }}</td>
-              <td>{{ variants.empty_form.sku_suffix }}</td>
-              <td>{{ variants.empty_form.stock_quantity }}</td>
-              <td>{{ variants.empty_form.weight_kg }}</td>
-              <td>{{ variants.empty_form.length_cm }}</td>
-              <td>{{ variants.empty_form.width_cm }}</td>
-              <td>{{ variants.empty_form.height_cm }}</td>
-              <td class="text-center"><button type="button" class="btn btn-icon btn-sm btn-light text-danger"
-                  data-row-remove><i class="ti ti-trash"></i></button></td>
+            <tr data-variant-row data-prefix="variants-__prefix__">
+              <td class="d-none">{{ variant_empty_form.id }}</td>
+              <td data-summary="variant_type"></td>
+              <td data-summary="name"></td>
+              <td data-summary="price"></td>
+              <td data-summary="stock_quantity"></td>
+              <td data-summary="image_count">0 images</td>
+              <td class="text-end">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-open-variant-modal><i class="ti ti-pencil me-1"></i>Edit</button>
+                <button type="button" class="btn btn-icon btn-sm btn-light text-danger" data-row-remove title="Remove"><i class="ti ti-trash"></i></button>
+              </td>
+              <td class="d-none" data-variant-fields>
+                <div data-field="variant_type">
+                  <label class="form-label">Type</label>
+                  {{ variant_empty_form.variant_type }}
+                </div>
+                <div data-field="name">
+                  <label class="form-label">Name</label>
+                  {{ variant_empty_form.name }}
+                </div>
+                <div data-field="price">
+                  <label class="form-label">Price</label>
+                  {{ variant_empty_form.price }}
+                </div>
+                <div data-field="mrp">
+                  <label class="form-label">MRP</label>
+                  {{ variant_empty_form.mrp }}
+                </div>
+                <div data-field="purchase_price">
+                  <label class="form-label">Purchase price</label>
+                  {{ variant_empty_form.purchase_price }}
+                </div>
+                <div data-field="sku_suffix">
+                  <label class="form-label">SKU suffix</label>
+                  {{ variant_empty_form.sku_suffix }}
+                </div>
+                <div data-field="stock_quantity">
+                  <label class="form-label">Stock</label>
+                  {{ variant_empty_form.stock_quantity }}
+                </div>
+                <div data-field="weight_kg">
+                  <label class="form-label">Weight (kg)</label>
+                  {{ variant_empty_form.weight_kg }}
+                </div>
+                <div data-field="length_cm">
+                  <label class="form-label">Length (cm)</label>
+                  {{ variant_empty_form.length_cm }}
+                </div>
+                <div data-field="width_cm">
+                  <label class="form-label">Width (cm)</label>
+                  {{ variant_empty_form.width_cm }}
+                </div>
+                <div data-field="height_cm">
+                  <label class="form-label">Height (cm)</label>
+                  {{ variant_empty_form.height_cm }}
+                </div>
+                <div data-field="existing_images">
+                  <label class="form-label">Existing images <span class="text-muted fw-normal">— click the star to set the primary (shown first)</span></label>
+                  <div class="variant-image-grid" data-existing-image-grid>
+                    <span class="text-muted small" data-no-images-label>No images yet.</span>
+                  </div>
+                </div>
+                <div data-field="new_images">
+                  <label class="form-label">Add images <span class="text-muted fw-normal">— pick again to add more.</span></label>
+                  <input type="file" name="variants-__prefix__-new_images" accept="image/*" multiple class="form-control" data-variant-file-input data-primary-field-name="variants-__prefix__-primary_choice">
+                  <div class="variant-image-grid" data-new-image-preview></div>
+                </div>
+              </td>
             </tr>
           </template>
+        </div>
+      </div>
+
+      <div class="modal fade" id="variant-edit-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Edit variant</h5>
+              <button type="button" class="btn-close" data-variant-modal-close data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="row g-3" data-variant-modal-slots>
+                <div class="col-md-6" data-slot="variant_type"></div>
+                <div class="col-md-6" data-slot="name"></div>
+                <div class="col-md-4" data-slot="price"></div>
+                <div class="col-md-4" data-slot="mrp"></div>
+                <div class="col-md-4" data-slot="purchase_price"></div>
+                <div class="col-md-6" data-slot="sku_suffix"></div>
+                <div class="col-md-6" data-slot="stock_quantity"></div>
+                <div class="col-md-3" data-slot="weight_kg"></div>
+                <div class="col-md-3" data-slot="length_cm"></div>
+                <div class="col-md-3" data-slot="width_cm"></div>
+                <div class="col-md-3" data-slot="height_cm"></div>
+                <div class="col-12"><hr></div>
+                <div class="col-12" data-slot="existing_images"></div>
+                <div class="col-12" data-slot="new_images"></div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-primary" data-variant-modal-done data-bs-dismiss="modal">Done</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -177,11 +305,14 @@
           <div>
             <h3 class="panel-title">Images</h3>
             <p class="panel-sub">Mark one image as primary for cards and rails</p>
+            <p class="form-text text-warning d-none mb-0" data-images-variant-note>
+              <i class="ti ti-info-circle me-1"></i>This product has variants — add images on each variant instead (Edit on a variant row above). These product-level images are still used as a fallback when a variant has none of its own.
+            </p>
           </div>
-          <button type="button" class="btn btn-sm btn-outline-primary" data-formset-add><i
+          <button type="button" class="btn btn-sm btn-outline-primary" data-formset-add data-images-variant-disable><i
               class="ti ti-plus me-1"></i>Add image</button>
         </div>
-        <div class="card-body p-0">
+        <div class="card-body p-0" data-images-formset-body>
           {{ images.management_form }}
           {% if images.non_form_errors %}
           <div class="alert alert-danger mx-3 mt-3 mb-0">{{ images.non_form_errors|join:", " }}</div>
@@ -239,12 +370,12 @@
           </div>
           <template data-formset-empty>
             <tr>
-              <td class="d-none">{{ images.empty_form.id }}</td>
+              <td class="d-none">{{ image_empty_form.id }}</td>
               <td><img src="" class="thumb d-none" data-img-preview alt=""></td>
-              <td>{{ images.empty_form.image }}</td>
-              <td>{{ images.empty_form.alt_text }}</td>
-              <td>{{ images.empty_form.display_order }}</td>
-              <td class="text-center">{{ images.empty_form.is_primary }}</td>
+              <td>{{ image_empty_form.image }}</td>
+              <td>{{ image_empty_form.alt_text }}</td>
+              <td>{{ image_empty_form.display_order }}</td>
+              <td class="text-center">{{ image_empty_form.is_primary }}</td>
               <td class="text-center"><button type="button" class="btn btn-icon btn-sm btn-light text-danger"
                   data-row-remove><i class="ti ti-trash"></i></button></td>
             </tr>
@@ -313,12 +444,12 @@
           <template data-formset-empty>
             <tr>
               <td class="d-none">
-                {{ specifications.empty_form.id }}
-                {{ specifications.empty_form.DELETE }}
+                {{ specification_empty_form.id }}
+                {{ specification_empty_form.DELETE }}
               </td>
-              <td>{{ specifications.empty_form.name }}</td>
-              <td>{{ specifications.empty_form.value }}</td>
-              <td>{{ specifications.empty_form.display_order }}</td>
+              <td>{{ specification_empty_form.name }}</td>
+              <td>{{ specification_empty_form.value }}</td>
+              <td>{{ specification_empty_form.display_order }}</td>
               <td class="text-center">
                 <button type="button" class="btn btn-icon btn-sm btn-light text-danger" data-row-remove>
                   <i class="ti ti-trash"></i>
@@ -417,15 +548,15 @@
           <template data-formset-empty>
             <tr>
               <td class="d-none">
-                {{ documents.empty_form.id }}
-                {{ documents.empty_form.DELETE }}
+                {{ document_empty_form.id }}
+                {{ document_empty_form.DELETE }}
               </td>
-              <td>{{ documents.empty_form.title }}</td>
+              <td>{{ document_empty_form.title }}</td>
               <td>
-                {{ documents.empty_form.document_file }}
+                {{ document_empty_form.document_file }}
                 <span class="text-muted d-block mt-1" style="font-size: 0.75rem;">Upload a PDF or Image.</span>
               </td>
-              <td>{{ documents.empty_form.display_order }}</td>
+              <td>{{ document_empty_form.display_order }}</td>
               <td class="text-center" data-view-container>
                 <span class="text-muted small" data-view-placeholder>-</span>
               </td>

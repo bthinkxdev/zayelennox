@@ -357,12 +357,274 @@
     body.addEventListener("change", refresh);
   }
 
+
+  function initVariantModal() {
+    var modalEl = document.getElementById("variant-edit-modal");
+    var variantsWrap = document.querySelector('[data-formset="variants"]');
+    if (!modalEl || !variantsWrap) return;
+    if (variantsWrap.dataset.variantModalBound === "1") return;
+    variantsWrap.dataset.variantModalBound = "1";
+
+    var slotsRoot = modalEl.querySelector("[data-variant-modal-slots]");
+    var bsModal = (typeof bootstrap !== "undefined" && bootstrap.Modal)
+      ? bootstrap.Modal.getOrCreateInstance(modalEl)
+      : null;
+    var currentRow = null;
+
+    function fieldsCellFor(row) {
+      return row.querySelector("[data-variant-fields]");
+    }
+
+    function refreshSummary(row) {
+      var cell = fieldsCellFor(row);
+      if (!cell) return;
+      ["variant_type", "name", "price", "stock_quantity"].forEach(function (name) {
+        var input = cell.querySelector('[name$="-' + name + '"]');
+        var summaryCell = row.querySelector('[data-summary="' + name + '"]');
+        if (input && summaryCell) summaryCell.textContent = input.value;
+      });
+      var existingCount = cell.querySelectorAll(".variant-image-grid__item[data-existing-image]").length;
+      var newFileInput = cell.querySelector('input[type="file"][name$="-new_images"]');
+      var newCount = newFileInput && newFileInput.files ? newFileInput.files.length : 0;
+      var summaryImg = row.querySelector('[data-summary="image_count"]');
+      if (summaryImg) {
+        var total = existingCount + newCount;
+        summaryImg.textContent = total + (total === 1 ? " image" : " images");
+      }
+    }
+
+    function closeAndReturnFields() {
+      if (!currentRow) return;
+      var cell = fieldsCellFor(currentRow);
+      if (cell && slotsRoot) {
+        Array.prototype.forEach.call(slotsRoot.querySelectorAll("[data-field]"), function (group) {
+          cell.appendChild(group);
+        });
+        refreshSummary(currentRow);
+      }
+      currentRow = null;
+    }
+
+    function openForRow(row) {
+      if (currentRow && currentRow !== row) closeAndReturnFields();
+      currentRow = row;
+      var cell = fieldsCellFor(row);
+      if (!cell || !slotsRoot) return;
+
+      Array.prototype.forEach.call(cell.querySelectorAll("[data-field]"), function (group) {
+        var name = group.getAttribute("data-field");
+        var slot = slotsRoot.querySelector('[data-slot="' + name + '"]');
+        if (slot) slot.appendChild(group);
+      });
+
+      var titleEl = modalEl.querySelector(".modal-title");
+      if (titleEl) {
+        var typeInput = modalEl.querySelector('input[name$="-variant_type"]');
+        var nameInput = modalEl.querySelector('input[name$="-name"]');
+        var label = [typeInput && typeInput.value, nameInput && nameInput.value].filter(Boolean).join(" / ");
+        titleEl.textContent = label ? "Edit variant — " + label : "Edit variant";
+      }
+
+      if (bsModal) {
+        bsModal.show();
+      } else {
+        modalEl.classList.add("show");
+        modalEl.style.display = "block";
+      }
+    }
+
+    variantsWrap.addEventListener("click", function (e) {
+
+      var addBtn = e.target.closest ? e.target.closest("[data-formset-add]") : null;
+      if (addBtn && variantsWrap.contains(addBtn)) {
+
+        var body = variantsWrap.querySelector("[data-formset-body]");
+        var lastRow = body ? body.lastElementChild : null;
+        if (lastRow) openForRow(lastRow);
+        return;
+      }
+
+      var editBtn = e.target.closest ? e.target.closest("[data-open-variant-modal]") : null;
+      if (editBtn) {
+        var row = editBtn.closest("tr[data-variant-row]");
+        if (row) openForRow(row);
+      }
+    });
+
+    Array.prototype.forEach.call(
+      modalEl.querySelectorAll("[data-variant-modal-close], [data-variant-modal-done]"),
+      function (btn) {
+        btn.addEventListener("click", closeAndReturnFields);
+      }
+    );
+    modalEl.addEventListener("hidden.bs.modal", closeAndReturnFields);
+
+
+    function previewHostFor(input) {
+      return input.parentElement ? input.parentElement.querySelector("[data-new-image-preview]") : null;
+    }
+
+    function setInputFiles(input, files) {
+      var dt = new DataTransfer();
+      files.forEach(function (file) { dt.items.add(file); });
+      input.files = dt.files;
+    }
+
+    function renderPendingPreview(input) {
+      var previewHost = previewHostFor(input);
+      if (!previewHost) return;
+      var pending = input._pendingFiles || [];
+      var fieldName = input.dataset.primaryFieldName || "";
+      previewHost.innerHTML = "";
+      pending.forEach(function (file, index) {
+        var url = URL.createObjectURL(file);
+        var item = document.createElement("div");
+        item.className = "variant-image-grid__item";
+        item.setAttribute("data-pending-image", "1");
+        item.setAttribute("data-pending-index", String(index));
+        var checked = input._primaryPendingFile === file;
+        item.innerHTML =
+          '<img src="' + url + '" alt="">' +
+          '<button type="button" class="variant-image-grid__remove-pending" title="Remove"><i class="ti ti-x"></i></button>' +
+          '<label class="variant-image-grid__primary-toggle" title="Set as primary image">' +
+          '<input type="radio" name="' + fieldName + '" value="new:' + index + '"' + (checked ? " checked" : "") + '>' +
+          '<i class="ti ti-star-filled"></i></label>';
+        previewHost.appendChild(item);
+      });
+    }
+
+    modalEl.addEventListener("change", function (e) {
+      var input = e.target;
+      if (input.type === "file" && /-new_images$/.test(input.name || "")) {
+        var picked = Array.prototype.slice.call(input.files || []);
+        if (!picked.length) return; // user cancelled the picker - keep what was already pending
+        input._pendingFiles = (input._pendingFiles || []).concat(picked);
+        setInputFiles(input, input._pendingFiles);
+
+        var fieldName = input.dataset.primaryFieldName || "";
+        var groupChecked = fieldName && modalEl.querySelector('input[name="' + fieldName + '"]:checked');
+        if (!groupChecked && input._pendingFiles.length) {
+          input._primaryPendingFile = input._pendingFiles[0];
+        }
+        renderPendingPreview(input);
+        return;
+      }
+
+      if (input.type === "radio" && /-primary_choice$/.test(input.name || "") && input.checked) {
+        var ownerInput = modalEl.querySelector(
+          'input[type="file"][data-primary-field-name="' + input.name + '"]'
+        );
+        if (ownerInput && input.value !== "" && input.value.indexOf("new:") !== 0) {
+          ownerInput._primaryPendingFile = null;
+        } else if (ownerInput && input.value.indexOf("new:") === 0) {
+          var idx = parseInt(input.value.split(":")[1], 10);
+          ownerInput._primaryPendingFile = (ownerInput._pendingFiles || [])[idx] || null;
+        }
+      }
+    });
+
+    modalEl.addEventListener("click", function (e) {
+      var removeBtn = e.target.closest ? e.target.closest(".variant-image-grid__remove-pending") : null;
+      if (!removeBtn) return;
+      var item = removeBtn.closest("[data-pending-image]");
+      var previewHost = removeBtn.closest("[data-new-image-preview]");
+      var fieldWrap = previewHost ? previewHost.closest('[data-field="new_images"]') : null;
+      var input = fieldWrap ? fieldWrap.querySelector('input[type="file"][data-variant-file-input]') : null;
+      if (!item || !input) return;
+      var index = parseInt(item.getAttribute("data-pending-index"), 10);
+      var removedFile = (input._pendingFiles || [])[index];
+      input._pendingFiles = (input._pendingFiles || []).filter(function (_, i) { return i !== index; });
+      if (input._primaryPendingFile === removedFile) input._primaryPendingFile = null;
+      setInputFiles(input, input._pendingFiles);
+      renderPendingPreview(input);
+    });
+  }
+
+
+  function initVariantImagesToggle() {
+    var variantsWrap = document.querySelector('[data-formset="variants"]');
+    var addImageBtn = document.querySelector("[data-images-variant-disable]");
+    var note = document.querySelector("[data-images-variant-note]");
+    if (!variantsWrap || !addImageBtn || !note) return;
+
+    var body = variantsWrap.querySelector("[data-formset-body]");
+    if (!body) return;
+
+    function rowHasData(row) {
+      var idInput = row.querySelector("input[name$='-id']");
+      var typeInput = row.querySelector("input[name$='-variant_type']");
+      var nameInput = row.querySelector("input[name$='-name']");
+      return !!(
+        (idInput && idInput.value) ||
+        (typeInput && typeInput.value.trim()) ||
+        (nameInput && nameInput.value.trim())
+      );
+    }
+
+    function hasLiveVariantData() {
+      var rows = body.querySelectorAll("tr");
+      for (var i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        if (row.style.display === "none") continue;
+        if (rowHasData(row)) return true;
+      }
+      return false;
+    }
+
+    function refresh() {
+      var hasVariants = hasLiveVariantData();
+      addImageBtn.disabled = hasVariants;
+      addImageBtn.classList.toggle("disabled", hasVariants);
+      note.classList.toggle("d-none", !hasVariants);
+    }
+
+    refresh();
+    var observer = new MutationObserver(refresh);
+    observer.observe(body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["style"],
+    });
+    body.addEventListener("input", refresh);
+    body.addEventListener("change", refresh);
+  }
+
+
+  function initVariantEmptyState() {
+    var variantsWrap = document.querySelector('[data-formset="variants"]');
+    if (!variantsWrap) return;
+    var body = variantsWrap.querySelector("[data-formset-body]");
+    var emptyRow = variantsWrap.querySelector("[data-variant-empty-state]");
+    if (!body || !emptyRow) return;
+
+    function refresh() {
+      var hasVisibleRow = Array.prototype.some.call(
+        body.querySelectorAll("[data-variant-row]"),
+        function (row) { return row.style.display !== "none"; }
+      );
+      emptyRow.classList.toggle("d-none", hasVisibleRow);
+    }
+
+    refresh();
+    var observer = new MutationObserver(refresh);
+    observer.observe(body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["style"],
+    });
+  }
+
   function initPage() {
     initSidebar();
     initFormValidation();
     initCharts();
     initFormsets();
     initVariantStockToggle();
+    initVariantModal();
+    initVariantImagesToggle();
+    initVariantEmptyState();
     initProductFormPersistFiles();
     initOrderStatusGuard();
   }
@@ -462,6 +724,9 @@
 
           initFormsets();
           initVariantStockToggle();
+          initVariantModal();
+          initVariantImagesToggle();
+          initVariantEmptyState();
           initProductFormPersistFiles();
           window.scrollTo({ top: 0, behavior: "smooth" });
         } else if (doc.getElementById("sidebar")) {

@@ -44,6 +44,8 @@ class BrandAdmin(admin.ModelAdmin):
 
 class ProductImageInline(admin.TabularInline):
     model = ProductImage
+    fk_name = "product"
+    fields = ("image", "variant", "alt_text", "display_order", "is_primary")
     extra = 1
 
 
@@ -208,10 +210,10 @@ class ProductVariantAdmin(admin.ModelAdmin):
 class ProductImageAdmin(admin.ModelAdmin):
     """Admin for product images."""
 
-    list_display = ("product", "display_order", "is_primary", "updated_at")
+    list_display = ("product", "variant", "display_order", "is_primary", "updated_at")
     list_filter = ("is_primary",)
-    search_fields = ("product__name", "alt_text")
-    list_select_related = ("product",)
+    search_fields = ("product__name", "alt_text", "variant__name")
+    list_select_related = ("product", "variant")
 
 
 @admin.register(ProductVideo)

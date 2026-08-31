@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from django import forms
+from django.utils import timezone
 from django.utils.text import slugify
 
 from accounts.models import CustomerProfile
@@ -25,7 +26,7 @@ from cms.models import (
     PolicyDocument,
     SecondarySlide,
 )
-from core.models import SiteSettings, Currency
+from core.models import SiteSettings
 from delivery.models import City
 from marketing.models import Coupon, FlashSale, NewsletterSubscriber
 
@@ -299,10 +300,18 @@ class ProductImageForm(forms.ModelForm):
             "display_order": {"required": "Display order is required."},
         }
 
+class ProductLevelImageFormSet(forms.BaseInlineFormSet):
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return qs.filter(variant__isnull=True)
+
+
 ProductImageFormSet = forms.inlineformset_factory(
     Product,
     ProductImage,
     form=ProductImageForm,
+    formset=ProductLevelImageFormSet,
     extra=1,
     can_delete=True,
 )
@@ -396,6 +405,35 @@ class CouponForm(forms.ModelForm):
         ]
         widgets = {"valid_from": _DATETIME, "valid_until": _DATETIME}
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Only stop the user picking a past date when the coupon is being
+        # created — an existing coupon may legitimately have a valid_from
+        # in the past (it already started) and editing it shouldn't be
+        # blocked just because that field is untouched.
+        if not self.instance.pk:
+            now_str = timezone.localtime(timezone.now()).strftime("%Y-%m-%dT%H:%M")
+            self.fields["valid_from"].widget.attrs["min"] = now_str
+            self.fields["valid_until"].widget.attrs["min"] = now_str
+
+    def clean(self):
+        cleaned = super().clean()
+        if self.instance.pk:
+            return cleaned
+
+        now = timezone.now()
+        valid_from = cleaned.get("valid_from")
+        valid_until = cleaned.get("valid_until")
+
+        if valid_from and valid_from < now:
+            self.add_error("valid_from", "Valid From date cannot be in the past.")
+        if valid_until and valid_until < now:
+            self.add_error("valid_until", "Valid To date cannot be in the past.")
+        if valid_from and valid_until and valid_until < valid_from:
+            self.add_error("valid_until", "Valid To date cannot be earlier than Valid From date.")
+
+        return cleaned
+
 
 
 class FlashSaleForm(forms.ModelForm):
@@ -403,6 +441,33 @@ class FlashSaleForm(forms.ModelForm):
         model = FlashSale
         fields = ["name", "products", "discount_percentage", "starts_at", "ends_at", "is_active"]
         widgets = {"starts_at": _DATETIME, "ends_at": _DATETIME}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Same reasoning as CouponForm: only enforce "no past dates" on
+        # creation so an in-progress flash sale can still be edited.
+        if not self.instance.pk:
+            now_str = timezone.localtime(timezone.now()).strftime("%Y-%m-%dT%H:%M")
+            self.fields["starts_at"].widget.attrs["min"] = now_str
+            self.fields["ends_at"].widget.attrs["min"] = now_str
+
+    def clean(self):
+        cleaned = super().clean()
+        if self.instance.pk:
+            return cleaned
+
+        now = timezone.now()
+        starts_at = cleaned.get("starts_at")
+        ends_at = cleaned.get("ends_at")
+
+        if starts_at and starts_at < now:
+            self.add_error("starts_at", "Start date cannot be in the past.")
+        if ends_at and ends_at < now:
+            self.add_error("ends_at", "End date cannot be in the past.")
+        if starts_at and ends_at and ends_at < starts_at:
+            self.add_error("ends_at", "End date cannot be earlier than start date.")
+
+        return cleaned
 
 
 class NewsletterSubscriberForm(forms.ModelForm):
@@ -577,13 +642,6 @@ class CityForm(SlugAutoMixin):
 
 
 class SiteSettingsForm(forms.ModelForm):
-    default_currency = forms.ModelChoiceField(
-        queryset=Currency.objects.all(),
-        required=False,
-        empty_label="--- Select Default Currency ---",
-        help_text="Select the store's default currency."
-    )
-
     field_order = [
         "site_name",
         "logo",
@@ -597,7 +655,6 @@ class SiteSettingsForm(forms.ModelForm):
         "vendor_email",
         "tax_rate_percent",
         "default_shipping_charge",
-        "default_currency",
         "razorpay_key_id",
         "razorpay_key_secret",
     ]
@@ -626,9 +683,6 @@ class SiteSettingsForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        default_curr = Currency.objects.filter(is_default=True).first()
-        if default_curr:
-            self.fields["default_currency"].initial = default_curr.pk
         for field_name, field in self.fields.items():
             if field_name != "logo":
                 if "class" in field.widget.attrs:
@@ -636,16 +690,18 @@ class SiteSettingsForm(forms.ModelForm):
                 else:
                     field.widget.attrs["class"] = "form-control"
 
-    def save(self, commit=True):
-        instance = super().save(commit)
-        new_default = self.cleaned_data.get("default_currency")
-        if new_default:
-            Currency.objects.update(is_default=False)
-            new_default.is_default = True
-            new_default.save()
-            from core.selectors import invalidate_default_currency_cache
-            invalidate_default_currency_cache()
-        return instance
+
+class ContactInquiryReplyForm(forms.Form):
+    """Compose-and-send reply to a storefront contact inquiry, sent by the
+    server over SMTP rather than handed off to the user's OS mail client."""
+
+    subject = forms.CharField(
+        max_length=200,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    message = forms.CharField(
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 8}),
+    )
 
 
 class OrderStatusForm(forms.Form):

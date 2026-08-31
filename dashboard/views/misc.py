@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.db.models import Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
@@ -46,7 +47,11 @@ def payment_list(request: HttpRequest) -> HttpResponse:
         qs = qs.filter(status=status)
     query = request.GET.get("q", "").strip()
     if query:
-        qs = qs.filter(order__order_number__icontains=query)
+        qs = qs.filter(
+            Q(order__order_number__icontains=query)
+            | Q(order__customer_profile__phone__icontains=query)
+            | Q(order__delivery_address_snapshot__phone__icontains=query)
+        )
 
     paginator = Paginator(qs, 25)
     page_obj = paginator.get_page(request.GET.get("page"))

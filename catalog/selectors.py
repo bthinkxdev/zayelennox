@@ -352,12 +352,18 @@ def get_product_detail(*, slug: str) -> Optional[Product]:
         .prefetch_related(
             Prefetch(
                 "variants",
-                queryset=ProductVariant.objects.order_by("variant_type", "name"),
+                queryset=ProductVariant.objects.order_by("variant_type", "name").prefetch_related(
+                    Prefetch(
+                        "images",
+                        queryset=ProductImage.objects.order_by("-is_primary", "display_order"),
+                        to_attr="image_list",
+                    ),
+                ),
                 to_attr="variant_list",
             ),
             Prefetch(
                 "images",
-                queryset=ProductImage.objects.order_by("display_order"),
+                queryset=ProductImage.objects.filter(variant__isnull=True).order_by("display_order"),
             ),
             Prefetch(
                 "videos",
@@ -611,6 +617,19 @@ def get_variant_price(
 
     is_low_stock = 0 < resolved_stock <= product.low_stock_threshold
 
+
+    gallery_images = []
+    if resolved_variant_id:
+        gallery_images = list(
+            ProductImage.objects.filter(variant_id=resolved_variant_id)
+            .order_by("-is_primary", "display_order")
+        )
+    if not gallery_images:
+        gallery_images = list(
+            ProductImage.objects.filter(product=product, variant__isnull=True)
+            .order_by("-is_primary", "display_order")
+        )
+
     result = {
         "base_price": str(product.base_price),
         "price": str(display_price),
@@ -621,6 +640,10 @@ def get_variant_price(
         "is_in_stock": str(resolved_stock > 0).lower(),
         "is_low_stock": str(is_low_stock).lower(),
         "low_stock_threshold": str(product.low_stock_threshold),
+        "images": [
+            {"url": img.image.url, "alt": img.alt_text or product.name}
+            for img in gallery_images
+        ],
     }
     if sale["is_flash_sale"]:
         result["original_price"] = str(sale["original_price"])

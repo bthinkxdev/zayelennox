@@ -302,6 +302,7 @@
       });
     });
   }
+  window.reinitPageScripts = reinitPageScripts;
 
   function applyDocumentLocale(detail) {
     if (!detail || !detail.lang) {

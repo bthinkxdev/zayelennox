@@ -24,6 +24,53 @@
       fetch(url + queryString)
         .then(function (r) { return r.json(); })
         .then(function (data) {
+          if (data.images && data.images.length) {
+            var galleryStage = document.querySelector('[data-jm-pdp-gallery] .jm-pdp-gallery__stage');
+            var mainImg = document.getElementById('main-pdp-image');
+            if (mainImg) {
+              mainImg.src = data.images[0].url;
+              mainImg.alt = data.images[0].alt || mainImg.alt;
+            } else if (galleryStage) {
+
+              mainImg = document.createElement('img');
+              mainImg.id = 'main-pdp-image';
+              mainImg.className = 'jm-pdp-gallery__image zoom-image object-fit-contain';
+              mainImg.width = 800;
+              mainImg.height = 800;
+              mainImg.src = data.images[0].url;
+              mainImg.alt = data.images[0].alt || '';
+              galleryStage.appendChild(mainImg);
+            }
+
+            var galleryRoot = document.querySelector('[data-jm-pdp-gallery]');
+            var thumbsWrap = galleryRoot ? galleryRoot.querySelector('.jm-pdp-gallery__thumbs') : null;
+            if (galleryRoot && data.images.length > 1) {
+              if (!thumbsWrap) {
+                thumbsWrap = document.createElement('div');
+                thumbsWrap.className = 'jm-pdp-gallery__thumbs';
+                thumbsWrap.setAttribute('role', 'list');
+                galleryRoot.appendChild(thumbsWrap);
+              }
+              thumbsWrap.innerHTML = '';
+              data.images.forEach(function (img, idx) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'jm-pdp-gallery__thumb thumb-btn' + (idx === 0 ? ' is-active active' : '');
+                btn.setAttribute('data-full', img.url);
+                btn.setAttribute('role', 'listitem');
+                btn.innerHTML = '<img src="' + img.url + '" alt="" width="72" height="72" class="object-fit-cover" loading="lazy">';
+                thumbsWrap.appendChild(btn);
+              });
+            } else if (thumbsWrap) {
+              thumbsWrap.innerHTML = '';
+            }
+
+     
+            if (typeof window.reinitPageScripts === 'function') {
+              window.reinitPageScripts();
+            }
+          }
+
           var el = document.getElementById('pdp-price');
           var elSticky = document.getElementById('pdp-sticky-price');
           var retailContainer = document.getElementById('pdp-retail-price-container');

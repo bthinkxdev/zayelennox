@@ -27,12 +27,30 @@ def _parse_date(value: str, default: date) -> date:
         return default
 
 
+def _clamp_range(start: date, end: date, today: date) -> tuple[date, date, bool]:
+
+    clamped = False
+    if end > today:
+        end = today
+        clamped = True
+    if start > today:
+        start = today
+        clamped = True
+    if start > end:
+        start = end
+        clamped = True
+    return start, end, clamped
+
+
 @dashboard_required
 def reports_view(request: HttpRequest) -> HttpResponse:
     """Analytics dashboard over the pre-aggregated report tables."""
     today = timezone.localdate()
     end = _parse_date(request.GET.get("end", ""), today)
     start = _parse_date(request.GET.get("start", ""), today - timedelta(days=29))
+    start, end, clamped = _clamp_range(start, end, today)
+    if clamped:
+        messages.warning(request, "Report dates can't be in the future — adjusted to today.")
 
     sales = get_daily_sales_reports(start_date=start, end_date=end, page=1, page_size=366)
     customers = get_daily_customer_reports(start_date=start, end_date=end, page=1, page_size=366)
@@ -49,6 +67,7 @@ def reports_view(request: HttpRequest) -> HttpResponse:
     context = {
         "nav_section": "reports",
         "page_title": "Reports",
+        "today": today,
         "start": start,
         "end": end,
         "summary": get_admin_dashboard_summary(),
@@ -67,6 +86,7 @@ def reports_export_csv(request: HttpRequest) -> HttpResponse:
     today = timezone.localdate()
     end = _parse_date(request.GET.get("end", ""), today)
     start = _parse_date(request.GET.get("start", ""), today - timedelta(days=29))
+    start, end, _clamped = _clamp_range(start, end, today)
     sales = get_daily_sales_reports(start_date=start, end_date=end, page=1, page_size=366)
 
     response = HttpResponse(content_type="text/csv")

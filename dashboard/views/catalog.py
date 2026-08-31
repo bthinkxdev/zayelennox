@@ -137,7 +137,7 @@ def _render_product_form(request, product, mode):
             and documents.is_valid()
         ):
             product = form.save()
-            _save_variants(product, variants)
+            _save_variants(product, variants, request)
             images.instance = product
             images.save()
             _normalize_primary_image(product)
@@ -161,6 +161,9 @@ def _render_product_form(request, product, mode):
             return redirect("dashboard:product-list")
     else:
         variants = forms.ProductVariantFormSet(instance=product, prefix="variants")
+        if product is None:
+
+            variants.extra = 0
         form = forms.ProductForm(instance=product, variants_formset=variants)
         images = forms.ProductImageFormSet(instance=product, prefix="images")
         specifications = forms.ProductSpecificationFormSet(
@@ -168,16 +171,22 @@ def _render_product_form(request, product, mode):
         )
         documents = forms.ProductDocumentFormSet(instance=product, prefix="documents")
 
+
+    variant_empty_form = variants.empty_form
+    image_empty_form = images.empty_form
+    specification_empty_form = specifications.empty_form
+    document_empty_form = documents.empty_form
+
     for f in [
         form,
         *variants.forms,
-        variants.empty_form,
+        variant_empty_form,
         *images.forms,
-        images.empty_form,
+        image_empty_form,
         *specifications.forms,
-        specifications.empty_form,
+        specification_empty_form,
         *documents.forms,
-        documents.empty_form,
+        document_empty_form,
     ]:
         _style(f)
 
@@ -192,6 +201,10 @@ def _render_product_form(request, product, mode):
         "form_mode": mode,
         "product": product,
         "cancel_url": reverse("dashboard:product-list"),
+        "variant_empty_form": variant_empty_form,
+        "image_empty_form": image_empty_form,
+        "specification_empty_form": specification_empty_form,
+        "document_empty_form": document_empty_form,
     }
     
     from catalog.models import ProductVariant
@@ -200,7 +213,7 @@ def _render_product_form(request, product, mode):
     return render(request, "dashboard/catalog/product_form.html", context)
 
 
-def _save_variants(product, variants):
+def _save_variants(product, variants, request):
     """
     Persist the variants formset, converting each kept variant's vendor-entered
     "price" into ProductVariant.price_delta against the product's just-saved
@@ -224,6 +237,70 @@ def _save_variants(product, variants):
             instance.price_delta = price - product.base_price
         instance.save()
 
+        _save_variant_images(product=product, variant=instance, prefix=vform.prefix, request=request)
+
+
+def _save_variant_images(*, product, variant, prefix, request):
+    """
+    Apply one variant row's image changes.
+
+    """
+    from catalog.models import ProductImage
+
+    delete_ids = request.POST.getlist(f"{prefix}-delete_image_ids")
+    if delete_ids:
+
+        ProductImage.objects.filter(variant=variant, pk__in=delete_ids).delete()
+
+    new_files = request.FILES.getlist(f"{prefix}-new_images")
+    created = []
+    if new_files:
+        next_order = ProductImage.objects.filter(variant=variant).count()
+        for offset, uploaded_file in enumerate(new_files):
+            created.append(
+                ProductImage.objects.create(
+                    product=product,
+                    variant=variant,
+                    image=uploaded_file,
+                    display_order=next_order + offset,
+                )
+            )
+
+    primary_choice = request.POST.get(f"{prefix}-primary_choice", "")
+    if primary_choice.startswith("existing:"):
+        chosen_pk = primary_choice.split(":", 1)[1]
+        if ProductImage.objects.filter(variant=variant, pk=chosen_pk).exists():
+            ProductImage.objects.filter(variant=variant).update(is_primary=False)
+            ProductImage.objects.filter(variant=variant, pk=chosen_pk).update(is_primary=True)
+    elif primary_choice.startswith("new:"):
+        try:
+            chosen_index = int(primary_choice.split(":", 1)[1])
+        except ValueError:
+            chosen_index = None
+        if chosen_index is not None and 0 <= chosen_index < len(created):
+            ProductImage.objects.filter(variant=variant).update(is_primary=False)
+            created[chosen_index].is_primary = True
+            created[chosen_index].save(update_fields=["is_primary"])
+
+
+    _normalize_variant_primary_image(variant)
+
+
+def _normalize_variant_primary_image(variant):
+    images_qs = list(variant.images.order_by("display_order", "pk"))
+    if not images_qs:
+        return
+
+    primary_images = [img for img in images_qs if img.is_primary]
+
+    if not primary_images:
+        images_qs[0].is_primary = True
+        images_qs[0].save(update_fields=["is_primary"])
+    elif len(primary_images) > 1:
+        for img in primary_images[1:]:
+            img.is_primary = False
+            img.save(update_fields=["is_primary"])
+
 
 def _normalize_primary_image(product):
     """
@@ -239,7 +316,10 @@ def _normalize_primary_image(product):
       (same ordering) and uncheck the rest.
     - Exactly one checked -> leave as-is.
     """
-    images_qs = list(product.images.order_by("display_order", "pk"))
+
+    images_qs = list(
+        product.images.filter(variant__isnull=True).order_by("display_order", "pk")
+    )
     if not images_qs:
         return
 
