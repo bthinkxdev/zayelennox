@@ -1,0 +1,154 @@
+.scroll-animation-wrapper {
+    width: 100%;
+    height: 300vh;
+    position: relative;
+    background-color: transparent;
+    margin-top: -15vh;
+    margin-bottom: -30vh;
+    mix-blend-mode: multiply;
+}
+
+.scroll-animation-container {
+    position: sticky;
+    top: 15vh;
+    width: 100%;
+    height: 80vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    background-color: transparent;
+}
+
+#animation-canvas {
+    width: 100%;
+    height: 80vh;
+    object-fit: contain;
+    transform: scale(1.0) translateY(0%);
+}
+
+.animation-text-blocks {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.text-block {
+    position: absolute;
+    max-width: 300px;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+.animation-text-blocks.visible .text-block {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.animation-text-blocks.visible .text-left.text-top {
+    transition-delay: 0.1s;
+}
+
+.animation-text-blocks.visible .text-right.text-top {
+    transition-delay: 0.2s;
+}
+
+.animation-text-blocks.visible .text-left.text-bottom {
+    transition-delay: 0.3s;
+}
+
+.animation-text-blocks.visible .text-right.text-bottom {
+    transition-delay: 0.4s;
+}
+
+.text-left {
+    left: 8%;
+}
+
+.text-right {
+    right: 8%;
+}
+
+.text-top {
+    top: 25%;
+}
+
+.text-bottom {
+    top: 65%;
+}
+
+.text-block h3 {
+    font-size: 1.4rem;
+    color: #C59F44;
+    margin-bottom: 12px;
+    font-weight: 500;
+}
+
+.text-block p {
+    font-size: 1rem;
+    color: #555;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.mobile-animation-text-blocks {
+    display: none;
+}
+
+/* Mobile Adjustments */
+@media (max-width: 768px) {
+    .scroll-animation-wrapper {
+        margin-top: -15vh;
+        margin-bottom: -30vh;
+        background-color: transparent;
+    }
+
+    .scroll-animation-container {
+        height: 80vh;
+        align-items: center;
+    }
+
+    #animation-canvas {
+        height: 80vh;
+        object-fit: cover;
+        transform: scale(1.1) translateY(0%);
+    }
+
+    .desktop-blocks {
+        display: none !important;
+    }
+
+    .mobile-animation-text-blocks {
+        display: block;
+        padding: 40px 20px;
+        background-color: #ffffff;
+    }
+
+    .mobile-text-block {
+        margin-bottom: 35px;
+        text-align: left;
+    }
+
+    .mobile-text-block:last-child {
+        margin-bottom: 0;
+    }
+
+    .mobile-text-block h3 {
+        font-size: 1.4rem;
+        color: #C59F44;
+        margin-bottom: 12px;
+        font-weight: 500;
+    }
+
+    .mobile-text-block p {
+        font-size: 1rem;
+        color: #555;
+        line-height: 1.5;
+        margin: 0;
+    }
+}

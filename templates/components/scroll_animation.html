@@ -1,0 +1,49 @@
+{% load static %}
+
+<link rel="stylesheet" href="{% static 'components/scroll_animation/css/animation.css' %}?v=29">
+
+<section class="scroll-animation-wrapper">
+    <div class="scroll-animation-container">
+        <canvas id="animation-canvas"></canvas>
+
+        <div class="animation-text-blocks desktop-blocks">
+            <div class="text-block text-left text-top">
+                <h3>Deep Scalp Nourishment</h3>
+                <p>Deeply nourishes the scalp and helps restore essential moisture for a healthier scalp and hair.</p>
+            </div>
+            <div class="text-block text-left text-bottom">
+                <h3>Stronger Hair Roots</h3>
+                <p>Helps strengthen hair from the roots, reducing dryness and breakage for stronger-looking strands.</p>
+            </div>
+            <div class="text-block text-right text-top">
+                <h3>Healthy Hair Growth</h3>
+                <p>Nourishes the scalp and supports healthy hair growth for fuller, thicker-looking hair.</p>
+            </div>
+            <div class="text-block text-right text-bottom">
+                <h3>Shine & Smoothness</h3>
+                <p>Tames frizz and dryness while leaving hair soft, smooth, manageable, and naturally radiant.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<div class="mobile-animation-text-blocks">
+    <div class="mobile-text-block">
+        <h3>Deep Scalp Nourishment</h3>
+        <p>Deeply nourishes the scalp and helps restore essential moisture for a healthier scalp and hair.</p>
+    </div>
+    <div class="mobile-text-block">
+        <h3>Stronger Hair Roots</h3>
+        <p>Helps strengthen hair from the roots, reducing dryness and breakage for stronger-looking strands.</p>
+    </div>
+    <div class="mobile-text-block">
+        <h3>Healthy Hair Growth</h3>
+        <p>Nourishes the scalp and supports healthy hair growth for fuller, thicker-looking hair.</p>
+    </div>
+    <div class="mobile-text-block">
+        <h3>Shine & Smoothness</h3>
+        <p>Tames frizz and dryness while leaving hair soft, smooth, manageable, and naturally radiant.</p>
+    </div>
+</div>
+
+<script src="{% static 'components/scroll_animation/js/animation.js' %}?v=23"></script>

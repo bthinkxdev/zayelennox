@@ -7,6 +7,12 @@
 <div class="homepage-sections">
   {% for block in section_contexts %}
     {% include block.partial with section_context=block.context %}
+    
+    {% if block.partial == 'cms/sections/shop_by_category.html' %}
+      <!-- Scroll Animation Section inserted right after Shop By Category & Trust Strip -->
+      {% include 'components/scroll_animation.html' %}
+    {% endif %}
+
   {% empty %}
   <div class="container py-5 text-center">
     <p class="text-muted">{% trans "Homepage content is being prepared." %}</p>
