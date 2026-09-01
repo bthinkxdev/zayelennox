@@ -425,6 +425,7 @@ def dashboard_view(request: HttpRequest) -> HttpResponse:
                 "default_address": (
                     _serialize_address(context.default_address) if context.default_address else None
                 ),
+                "addresses": [_serialize_address(a) for a in context.addresses],
                 "recent_orders": [_serialize_order(o) for o in context.recent_orders],
                 "unread_notification_count": context.unread_notification_count,
             }
@@ -825,6 +826,10 @@ def email_otp_resend_view(request: HttpRequest) -> HttpResponse:
 
     if not email:
         return _error_response("Email is required.", status=400)
+
+    email_check = EmailOTPRequestForm({"email": email})
+    if not email_check.is_valid():
+        return _error_response("Enter a valid email address.", status=400, code="validation_error")
 
     try:
         request_email_otp(email=email, purpose=purpose)

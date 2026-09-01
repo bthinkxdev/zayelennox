@@ -18,7 +18,16 @@
       });
 
       var qtyInput = document.getElementById('pdp-qty');
-      var qty = qtyInput ? qtyInput.value : '1';
+      if (qtyInput) {
+        qtyInput.value = 1;
+      }
+      document.querySelectorAll('.pdp-qty-input').forEach(function (input) {
+        input.value = 1;
+      });
+      var qtyLimitMsgReset = document.getElementById('pdp-qty-limit-msg');
+      if (qtyLimitMsgReset) qtyLimitMsgReset.classList.add('d-none');
+
+      var qty = '1';
       var queryString = '?quantity=' + qty + (vid ? '&variant_id=' + vid : '');
 
       fetch(url + queryString)

@@ -10,6 +10,7 @@ from django.core.validators import validate_email
 from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 
 from accounts.selectors import get_address_by_id, get_saved_addresses
@@ -126,13 +127,16 @@ def _checkout_url(*, buy_now_mode: bool) -> str:
 
 
 @require_GET
+@never_cache
 def checkout_view(request: HttpRequest) -> HttpResponse:
-    """Multi-step checkout page with gift Order Preview partial."""
+    """
+    Multi-step checkout page with gift Order Preview partial.
+
+    """
     cart, buy_now_mode = _resolve_checkout_cart(request)
     summary = get_cart_summary(cart=cart)
     if not summary.lines:
-        #do not redirect,render the empty state in checkout.html
-        pass
+        return redirect(f"{reverse('cms:homepage')}?open_cart=1")
 
     if request.user.is_authenticated:
         from accounts.services import ensure_customer_profile_for_user
@@ -358,10 +362,14 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
     summary = get_cart_summary(cart=cart)
     if summary.has_stock_issues:
         from django.utils.translation import gettext as _
+        if summary.has_out_of_stock_items:
+            message = _("Some items in your cart are out of stock. Please remove them to proceed.")
+        else:
+            message = _("Some items in your cart exceed available quantity. Please reduce quantity to proceed.")
         return render(
             request,
             "checkout/partials/errors.html",
-            {"errors": {"__all__": [_("Some items in your cart are out of stock. Please remove them to proceed.")]}},
+            {"errors": {"__all__": [message]}},
             status=200,
         )
 

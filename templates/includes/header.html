@@ -38,7 +38,7 @@
       <div class="jm-header__start">
         <button class="jm-menu-toggle d-lg-none" 
                 type="button" 
-                data-bs-toggle="collapse" 
+                data-bs-toggle="offcanvas" 
                 data-bs-target="#jmMainNav"
                 aria-controls="jmMainNav" 
                 aria-expanded="false" 
@@ -228,23 +228,30 @@
     </div>
   </nav>
 
-  <div class="collapse d-lg-none" id="jmMainNav">
-    <div class="jm-mobile-nav container">
-      <a class="{% if request.resolver_match.url_name == 'homepage' and request.GET.ref != 'brands' %}is-active{% endif %}"
-        href="{% url 'cms:homepage' %}">{% trans "Home" %}</a>
-      <a class="{% if request.resolver_match.url_name == 'plp' %}is-active{% endif %}" href="{% url 'catalog:plp' %}">{% trans "Shop All" %}</a>
-      {% for cat in category_tree %}
-      <a class="{% if request.resolver_match.kwargs.category_slug == cat.slug %}is-active{% endif %}"
-        href="{% url 'catalog:plp-category' category_slug=cat.slug %}">{{ cat.name }}</a>
-      {% endfor %}
+</header>
 
-      <a class="{% if request.resolver_match.url_name == 'about-us' %}is-active{% endif %}"
-        href="{% url 'core:about-us' %}">{% trans "About Us" %}</a>
-      <a class="{% if request.resolver_match.url_name == 'contact-us' %}is-active{% endif %}"
-        href="{% url 'core:contact-us' %}">{% trans "Contact Us" %}</a>
+  <div class="offcanvas offcanvas-start jm-mobile-nav-offcanvas d-lg-none" tabindex="-1" id="jmMainNav" aria-labelledby="jmMainNavLabel">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="jmMainNavLabel">{% trans "Menu" %}</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="{% trans 'Close' %}"></button>
+    </div>
+    <div class="offcanvas-body p-0">
+      <div class="jm-mobile-nav container">
+        <a class="{% if request.resolver_match.url_name == 'homepage' and request.GET.ref != 'brands' %}is-active{% endif %}"
+          href="{% url 'cms:homepage' %}">{% trans "Home" %}</a>
+        <a class="{% if request.resolver_match.url_name == 'plp' %}is-active{% endif %}" href="{% url 'catalog:plp' %}">{% trans "Shop All" %}</a>
+        {% for cat in category_tree %}
+        <a class="{% if request.resolver_match.kwargs.category_slug == cat.slug %}is-active{% endif %}"
+          href="{% url 'catalog:plp-category' category_slug=cat.slug %}">{{ cat.name }}</a>
+        {% endfor %}
+
+        <a class="{% if request.resolver_match.url_name == 'about-us' %}is-active{% endif %}"
+          href="{% url 'core:about-us' %}">{% trans "About Us" %}</a>
+        <a class="{% if request.resolver_match.url_name == 'contact-us' %}is-active{% endif %}"
+          href="{% url 'core:contact-us' %}">{% trans "Contact Us" %}</a>
+      </div>
     </div>
   </div>
-</header>
 
 {% with wa=site_settings.whatsapp_number|default:"919292773339" %}
 <a class="jm-wa-float"

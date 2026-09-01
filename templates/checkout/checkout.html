@@ -223,10 +223,10 @@
         {% for line in summary.lines %}
         <div class="d-flex align-items-center justify-content-between py-2 border-bottom gap-2">
           <div class="d-flex align-items-center gap-2 text-truncate" style="min-width: 0;">
-            {% with line.product.primary_images|first as primary_image %}
+            {% with line.display_image as primary_image %}
             <div class="flex-shrink-0 bg-light border rounded" style="width: 48px; height: 48px; overflow: hidden;">
               {% if primary_image %}
-              <img src="{{ primary_image.image.url }}" alt="{{ line.product.name }}"
+              <img src="{{ primary_image.image.url }}" alt="{{ primary_image.alt_text|default:line.product.name }}"
                 style="width: 100%; height: 100%; object-fit: cover;">
               {% else %}
               <svg width="48" height="48" class="text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -289,7 +289,11 @@
         </div>
         {% if summary.has_stock_issues %}
         <button type="button" class="btn btn-floward w-100 py-2 mt-3" disabled style="cursor: not-allowed;">{% trans "Place Order & Pay" %}</button>
+        {% if summary.has_out_of_stock_items %}
         <div class="text-danger small mt-2 text-center">{% trans "Some items are out of stock. Please click 'Edit Cart' to remove them." %}</div>
+        {% else %}
+        <div class="text-danger small mt-2 text-center">{% trans "Some items exceed available quantity. Please click 'Cart' to reduce quantity." %}</div>
+        {% endif %}
         {% else %}
         <button type="submit" form="checkout-form" class="btn btn-floward w-100 py-2 mt-3">{% trans "Place Order & Pay" %}</button>
         {% endif %}

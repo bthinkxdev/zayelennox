@@ -363,6 +363,13 @@
     }
 
     digitFields.forEach(function(field, idx) {
+      field.addEventListener('focus', function() {
+        field.select();
+      });
+      field.addEventListener('click', function() {
+        field.select();
+      });
+
       field.addEventListener('input', function(e) {
         var cleanVal = e.target.value.replace(/[^0-9]/g, '');
         e.target.value = cleanVal;

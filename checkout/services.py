@@ -11,6 +11,7 @@ from django.db import IntegrityError, transaction
 from accounts.models import Address, CustomerProfile
 from cart.models import Cart, CartItem
 from cart.selectors import get_cart_summary
+from cart.services import reset_cart
 from catalog.services import adjust_stock
 from checkout.exceptions import CheckoutSessionError
 from checkout.models import CheckoutSession, CheckoutSessionStatus
@@ -200,13 +201,17 @@ def place_order(
     session.order = order
     session.idempotency_key = idempotency_key
     session.customer_profile = customer_profile
+    session.status = CheckoutSessionStatus.COMPLETED
     session.save(
         update_fields=[
             "order",
             "idempotency_key",
             "customer_profile",
+            "status",
             "updated_at",
         ]
     )
+
+    reset_cart(cart=session.cart)
 
     return order

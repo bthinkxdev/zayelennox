@@ -10,7 +10,7 @@ from django.db.models import Prefetch, Sum
 from django.http import HttpRequest
 
 from cart.models import Cart, CartItem
-from catalog.models import ProductImage
+from catalog.models import Product, ProductImage
 from delivery.selectors import get_delivery_charge
 
 _CART_CACHE_ATTR = "_floward_resolved_cart"
@@ -101,6 +101,26 @@ class CartSummaryLine:
         """Whether this line (its variant, if any) is currently sellable."""
         return self.available_stock > 0
 
+    @property
+    def display_image(self):
+        """
+        The thumbnail this line should show: the selected variant's own
+        image when it has one (matching what the PDP shows once that
+        variant is picked - see catalog.selectors.get_variant_price's same
+        variant-images-first-else-product-images fallback), otherwise the
+        product's own primary image. Without this, cart/checkout thumbnails
+        always showed the product's generic image regardless of which
+        variant was actually added.
+        """
+        if self.variant is not None:
+            variant_images = getattr(self.variant, "variant_images", None)
+            if variant_images:
+                return variant_images[0]
+        primary_images = getattr(self.product, "primary_images", None)
+        if primary_images:
+            return primary_images[0]
+        return None
+
 
 @dataclass
 class CartSummary:
@@ -115,6 +135,7 @@ class CartSummary:
     grand_total: Decimal = Decimal("0.00")
     item_count: int = 0
     has_stock_issues: bool = False
+    has_out_of_stock_items: bool = False
 
 
 def get_cart_by_id(*, cart_id: int) -> Optional[Cart]:
@@ -209,6 +230,11 @@ def get_cart_summary(*, cart: Cart) -> CartSummary:
                 queryset=ProductImage.objects.filter(is_primary=True).order_by("display_order"),
                 to_attr="primary_images",
             ),
+            Prefetch(
+                "variant__images",
+                queryset=ProductImage.objects.order_by("-is_primary", "display_order"),
+                to_attr="variant_images",
+            ),
         )
         .order_by("id")
     )
@@ -217,9 +243,25 @@ def get_cart_summary(*, cart: Cart) -> CartSummary:
     subtotal = Decimal("0.00")
     item_count = 0
     has_stock_issues = False
+    has_out_of_stock_items = False
+
+    user = (
+        cart.customer_profile.user
+        if (cart.customer_profile and cart.customer_profile.user_id)
+        else None
+    )
+    from cart.services import _resolve_unit_price
 
     for item in items:
-        unit_price = item.unit_price_at_add
+        try:
+            unit_price = _resolve_unit_price(
+                product=item.product,
+                variant=item.variant,
+                user=user,
+                quantity=item.quantity,
+            )
+        except Product.DoesNotExist:
+            unit_price = item.unit_price_at_add
 
         line_subtotal = unit_price * item.quantity
         subtotal += line_subtotal
@@ -237,7 +279,10 @@ def get_cart_summary(*, cart: Cart) -> CartSummary:
         # of the parent product's stock_quantity (which is only meaningful
         # for products that don't have variants at all - see
         # CartSummaryLine.available_stock / Product.is_in_stock).
-        if not line.is_in_stock or item.quantity > line.available_stock:
+        if not line.is_in_stock:
+            has_stock_issues = True
+            has_out_of_stock_items = True
+        elif item.quantity > line.available_stock:
             has_stock_issues = True
 
     delivery_charge = cart.delivery_charge
@@ -277,4 +322,5 @@ def get_cart_summary(*, cart: Cart) -> CartSummary:
         grand_total=grand_total,
         item_count=item_count,
         has_stock_issues=has_stock_issues,
+        has_out_of_stock_items=has_out_of_stock_items,
     )

@@ -21,15 +21,42 @@
         <p class="small mb-1"><strong>{% trans "Name" %}:</strong> {{ request.user.get_full_name|default:"—" }}</p>
         <p class="small mb-1"><strong>{% trans "Email" %}:</strong> {{ request.user.email }}</p>
         {% if dashboard.profile.phone %}
-        <p class="small mb-1"><strong>{% trans "Phone" %}:</strong> {{ dashboard.profile.phone }}</p>
+        <p class="small mb-0"><strong>{% trans "Phone" %}:</strong> {{ dashboard.profile.phone }}</p>
         {% endif %}
-        {% if dashboard.default_address %}
-        <p class="small mb-0"><strong>{% trans "Address" %}:</strong>
-          {{ dashboard.default_address.line1 }}{% if dashboard.default_address.line2 %}, {{ dashboard.default_address.line2 }}{% endif %}, {{ dashboard.default_address.display_city }}{% if dashboard.default_address.pincode %} - {{ dashboard.default_address.pincode }}{% endif %}
-        </p>
+      </div>
+
+      <div class="card p-4 rounded-3 border-0 shadow-sm bg-white mt-4">
+        <h2 class="h6 mb-3">{% trans "Saved Addresses" %}</h2>
+        {% if dashboard.addresses %}
+        <div class="d-flex flex-column gap-3" id="dashboard-address-list">
+          {% for address in dashboard.addresses %}
+          <div class="d-flex align-items-start justify-content-between gap-2{% if not forloop.last %} pb-3 border-bottom{% endif %}">
+            <div class="small">
+              <div class="fw-semibold" id="dash-addr-{{ address.pk }}-label">
+                {{ address.label }}{% if dashboard.default_address and address.pk == dashboard.default_address.pk %} <span class="badge bg-light text-dark border fw-normal" style="font-size: 0.65rem;">{% trans "Default" %}</span>{% endif %}
+              </div>
+              <div class="text-muted" id="dash-addr-{{ address.pk }}-body">
+                {{ address.line1 }}{% if address.line2 %}, {{ address.line2 }}{% endif %}, {{ address.display_city }}{% if address.pincode %} - {{ address.pincode }}{% endif %}
+              </div>
+            </div>
+            <button type="button" class="btn btn-link btn-sm p-0 small flex-shrink-0 jm-dash-edit-address-btn"
+              data-update-url="{% url 'checkout:address-update' address_id=address.pk %}"
+              data-address-id="{{ address.pk }}"
+              data-name="{{ request.user.first_name|default:'' }}"
+              data-phone="{{ dashboard.profile.phone|default:'' }}"
+              data-line1="{{ address.line1|default:'' }}"
+              data-line2="{{ address.line2|default:'' }}"
+              data-city="{{ address.city_name|default:'' }}"
+              data-state="{{ address.state_name|default:'' }}"
+              data-pincode="{{ address.pincode|default:'' }}"
+              data-label-text="{{ address.label|default:'' }}">
+              {% trans "Edit" %}
+            </button>
+          </div>
+          {% endfor %}
+        </div>
         {% else %}
-        <p class="small mb-0 text-muted"><strong>{% trans "Address" %}:</strong> {% trans "No default address set." %}
-        </p>
+        <p class="small mb-0 text-muted">{% trans "No saved addresses yet." %}</p>
         {% endif %}
       </div>
     </div>
@@ -110,5 +137,277 @@
     </div>
   </div>
   {% endif %}
+
+  <div class="modal fade" id="dashEditAddressModal" tabindex="-1" aria-labelledby="dashEditAddressModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="dashEditAddressModalLabel">{% trans "Edit Delivery Details" %}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+        </div>
+        <div class="modal-body">
+          <div id="dash-edit-address-alert" class="alert alert-danger small d-none" role="alert"></div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label small">{% trans "Full Name" %} <span class="text-danger">*</span></label>
+              <input type="text" id="dash-edit-name" class="form-control form-control-sm">
+              <div id="dash-edit-error-guest_name" class="text-danger small mt-1"></div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small">{% trans "Phone Number" %} <span class="text-danger">*</span></label>
+              <input type="tel" inputmode="numeric" maxlength="10" id="dash-edit-phone" class="form-control form-control-sm" placeholder="{% trans '10-digit mobile number' %}">
+              <div id="dash-edit-error-guest_phone" class="text-danger small mt-1"></div>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small">{% trans "Address Line 1" %} <span class="text-danger">*</span></label>
+            <input type="text" id="dash-edit-line1" class="form-control form-control-sm">
+            <div id="dash-edit-error-guest_address_line1" class="text-danger small mt-1"></div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small">{% trans "Address Line 2 (Optional)" %}</label>
+            <input type="text" id="dash-edit-line2" class="form-control form-control-sm">
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label small">{% trans "City / Town" %} <span class="text-danger">*</span></label>
+              <input type="text" id="dash-edit-city" class="form-control form-control-sm">
+              <div id="dash-edit-error-guest_city_name" class="text-danger small mt-1"></div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small">{% trans "State" %} <span class="text-danger">*</span></label>
+              <input type="text" id="dash-edit-state" class="form-control form-control-sm">
+              <div id="dash-edit-error-guest_state_name" class="text-danger small mt-1"></div>
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small">{% trans "Pincode" %} <span class="text-danger">*</span></label>
+            <input type="text" inputmode="numeric" maxlength="6" id="dash-edit-pincode" class="form-control form-control-sm" style="max-width: 160px;">
+            <div id="dash-edit-error-guest_pincode" class="text-danger small mt-1"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-dark btn-sm" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+          <button type="button" id="dash-edit-address-save-btn" class="btn btn-floward btn-sm">{% trans "Save Changes" %}</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    'use strict';
+
+    var INDIA_PHONE_RE = /^[6-9]\d{9}$/;
+    var PINCODE_RE = /^[1-9][0-9]{5}$/;
+    var HAS_LETTER_RE = /[A-Za-z]/;
+
+    function digitsOnly(el) {
+      var cleaned = el.value.replace(/\D/g, '');
+      if (cleaned !== el.value) {
+        el.value = cleaned;
+      }
+      return cleaned;
+    }
+
+    var editModalEl = document.getElementById('dashEditAddressModal');
+    var editModal = (editModalEl && window.bootstrap) ? new bootstrap.Modal(editModalEl) : null;
+    var editAlert = document.getElementById('dash-edit-address-alert');
+    var editFields = {
+      name: document.getElementById('dash-edit-name'),
+      phone: document.getElementById('dash-edit-phone'),
+      line1: document.getElementById('dash-edit-line1'),
+      line2: document.getElementById('dash-edit-line2'),
+      city: document.getElementById('dash-edit-city'),
+      state: document.getElementById('dash-edit-state'),
+      pincode: document.getElementById('dash-edit-pincode')
+    };
+    var editSaveBtn = document.getElementById('dash-edit-address-save-btn');
+    var editUpdateUrl = '';
+    var editAddressId = '';
+
+    function setEditFieldError(key, message) {
+      var el = document.getElementById('dash-edit-error-guest_' + key);
+      if (el) el.innerText = message || '';
+    }
+
+    function clearEditErrors() {
+      ['name', 'phone', 'address_line1', 'city_name', 'state_name', 'pincode'].forEach(function (key) {
+        var el = document.getElementById('dash-edit-error-guest_' + key);
+        if (el) el.innerText = '';
+      });
+      if (editAlert) {
+        editAlert.classList.add('d-none');
+        editAlert.textContent = '';
+      }
+    }
+
+    if (editFields.phone) {
+      ['input', 'keyup', 'change'].forEach(function (evtName) {
+        editFields.phone.addEventListener(evtName, function (e) { digitsOnly(e.target); });
+      });
+      editFields.phone.addEventListener('keypress', function (e) {
+        if (e.key && !/\d/.test(e.key)) e.preventDefault();
+      });
+    }
+    if (editFields.pincode) {
+      ['input', 'keyup', 'change'].forEach(function (evtName) {
+        editFields.pincode.addEventListener(evtName, function (e) { digitsOnly(e.target); });
+      });
+      editFields.pincode.addEventListener('keypress', function (e) {
+        if (e.key && !/\d/.test(e.key)) e.preventDefault();
+      });
+    }
+
+    document.querySelectorAll('.jm-dash-edit-address-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        editUpdateUrl = btn.getAttribute('data-update-url') || '';
+        editAddressId = btn.getAttribute('data-address-id') || '';
+        editFields.name.value = btn.getAttribute('data-name') || '';
+        editFields.phone.value = btn.getAttribute('data-phone') || '';
+        editFields.line1.value = btn.getAttribute('data-line1') || '';
+        editFields.line2.value = btn.getAttribute('data-line2') || '';
+        editFields.city.value = btn.getAttribute('data-city') || '';
+        editFields.state.value = btn.getAttribute('data-state') || '';
+        editFields.pincode.value = btn.getAttribute('data-pincode') || '';
+        clearEditErrors();
+        if (editModal) editModal.show();
+      });
+    });
+
+    function validateEditFields() {
+      var ok = true;
+      var name = editFields.name.value.trim();
+      if (!name) {
+        setEditFieldError('name', "{% trans 'Full name is required.' %}");
+        ok = false;
+      } else if (!HAS_LETTER_RE.test(name)) {
+        setEditFieldError('name', "{% trans 'Name must contain letters.' %}");
+        ok = false;
+      }
+
+      var phone = digitsOnly(editFields.phone);
+      if (!phone) {
+        setEditFieldError('phone', "{% trans 'Phone number is required.' %}");
+        ok = false;
+      } else if (!INDIA_PHONE_RE.test(phone)) {
+        setEditFieldError('phone', "{% trans 'Enter a valid 10-digit Indian mobile number.' %}");
+        ok = false;
+      }
+
+      var line1 = editFields.line1.value.trim();
+      if (!line1) {
+        setEditFieldError('address_line1', "{% trans 'Address line 1 is required.' %}");
+        ok = false;
+      } else if (!HAS_LETTER_RE.test(line1)) {
+        setEditFieldError('address_line1', "{% trans 'Address line 1 must contain letters.' %}");
+        ok = false;
+      }
+
+      var cityName = editFields.city.value.trim();
+      if (!cityName) {
+        setEditFieldError('city_name', "{% trans 'City is required.' %}");
+        ok = false;
+      } else if (!HAS_LETTER_RE.test(cityName)) {
+        setEditFieldError('city_name', "{% trans 'City must contain letters.' %}");
+        ok = false;
+      }
+
+      var stateName = editFields.state.value.trim();
+      if (!stateName) {
+        setEditFieldError('state_name', "{% trans 'State is required.' %}");
+        ok = false;
+      } else if (!HAS_LETTER_RE.test(stateName)) {
+        setEditFieldError('state_name', "{% trans 'State must contain letters.' %}");
+        ok = false;
+      }
+
+      var pincode = digitsOnly(editFields.pincode);
+      if (!pincode) {
+        setEditFieldError('pincode', "{% trans 'Pincode is required.' %}");
+        ok = false;
+      } else if (!PINCODE_RE.test(pincode)) {
+        setEditFieldError('pincode', "{% trans 'Enter a valid 6-digit pincode.' %}");
+        ok = false;
+      }
+
+      return ok;
+    }
+
+    if (editSaveBtn) {
+      editSaveBtn.addEventListener('click', function () {
+        clearEditErrors();
+        if (!validateEditFields() || !editUpdateUrl) {
+          return;
+        }
+
+        editSaveBtn.disabled = true;
+        var originalLabel = editSaveBtn.textContent;
+        editSaveBtn.textContent = "{% trans 'Saving...' %}";
+
+        var body = new URLSearchParams();
+        body.set('name', editFields.name.value.trim());
+        body.set('phone', digitsOnly(editFields.phone));
+        body.set('address_line1', editFields.line1.value.trim());
+        body.set('address_line2', editFields.line2.value.trim());
+        body.set('city_name', editFields.city.value.trim());
+        body.set('state_name', editFields.state.value.trim());
+        body.set('pincode', digitsOnly(editFields.pincode));
+
+        fetch(editUpdateUrl, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: body.toString()
+        })
+          .then(function (res) {
+            return res.json().then(function (payload) { return { ok: res.ok, payload: payload }; });
+          })
+          .then(function (result) {
+            editSaveBtn.disabled = false;
+            editSaveBtn.textContent = originalLabel;
+
+            if (result.ok && result.payload.success) {
+              var addr = result.payload.address;
+              var body = document.getElementById('dash-addr-' + editAddressId + '-body');
+              if (body && addr) {
+                body.textContent = addr.line1 + (addr.line2 ? ', ' + addr.line2 : '') +
+                  (addr.city_name ? ', ' + addr.city_name : '') + (addr.pincode ? ' - ' + addr.pincode : '');
+              }
+              if (editModal) editModal.hide();
+            } else if (result.payload.errors) {
+              var errs = result.payload.errors;
+              Object.keys(errs).forEach(function (key) {
+                var el = document.getElementById('dash-edit-error-' + key);
+                if (el) {
+                  el.innerText = errs[key].join(', ');
+                } else if (editAlert) {
+                  editAlert.classList.remove('d-none');
+                  editAlert.textContent = errs[key].join(', ');
+                }
+              });
+            } else if (editAlert) {
+              editAlert.classList.remove('d-none');
+              editAlert.textContent = "{% trans 'Could not save changes. Please try again.' %}";
+            }
+          })
+          .catch(function () {
+            editSaveBtn.disabled = false;
+            editSaveBtn.textContent = originalLabel;
+            if (editAlert) {
+              editAlert.classList.remove('d-none');
+              editAlert.textContent = "{% trans 'Could not save changes. Please try again.' %}";
+            }
+          });
+      });
+    }
+  })();
+</script>
 {% endblock %}

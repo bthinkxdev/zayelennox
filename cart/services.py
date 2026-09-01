@@ -108,20 +108,10 @@ def clear_cart(*, cart: Cart) -> None:
 
 
 @transaction.atomic
-def set_buy_now_item(
-    *,
-    cart: Cart,
-    product: Product,
-    variant: Optional[ProductVariant] = None,
-    quantity: int = 1,
-) -> CartItem:
+def reset_cart(*, cart: Cart) -> None:
     """
-    Replace the contents of a Buy Now cart with exactly one line item.
+    Empty a cart's line items and clear any coupon/delivery state on it.
 
-    Buy Now always represents a single, current purchase intent — any item,
-    coupon, or delivery-charge state left over from a previous Buy Now click
-    is cleared first, so each click is a fresh, isolated selection
-    independent of both past Buy Now attempts and the persistent cart.
     """
     clear_cart(cart=cart)
     if cart.coupon_code or cart.coupon_discount or cart.delivery_charge or cart.destination_city_id:
@@ -138,6 +128,25 @@ def set_buy_now_item(
                 "updated_at",
             ]
         )
+
+
+@transaction.atomic
+def set_buy_now_item(
+    *,
+    cart: Cart,
+    product: Product,
+    variant: Optional[ProductVariant] = None,
+    quantity: int = 1,
+) -> CartItem:
+    """
+    Replace the contents of a Buy Now cart with exactly one line item.
+
+    Buy Now always represents a single, current purchase intent — any item,
+    coupon, or delivery-charge state left over from a previous Buy Now click
+    is cleared first, so each click is a fresh, isolated selection
+    independent of both past Buy Now attempts and the persistent cart.
+    """
+    reset_cart(cart=cart)
     return add_to_cart(cart=cart, product=product, variant=variant, quantity=quantity, overwrite=True)
 
 
@@ -240,7 +249,10 @@ def adjust_cart_item_quantity(
 
     max_stock = item.variant.stock_quantity if item.variant else item.product.stock_quantity
     if new_quantity > max_stock:
-        raise InsufficientStockError(f"Only {max_stock} items available in stock.")
+        if delta > 0 or max_stock < 1:
+            raise InsufficientStockError(f"Only {max_stock} items available in stock.")
+
+        new_quantity = max_stock
 
     user = (
         cart.customer_profile.user

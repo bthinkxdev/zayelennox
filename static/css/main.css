@@ -1689,6 +1689,14 @@ body.mobile-search-open {
   font-weight: 600;
   font-size: 1.125rem;
 }
+
+.jm-mobile-nav-offcanvas {
+  border-left: none;
+}
+.jm-mobile-nav-offcanvas .offcanvas-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .cart-line {
   display: flex;
   gap: 0.75rem;
@@ -2856,6 +2864,15 @@ body.mobile-search-open {
   margin-top: 0 !important;
 }
 
+/* Keep the "View Cart" swap-in aligned with the "Add to Cart" button it
+   replaces. .jm-product-card__cart supplies a 0.45rem padding-top around
+   the Add to Cart button; the View Cart link (.jm-product-card__atc--in-cart)
+   sits directly in the card body with no such offset, so without this it
+   renders slightly higher once the button state is toggled. */
+.wishlist-card .jm-product-card__atc--in-cart {
+  margin-top: 0.45rem !important;
+}
+
 .wishlist-card .jm-product-card:hover {
   transform: none;
   box-shadow: none !important;
@@ -3660,6 +3677,12 @@ body.mobile-search-open .jm-wa-float {
 .jm-mobile-nav a:hover {
   background: var(--jm-accent-soft);
   color: var(--jm-accent);
+}
+
+.jm-mobile-nav a.is-active {
+  background: var(--jm-accent-soft);
+  color: var(--jm-accent);
+  font-weight: 700;
 }
 
 .jm-mobile-nav__cta {

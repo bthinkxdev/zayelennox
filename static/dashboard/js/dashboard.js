@@ -735,6 +735,7 @@
           document.body.innerHTML = doc.body.innerHTML;
           window.history.pushState({}, doc.title, result.url);
           initPage();
+          window.scrollTo(0, 0);
         } else {
          
           window.location.href = result.url;

@@ -68,14 +68,11 @@
               data-stock="{{ v.stock_quantity }}"
               data-in-stock="{% if v.stock_quantity > 0 %}true{% else %}false{% endif %}" {% if v.stock_quantity <= 0 %}disabled{% endif %}>
               <span class="jm-variant-option__name">{{ v.name }}</span>
-              {% if v_discount > 0 %}<span class="jm-variant-option__discount">{{ v_discount }}% {% trans "OFF"
-                %}</span>{% endif %}
+              {% if v_discount > 0 %}<span class="jm-variant-option__discount">{{ v_discount }}% {% trans "OFF"%}</span>{% endif %}
               <span class="jm-variant-option__price">
-                {% money_label v_price display_currency %}{% if v_discount > 0 %}<span class="jm-variant-option__mrp">{%
-                  money_label v_mrp display_currency %}</span>{% endif %}
+                {% money_label v_price display_currency %}{% if v_discount > 0 %}<span class="jm-variant-option__mrp">{%money_label v_mrp display_currency %}</span>{% endif %}
               </span>
-              {% if v.stock_quantity <= 0 %}<span class="jm-variant-option__oos-label">{% trans "Out of stock"
-                %}</span>{% endif %}
+              {% if v.stock_quantity <= 0 %}<span class="jm-variant-option__oos-label">{% trans "Out of stock" %}</span>{% endif %}
             </button>
             {% endwith %}
             {% endwith %}

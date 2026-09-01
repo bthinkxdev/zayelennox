@@ -9,9 +9,9 @@
     {% for line in summary.lines %}
     <li class="cart-line">
     <div class="cart-line__img-wrap">
-      {% with line.product.primary_images|first as primary_image %}
+      {% with line.display_image as primary_image %}
       {% if primary_image %}
-      <img src="{{ primary_image.image.url }}" alt="{{ line.product.name }}" class="cart-line__img" loading="lazy">
+      <img src="{{ primary_image.image.url }}" alt="{{ primary_image.alt_text|default:line.product.name }}" class="cart-line__img" loading="lazy">
       {% else %}
       <img src="{% static 'img/product-placeholder.svg' %}" alt="{{ line.product.name }}" class="cart-line__img cart-line__img--placeholder">
       {% endif %}
@@ -69,7 +69,11 @@
   <a href="{% url 'cart:page' %}" class="btn btn-outline-floward w-100 py-2 mt-2">{% trans "View Cart" %}</a>
   {% if summary.has_stock_issues %}
   <button class="btn btn-floward w-100 py-2 mt-2" disabled style="cursor: not-allowed;" onclick="event.preventDefault();">{% trans "Checkout" %}</button>
+  {% if summary.has_out_of_stock_items %}
   <div class="text-danger small mt-2 text-center">{% trans "Some items are out of stock. Please remove them to checkout." %}</div>
+  {% else %}
+  <div class="text-danger small mt-2 text-center">{% trans "Some items exceed available quantity. Please reduce quantity to checkout." %}</div>
+  {% endif %}
   {% else %}
   <a href="{% url 'checkout:checkout' %}" class="btn btn-floward w-100 py-2 mt-2">{% trans "Checkout" %}</a>
   {% endif %}

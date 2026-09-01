@@ -141,6 +141,17 @@
     });
   }
 
+  if (cartOffcanvas && window.bootstrap && window.bootstrap.Offcanvas) {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('open_cart') === '1') {
+      params.delete('open_cart');
+      var cleanedSearch = params.toString();
+      var cleanedUrl = window.location.pathname + (cleanedSearch ? '?' + cleanedSearch : '') + window.location.hash;
+      window.history.replaceState(window.history.state, '', cleanedUrl);
+      bootstrap.Offcanvas.getOrCreateInstance(cartOffcanvas).show();
+    }
+  }
+
   document.body.addEventListener('htmx:afterSwap', function (event) {
     if (event.detail.target && event.detail.target.id === 'cart-drawer-body') {
       event.detail.target.dataset.drawerHydrated = 'true';

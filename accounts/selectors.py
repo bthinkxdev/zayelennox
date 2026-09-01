@@ -27,6 +27,7 @@ class CustomerDashboardContext:
 
     profile: CustomerProfile
     default_address: Optional[Address]
+    addresses: list[Any]
     recent_orders: list[Any]
     unread_notification_count: int
 
@@ -74,9 +75,12 @@ def get_customer_dashboard_context(*, user: User) -> Optional[CustomerDashboardC
     if not address:
         address = Address.objects.select_related("city").filter(customer_profile=profile).first()
 
+    addresses = get_saved_addresses(customer_profile=profile)["results"]
+
     return CustomerDashboardContext(
         profile=profile,
         default_address=address,
+        addresses=addresses,
         recent_orders=recent_orders,
         unread_notification_count=unread_count,
     )
