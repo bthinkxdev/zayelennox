@@ -736,5 +736,13 @@ class ProductDocument(TimeStampedModel):
         import os
         return os.path.basename(self.document_file.name) if self.document_file else ""
 
+    @property
+    def is_image(self) -> bool:
+        if not self.document_file:
+            return False
+        import os
+        ext = os.path.splitext(self.document_file.name)[1].lower()
+        return ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+
     def __str__(self) -> str:
         return f"{self.product.name} - {self.title}"

@@ -35,16 +35,17 @@
           <span id="pdp-price-value">{% money_label price_data.price display_currency %}</span>
         </p>
         <div class="jm-pdp-buybox__stock-wrap">
-          <p class="jm-pdp-buybox__stock {% if price_data.is_in_stock == "true" %}is-in{% else %}is-out{% endif %} {% if price_data.is_low_stock == "true" %}d-none{% endif %}">
-            {% if price_data.is_in_stock == "true" %}
+          <p class="jm-pdp-buybox__stock {% if price_data.is_in_stock == 'true' %}is-in{% else %}is-out{% endif %} {% if price_data.is_low_stock == 'true' %}d-none{% endif %}">
+            {% if price_data.is_in_stock == 'true' %}
             {% trans "In stock" %}
             {% else %}
             {% trans "Out of stock" %}
             {% endif %}
           </p>
-          <div id="pdp-low-stock-alert" class="text-danger small mt-1 fw-semibold {% if price_data.is_low_stock != "true" %}d-none{% endif %}">{% trans "Only" %} <span id="pdp-low-stock-count">{{ resolved_stock }}</span> {% trans "left!" %}</div>
-          {% if price_data.is_in_stock == "true" %}
-          <div id="pdp-qty-limit-msg" class="text-danger small mt-1 {% if not cart_item or cart_item.quantity < resolved_stock %}d-none{% endif %}">{% trans "Only" %} {{ resolved_stock|default:1 }} {% trans "items available in stock." %}</div>
+          <div id="pdp-low-stock-alert" class="text-danger small mt-1 fw-semibold {% if price_data.is_low_stock != 'true' %}d-none{% endif %}">{% trans "Only" %} <span id="pdp-low-stock-count">{{ resolved_stock }}</span> {% trans "left!" %}</div>
+          {% if price_data.is_in_stock == 'true' %}
+          <div id="pdp-qty-limit-msg" class="text-danger small mt-1 {% if not cart_item or cart_item.quantity < resolved_stock %}d-none{% endif %}">
+            {% trans "Only" %} {{ resolved_stock|default:1 }} {% trans "items available in stock." %}</div>
           {% endif %}
         </div>
       </div>
@@ -55,28 +56,26 @@
         <div class="jm-pdp-field">
           <label class="jm-pdp-field__label">{% trans "Option" %}</label>
           <div id="pdp-variant-options" class="jm-vm__options jm-pdp-variant-options"
-               data-price-url="{% url 'catalog:variant-price' product_id=product.pk %}"
-               data-currency-symbol="{{ display_currency.symbol }}">
+            data-price-url="{% url 'catalog:variant-price' product_id=product.pk %}"
+            data-currency-symbol="{{ display_currency.symbol }}">
             {% for v in product.variant_list %}
             {% with v_price=product.base_price|decimal_add:v.price_delta v_mrp=v.effective_mrp %}
             {% with v_discount=v_mrp|discount_percent:v_price %}
             <button type="button"
-                    class="jm-variant-option{% if v.stock_quantity <= 0 %} jm-variant-option--oos{% endif %}{% if v.pk == selected_variant_id %} is-selected{% endif %}"
-                    data-variant-id="{{ v.pk }}"
-                    data-variant-name="{{ v.name }}"
-                    data-variant-type="{{ v.variant_type }}"
-                    data-price="{{ v_price }}"
-                    data-mrp="{{ v_mrp }}"
-                    data-discount="{{ v_discount }}"
-                    data-stock="{{ v.stock_quantity }}"
-                    data-in-stock="{% if v.stock_quantity > 0 %}true{% else %}false{% endif %}"
-                    {% if v.stock_quantity <= 0 %}disabled{% endif %}>
+              class="jm-variant-option{% if v.stock_quantity <= 0 %} jm-variant-option--oos{% endif %}{% if v.pk == selected_variant_id %} is-selected{% endif %}"
+              data-variant-id="{{ v.pk }}" data-variant-name="{{ v.name }}" data-variant-type="{{ v.variant_type }}"
+              data-price="{{ v_price }}" data-mrp="{{ v_mrp }}" data-discount="{{ v_discount }}"
+              data-stock="{{ v.stock_quantity }}"
+              data-in-stock="{% if v.stock_quantity > 0 %}true{% else %}false{% endif %}" {% if v.stock_quantity <= 0 %}disabled{% endif %}>
               <span class="jm-variant-option__name">{{ v.name }}</span>
-              {% if v_discount > 0 %}<span class="jm-variant-option__discount">{{ v_discount }}% {% trans "OFF" %}</span>{% endif %}
+              {% if v_discount > 0 %}<span class="jm-variant-option__discount">{{ v_discount }}% {% trans "OFF"
+                %}</span>{% endif %}
               <span class="jm-variant-option__price">
-                {% money_label v_price display_currency %}{% if v_discount > 0 %}<span class="jm-variant-option__mrp">{% money_label v_mrp display_currency %}</span>{% endif %}
+                {% money_label v_price display_currency %}{% if v_discount > 0 %}<span class="jm-variant-option__mrp">{%
+                  money_label v_mrp display_currency %}</span>{% endif %}
               </span>
-              {% if v.stock_quantity <= 0 %}<span class="jm-variant-option__oos-label">{% trans "Out of stock" %}</span>{% endif %}
+              {% if v.stock_quantity <= 0 %}<span class="jm-variant-option__oos-label">{% trans "Out of stock"
+                %}</span>{% endif %}
             </button>
             {% endwith %}
             {% endwith %}
@@ -89,96 +88,89 @@
       </div>
 
       <div id="purchase-actions-wrap">
-        <div id="purchase-actions" class="jm-pdp-buybox__purchase" 
-        hx-get="{{ request.path }}"
-        hx-select="#purchase-actions" 
-        hx-swap="outerHTML"
-        hx-include=".pdp-variant-id-input"
-        hx-trigger="pageshow from:window, cartItemAdded from:body, cartUpdated from:body">
+        <div id="purchase-actions" class="jm-pdp-buybox__purchase" hx-get="{{ request.path }}"
+          hx-select="#purchase-actions" hx-swap="outerHTML" hx-include=".pdp-variant-id-input"
+          hx-trigger="pageshow from:window, cartItemAdded from:body, cartUpdated from:body">
 
-        <div id="pdp-add-to-cart-group"
-          class="jm-pdp-buybox__row {% if is_in_cart %}d-none{% endif %}">
-          {% if price_data.is_in_stock == "true" %}
-          <div class="qty-stepper jm-pdp-qty" aria-label="{% trans 'Quantity' %}">
-            <button class="qty-stepper__btn" type="button"
-              onclick="let inp = document.getElementById('pdp-qty'); let msg = document.getElementById('pdp-qty-limit-msg'); if(inp.value > 1) { inp.value = parseInt(inp.value) - 1; document.querySelectorAll('.pdp-qty-input').forEach(i => i.value = inp.value); } if(msg) msg.classList.add('d-none');"
-              aria-label="{% trans 'Decrease quantity' %}">&minus;</button>
-            <input type="number" id="pdp-qty" class="qty-stepper__value pdp-qty-input"
-              value="{{ cart_item.quantity|default:1 }}" min="1" max="{{ resolved_stock|default:1 }}" readonly aria-label="{% trans 'Quantity' %}">
-            <button class="qty-stepper__btn" type="button"
-              onclick="let inp = document.getElementById('pdp-qty'); let max = parseInt(inp.getAttribute('max'), 10) || 1; let msg = document.getElementById('pdp-qty-limit-msg'); if(parseInt(inp.value, 10) < max) { inp.value = parseInt(inp.value, 10) + 1; document.querySelectorAll('.pdp-qty-input').forEach(i => i.value = inp.value); } if(msg) msg.classList.toggle('d-none', parseInt(inp.value, 10) < max);"
-              aria-label="{% trans 'Increase quantity' %}">&plus;</button>
+          <div id="pdp-add-to-cart-group" class="jm-pdp-buybox__row {% if is_in_cart %}d-none{% endif %}">
+            {% if price_data.is_in_stock == "true" %}
+            <div class="qty-stepper jm-pdp-qty" aria-label="{% trans 'Quantity' %}">
+              <button class="qty-stepper__btn" type="button"
+                onclick="let inp = document.getElementById('pdp-qty'); let msg = document.getElementById('pdp-qty-limit-msg'); if(inp.value > 1) { inp.value = parseInt(inp.value) - 1; document.querySelectorAll('.pdp-qty-input').forEach(i => i.value = inp.value); } if(msg) msg.classList.add('d-none');"
+                aria-label="{% trans 'Decrease quantity' %}">&minus;</button>
+              <input type="number" id="pdp-qty" class="qty-stepper__value pdp-qty-input"
+                value="{{ cart_item.quantity|default:1 }}" min="1" max="{{ resolved_stock|default:1 }}" readonly
+                aria-label="{% trans 'Quantity' %}">
+              <button class="qty-stepper__btn" type="button"
+                onclick="let inp = document.getElementById('pdp-qty'); let max = parseInt(inp.getAttribute('max'), 10) || 1; let msg = document.getElementById('pdp-qty-limit-msg'); if(parseInt(inp.value, 10) < max) { inp.value = parseInt(inp.value, 10) + 1; document.querySelectorAll('.pdp-qty-input').forEach(i => i.value = inp.value); } if(msg) msg.classList.toggle('d-none', parseInt(inp.value, 10) < max);"
+                aria-label="{% trans 'Increase quantity' %}">&plus;</button>
+            </div>
+            {% endif %}
+
+            <form id="buy-form" method="post" action="{% url 'cart:add' %}" class="jm-pdp-buybox__atc flex-grow-1"
+              hx-post="{% url 'cart:add' %}" hx-target="#cart-drawer-body" hx-swap="innerHTML">
+              {% csrf_token %}
+              <input type="hidden" name="product_id" value="{{ product.pk }}">
+              <input type="hidden" name="quantity" class="pdp-qty-input" value="{{ cart_item.quantity|default:1 }}">
+              <input type="hidden" name="variant_id" class="pdp-variant-id-input" value="{{ selected_variant_id }}">
+              <button type="submit" class="btn btn-outline-floward w-100 jm-pdp-btn" {% if price_data.is_in_stock != 'true' %}disabled{% endif %}>
+                {% if price_data.is_in_stock == 'true' %}{% trans "Add to Cart" %}{% else %}{% trans "Unavailable" %}{% endif %}
+              </button>
+            </form>
+
+
+
+            <form method="post" action="{% url 'cart:wishlist-toggle' %}" class="jm-pdp-wish"
+              hx-post="{% url 'cart:wishlist-toggle' %}" hx-swap="none">
+              {% csrf_token %}
+              <input type="hidden" name="product_id" value="{{ product.pk }}">
+              <button type="submit" class="jm-pdp-wish__btn jm-wish-btn {% if is_in_wishlist %}is-active{% endif %}"
+                aria-label="{% trans 'Wishlist' %}" aria-pressed="{% if is_in_wishlist %}true{% else %}false{% endif %}"
+                data-jm-wish-btn data-product-id="{{ product.pk }}">
+                <svg width="20" height="20" viewBox="0 0 24 24"
+                  fill="{% if is_in_wishlist %}currentColor{% else %}none{% endif %}" stroke="currentColor"
+                  stroke-width="2" aria-hidden="true">
+                  <path
+                    d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
+              </button>
+            </form>
           </div>
-          {% endif %}
 
-          <form id="buy-form" method="post" action="{% url 'cart:add' %}" class="jm-pdp-buybox__atc flex-grow-1"
-            hx-post="{% url 'cart:add' %}" hx-target="#cart-drawer-body" hx-swap="innerHTML">
-            {% csrf_token %}
-            <input type="hidden" name="product_id" value="{{ product.pk }}">
-            <input type="hidden" name="quantity" class="pdp-qty-input" value="{{ cart_item.quantity|default:1 }}">
-            <input type="hidden" name="variant_id" class="pdp-variant-id-input" value="{{ selected_variant_id }}">
-            <button type="submit" class="btn btn-outline-floward w-100 jm-pdp-btn" {% if price_data.is_in_stock != "true" %}disabled{% endif %}>
-              {% if price_data.is_in_stock == "true" %}{% trans "Add to Cart" %}{% else %}{% trans "Unavailable" %}{% endif %}
-            </button>
-          </form>
+          <div id="pdp-view-cart-group" class="jm-pdp-buybox__row {% if not is_in_cart %}d-none{% endif %}">
+            <a href="{% url 'cart:page' %}" class="btn btn-outline-floward flex-grow-1 jm-pdp-btn">
+              {% trans "View Cart" %}
+            </a>
+            <form method="post" action="{% url 'cart:wishlist-toggle' %}" class="jm-pdp-wish"
+              hx-post="{% url 'cart:wishlist-toggle' %}" hx-swap="none">
+              {% csrf_token %}
+              <input type="hidden" name="product_id" value="{{ product.pk }}">
+              <button type="submit" class="jm-pdp-wish__btn jm-wish-btn {% if is_in_wishlist %}is-active{% endif %}"
+                aria-label="{% trans 'Wishlist' %}" aria-pressed="{% if is_in_wishlist %}true{% else %}false{% endif %}"
+                data-jm-wish-btn data-product-id="{{ product.pk }}">
+                <svg width="20" height="20" viewBox="0 0 24 24"
+                  fill="{% if is_in_wishlist %}currentColor{% else %}none{% endif %}" stroke="currentColor"
+                  stroke-width="2" aria-hidden="true">
+                  <path
+                    d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
+              </button>
+            </form>
+          </div>
 
-
-
-          <form method="post" action="{% url 'cart:wishlist-toggle' %}" class="jm-pdp-wish"
-            hx-post="{% url 'cart:wishlist-toggle' %}" hx-swap="none">
-            {% csrf_token %}
-            <input type="hidden" name="product_id" value="{{ product.pk }}">
-            <button type="submit" 
-              class="jm-pdp-wish__btn jm-wish-btn {% if is_in_wishlist %}is-active{% endif %}"
-              aria-label="{% trans 'Wishlist' %}" 
-              aria-pressed="{% if is_in_wishlist %}true{% else %}false{% endif %}"
-              data-jm-wish-btn 
-              data-product-id="{{ product.pk }}">
-              <svg width="20" height="20" viewBox="0 0 24 24"
-                fill="{% if is_in_wishlist %}currentColor{% else %}none{% endif %}" stroke="currentColor"
-                stroke-width="2" aria-hidden="true">
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-              </svg>
-            </button>
-          </form>
-        </div>
-
-        <div id="pdp-view-cart-group"
-          class="jm-pdp-buybox__row {% if not is_in_cart %}d-none{% endif %}">
-          <a href="{% url 'cart:page' %}" class="btn btn-outline-floward flex-grow-1 jm-pdp-btn">
-            {% trans "View Cart" %}
-          </a>
-          <form method="post" action="{% url 'cart:wishlist-toggle' %}" class="jm-pdp-wish"
-            hx-post="{% url 'cart:wishlist-toggle' %}" hx-swap="none">
-            {% csrf_token %}
-            <input type="hidden" name="product_id" value="{{ product.pk }}">
-            <button type="submit" 
-              class="jm-pdp-wish__btn jm-wish-btn {% if is_in_wishlist %}is-active{% endif %}"
-              aria-label="{% trans 'Wishlist' %}" 
-              aria-pressed="{% if is_in_wishlist %}true{% else %}false{% endif %}"
-              data-jm-wish-btn 
-              data-product-id="{{ product.pk }}">
-              <svg width="20" height="20" viewBox="0 0 24 24"
-                fill="{% if is_in_wishlist %}currentColor{% else %}none{% endif %}" stroke="currentColor"
-                stroke-width="2" aria-hidden="true">
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-              </svg>
-            </button>
-          </form>
-        </div>
-
-        <div class="jm-pdp-buybox__cta-row">
-          <form id="buy-now-form" method="post" action="{% url 'cart:add' %}" class="flex-grow-1"
-            hx-post="{% url 'cart:add' %}" hx-target="#cart-drawer-body" hx-swap="innerHTML">
-            {% csrf_token %}
-            <input type="hidden" name="product_id" value="{{ product.pk }}">
-            <input type="hidden" name="quantity" class="pdp-qty-input" value="{{ cart_item.quantity|default:1 }}">
-            <input type="hidden" name="variant_id" class="pdp-variant-id-input" value="{{ selected_variant_id }}">
-            <button type="submit" name="buy_now" value="true" class="btn btn-floward w-100 jm-pdp-btn jm-pdp-btn--primary" {% if price_data.is_in_stock != "true" %}disabled{% endif %}>
-              {% trans "Buy Now" %}
-            </button>
-          </form>
-        </div>
+          <div class="jm-pdp-buybox__cta-row">
+            <form id="buy-now-form" method="post" action="{% url 'cart:add' %}" class="flex-grow-1"
+              hx-post="{% url 'cart:add' %}" hx-target="#cart-drawer-body" hx-swap="innerHTML">
+              {% csrf_token %}
+              <input type="hidden" name="product_id" value="{{ product.pk }}">
+              <input type="hidden" name="quantity" class="pdp-qty-input" value="{{ cart_item.quantity|default:1 }}">
+              <input type="hidden" name="variant_id" class="pdp-variant-id-input" value="{{ selected_variant_id }}">
+              <button type="submit" name="buy_now" value="true"
+                class="btn btn-floward w-100 jm-pdp-btn jm-pdp-btn--primary" {% if price_data.is_in_stock != 'true' %}disabled{% endif %}>
+                {% trans "Buy Now" %}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>
@@ -189,27 +181,26 @@
     <div class="jm-pdp-sticky__price" id="pdp-sticky-price">{% money_label price_data.price display_currency %}</div>
     <div class="jm-pdp-sticky__actions" id="pdp-sticky-actions-group">
       <form id="sticky-buy-form" method="post" action="{% url 'cart:add' %}"
-        class="jm-pdp-sticky__atc {% if is_in_cart %}d-none{% endif %}" 
-        hx-post="{% url 'cart:add' %}" hx-target="#cart-drawer-body" hx-swap="innerHTML">
+        class="jm-pdp-sticky__atc {% if is_in_cart %}d-none{% endif %}" hx-post="{% url 'cart:add' %}"
+        hx-target="#cart-drawer-body" hx-swap="innerHTML">
         {% csrf_token %}
         <input type="hidden" name="product_id" value="{{ product.pk }}">
         <input type="hidden" name="quantity" class="pdp-qty-input" value="{{ cart_item.quantity|default:1 }}">
         <input type="hidden" name="variant_id" class="pdp-variant-id-input" value="{{ selected_variant_id }}">
-        <button type="submit" class="btn btn-outline-floward jm-pdp-sticky__btn" {% if price_data.is_in_stock != "true" %}disabled{% endif %}>{% if price_data.is_in_stock == "true" %}{% trans "Add" %}{% else %}{% trans "Unavailable" %}{% endif %}</button>
+        <button type="submit" class="btn btn-outline-floward jm-pdp-sticky__btn" {% if price_data.is_in_stock != 'true' %}disabled{% endif %}>{% if price_data.is_in_stock == 'true' %}{% trans "Add" %}{% else %}{% trans "Unavailable" %}{% endif %}</button>
       </form>
 
       <div id="pdp-sticky-view-cart-btn" class="jm-pdp-sticky__atc {% if not is_in_cart %}d-none{% endif %}">
         <a href="{% url 'cart:page' %}" class="btn btn-outline-floward jm-pdp-sticky__btn">{% trans "Cart" %}</a>
       </div>
 
-      <form id="sticky-buy-now-form" method="post" action="{% url 'cart:add' %}"
-        class="jm-pdp-sticky__buy" 
+      <form id="sticky-buy-now-form" method="post" action="{% url 'cart:add' %}" class="jm-pdp-sticky__buy"
         hx-post="{% url 'cart:add' %}" hx-target="#cart-drawer-body" hx-swap="innerHTML">
         {% csrf_token %}
         <input type="hidden" name="product_id" value="{{ product.pk }}">
         <input type="hidden" name="quantity" class="pdp-qty-input" value="{{ cart_item.quantity|default:1 }}">
         <input type="hidden" name="variant_id" class="pdp-variant-id-input" value="{{ selected_variant_id }}">
-        <button type="submit" name="buy_now" value="true" class="btn btn-floward jm-pdp-sticky__btn" {% if price_data.is_in_stock != "true" %}disabled{% endif %}>{% trans "Buy Now" %}</button>
+        <button type="submit" name="buy_now" value="true" class="btn btn-floward jm-pdp-sticky__btn" {% if price_data.is_in_stock != 'true' %}disabled{% endif %}>{% trans "Buy Now" %}</button>
       </form>
     </div>
 
@@ -238,19 +229,29 @@
 
       {% if product.documents.all %}
       <div class="{% if product.specifications.all %}col-lg-5{% else %}col-12{% endif %}">
-        <h2 class="section-title h5 mb-3">{% trans "Manuals & Documents" %}</h2>
         <div class="d-flex flex-column gap-2">
           {% for doc in product.documents.all %}
+          {% if doc.is_image %}
+          <div class="jm-pdp-doc-image mb-5 text-center">
+            <h2 class="mb-4"
+              style="font-family: 'Playfair Display', 'Times New Roman', serif; font-size: clamp(1.5rem, 4vw, 2.25rem); color: #1a1a1a;">
+              {{ doc.title }}</h2>
+            <img src="{{ doc.document_file.url }}" alt="{{ doc.title }}" class="img-fluid w-100 rounded"
+              style="object-fit: contain;">
+          </div>
+          {% else %}
           <div class="jm-pdp-doc">
             <div>
               <h3 class="jm-pdp-doc__title">{{ doc.title }}</h3>
               <span class="jm-pdp-doc__type">PDF {% trans "Document" %}</span>
             </div>
             <div class="jm-pdp-doc__actions">
-              <a href="{{ doc.document_file.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-floward">{% trans "View" %}</a>
+              <a href="{{ doc.document_file.url }}" target="_blank" rel="noopener"
+                class="btn btn-sm btn-outline-floward">{% trans "View" %}</a>
               <a href="{{ doc.document_file.url }}" download class="btn btn-sm btn-floward">{% trans "Download" %}</a>
             </div>
           </div>
+          {% endif %}
           {% endfor %}
         </div>
       </div>
@@ -260,7 +261,8 @@
   {% endif %}
 
   <section class="jm-pdp-section mt-4 mt-lg-5 pt-4 border-top" id="reviews">
-    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-3">
+    <div
+      class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-3">
       <h2 class="section-title h5 mb-0">{% trans "Reviews" %}</h2>
       {% if has_delivered_order %}
       <p class="text-muted small mb-0">
@@ -311,7 +313,7 @@
       const addGroup = document.getElementById("pdp-add-to-cart-group");
       const stickyBuyForm = document.getElementById("sticky-buy-form");
       const stickyViewCartBtn = document.getElementById("pdp-sticky-view-cart-btn");
-      
+
       if (addGroup && stickyBuyForm && stickyViewCartBtn) {
         const inCart = addGroup.classList.contains("d-none");
         if (inCart) {
@@ -324,7 +326,7 @@
       }
     }
 
-    document.body.addEventListener("htmx:afterSettle", function(e) {
+    document.body.addEventListener("htmx:afterSettle", function (e) {
       if (e.target.id === "purchase-actions") {
         syncStickyState();
       }
