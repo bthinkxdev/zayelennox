@@ -34,7 +34,7 @@ def about_us_view(request: HttpRequest) -> HttpResponse:
     context = seo_context(
         request=request,
         title=_("About Us | ZAYE LENNOX"),
-        description=_("Learn more about ZAYE LENNOX and our mission to deliver herbal remedies and skincare products."),
+        description=_("Learn more about ZAYE LENNOX and our mission to deliver quality hair care, skin care, and body care products."),
     )
     return render(request, "core/about_us.html", context)
 
@@ -130,7 +130,7 @@ def blog_view(request: HttpRequest) -> HttpResponse:
     context = seo_context(
         request=request,
         title=_("Blog | ZAYE LENNOX"),
-        description=_("Read our latest news and herbal wellness articles."),
+        description=_("Read our latest news and hair, skin & body care tips."),
     )
     from cms.models import BlogPost
     context["blogs"] = BlogPost.objects.filter(is_published=True)
