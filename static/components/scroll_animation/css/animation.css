@@ -100,12 +100,8 @@
     margin: 0;
 }
 
-.mobile-animation-text-blocks {
-    display: none;
-}
-
-/* Mobile Adjustments */
-@media (max-width: 768px) {
+/* Mobile & Tablet Adjustments */
+@media (max-width: 991px) {
     .scroll-animation-wrapper {
         margin-top: -15vh;
         margin-bottom: -30vh;
@@ -125,36 +121,40 @@
         mask-image: none;
     }
 
-    .desktop-blocks {
-        display: none !important;
+    /* Overlay the text as compact cards in the four corners of the animation,
+       same scroll-triggered reveal as desktop, instead of a separate static block. */
+    .text-block {
+        max-width: 46%;
+        padding: 8px 10px;
+        background: rgba(255, 255, 255, 0.85);
+        border-radius: 8px;
+        backdrop-filter: blur(2px);
     }
 
-    .mobile-animation-text-blocks {
-        display: block;
-        padding: 40px 20px;
-        background-color: #ffffff;
+    .text-left {
+        left: 4%;
     }
 
-    .mobile-text-block {
-        margin-bottom: 35px;
-        text-align: left;
+    .text-right {
+        right: 4%;
     }
 
-    .mobile-text-block:last-child {
-        margin-bottom: 0;
+    .text-top {
+        top: 4%;
     }
 
-    .mobile-text-block h3 {
-        font-size: 1.4rem;
-        color: #C59F44;
-        margin-bottom: 12px;
-        font-weight: 500;
+    .text-bottom {
+        top: auto;
+        bottom: 4%;
     }
 
-    .mobile-text-block p {
-        font-size: 1rem;
-        color: #555;
-        line-height: 1.5;
-        margin: 0;
+    .text-block h3 {
+        font-size: 0.8rem;
+        margin-bottom: 3px;
+    }
+
+    .text-block p {
+        font-size: 0.62rem;
+        line-height: 1.3;
     }
 }
