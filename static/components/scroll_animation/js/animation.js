@@ -4,10 +4,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const context = canvas.getContext("2d");
 
-    const frameCount = 60;
+    const frameCount = 96;
 
     const currentFrame = index => (
-        `/static/components/scroll_animation/images/ezgif-frame-${index.toString().padStart(3, '0')}.jpg`
+        `/static/components/scroll_animation/images/frame_${index.toString().padStart(3, '0')}.png`
     );
 
     // Preload images to prevent flickering
