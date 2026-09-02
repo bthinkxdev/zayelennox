@@ -243,6 +243,12 @@
                     {% endif %}
                     <div>{{ order.delivery_address_snapshot.city }}{% if order.delivery_address_snapshot.state %}, {{ order.delivery_address_snapshot.state }}{% endif %} {{ order.delivery_address_snapshot.pincode }}</div>
 
+                    {% if order.delivery_address_snapshot.email %}
+                        <div>{{ order.delivery_address_snapshot.email }}</div>
+                    {% elif order.customer_profile %}
+                        <div>{{ order.customer_profile.user.email }}</div>
+                    {% endif %}
+
                     {% if order.delivery_address_snapshot.phone %}
                         <div>{{ order.delivery_address_snapshot.phone }}</div>
                     {% elif order.customer_profile and order.customer_profile.get_phone %}

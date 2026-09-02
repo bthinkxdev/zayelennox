@@ -161,15 +161,20 @@ def _render_product_form(request, product, mode):
             return redirect("dashboard:product-list")
     else:
         variants = forms.ProductVariantFormSet(instance=product, prefix="variants")
-        if product is None:
-
-            variants.extra = 0
-        form = forms.ProductForm(instance=product, variants_formset=variants)
         images = forms.ProductImageFormSet(instance=product, prefix="images")
         specifications = forms.ProductSpecificationFormSet(
             instance=product, prefix="specifications"
         )
         documents = forms.ProductDocumentFormSet(instance=product, prefix="documents")
+        if product is None:
+
+            variants.extra = 0
+        else:
+            variants.extra = 0
+            images.extra = 0
+            specifications.extra = 0
+            documents.extra = 0
+        form = forms.ProductForm(instance=product, variants_formset=variants)
 
 
     variant_empty_form = variants.empty_form

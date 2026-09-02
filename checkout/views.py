@@ -504,6 +504,7 @@ def checkout_address_update_view(request: HttpRequest, address_id: int) -> HttpR
 
 
 @require_GET
+@never_cache
 def checkout_confirmation_view(request: HttpRequest, order_id: int) -> HttpResponse:
     """Separate order confirmation / success page."""
     from orders.models import Order
@@ -519,6 +520,7 @@ def checkout_confirmation_view(request: HttpRequest, order_id: int) -> HttpRespo
 
 
 @require_GET
+@never_cache
 def razorpay_pay_view(request: HttpRequest, order_id: int) -> HttpResponse:
     """Render Razorpay checkout payment page."""
     from orders.models import Order
@@ -527,6 +529,8 @@ def razorpay_pay_view(request: HttpRequest, order_id: int) -> HttpResponse:
     from django.shortcuts import get_object_or_404
 
     order = get_object_or_404(Order, pk=order_id)
+    if order.payment_transactions.filter(status="success").exists():
+        return redirect(f"{reverse('cms:homepage')}?open_cart=1")
     payment_tx = PaymentTransaction.objects.filter(order=order, gateway_key__startswith="razorpay").last()
     key_id, _ = _get_razorpay_credentials()
 

@@ -538,6 +538,15 @@
       setInputFiles(input, input._pendingFiles);
       renderPendingPreview(input);
     });
+
+    var formsetBody = variantsWrap.querySelector("[data-formset-body]");
+    var erroredField = formsetBody
+      ? formsetBody.querySelector('tr[data-variant-row] [data-variant-fields] .text-danger')
+      : null;
+    if (erroredField) {
+      var erroredRow = erroredField.closest("tr[data-variant-row]");
+      if (erroredRow) openForRow(erroredRow);
+    }
   }
 
 
@@ -627,6 +636,43 @@
     initVariantEmptyState();
     initProductFormPersistFiles();
     initOrderStatusGuard();
+    initSearchFormGuard();
+  }
+
+  // ---- List page search forms: don't let "Search" submit on empty/whitespace ----
+  // The vendor dashboard's Orders/Products/Payments list pages each have a
+  // "q" search field + Search button in a <form method="get">. Clicking
+  // Search with a blank (or whitespace-only) query still reloaded the page
+  // pointlessly, so disable the button until there's real text to search
+  // for. The status/category/sort <select> elements on those same forms
+  // submit themselves via a plain form.submit() call on "change" (see the
+  // inline onchange="this.form.submit()" in the templates), which bypasses
+  // the "submit" event entirely, so this guard has no effect on them.
+  function initSearchFormGuard() {
+    var forms = document.querySelectorAll("form");
+    Array.prototype.forEach.call(forms, function (form) {
+      var input = form.querySelector('input[name="q"]');
+      if (!input) return;
+      var btn = form.querySelector('button[type="submit"]');
+      if (!btn || form.dataset.searchGuardBound === "1") return;
+      form.dataset.searchGuardBound = "1";
+
+      function refresh() {
+        btn.disabled = !input.value.trim();
+      }
+
+      input.addEventListener("input", refresh);
+      //belt-and-braces: also block the submit event itself (covers
+      //pressing Enter in the field, which some browsers still honor even
+      //when the form's submit button is disabled).
+      form.addEventListener("submit", function (e) {
+        if (!input.value.trim()) {
+          e.preventDefault();
+        }
+      });
+
+      refresh();
+    });
   }
 
 

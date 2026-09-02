@@ -125,6 +125,45 @@ class ProductForm(SlugAutoMixin):
             return None
         return get_active_variant_forms(fs)
 
+    def _check_variant_sku_uniqueness(self, active_variants):
+
+        from catalog.models import ProductVariant
+
+        by_suffix: dict[str, list] = {}
+        for vform in active_variants:
+            suffix = vform.cleaned_data.get("sku_suffix")
+            if not suffix:
+                continue
+            by_suffix.setdefault(suffix, []).append(vform)
+
+        if not by_suffix:
+            return
+
+        for suffix, vforms in by_suffix.items():
+            if len(vforms) > 1:
+                for vform in vforms:
+                    vform.add_error(
+                        "sku_suffix",
+                        "This SKU is already used by another variant below.",
+                    )
+
+        existing = ProductVariant.objects.filter(sku_suffix__in=by_suffix.keys())
+        exclude_pks = [
+            vform.instance.pk
+            for vforms in by_suffix.values()
+            for vform in vforms
+            if vform.instance.pk
+        ]
+        if exclude_pks:
+            existing = existing.exclude(pk__in=exclude_pks)
+        taken = set(existing.values_list("sku_suffix", flat=True))
+        for suffix in taken:
+            for vform in by_suffix[suffix]:
+                vform.add_error(
+                    "sku_suffix",
+                    "A product variant with this SKU already exists.",
+                )
+
     def clean(self):
         cleaned = super().clean()
         active_variants = self._active_variant_forms()
@@ -138,7 +177,9 @@ class ProductForm(SlugAutoMixin):
         )
 
         if has_variants:
-            
+
+            self._check_variant_sku_uniqueness(active_variants)
+
             prices = []
             for vform in active_variants:
                 price = vform.cleaned_data.get("price")
@@ -411,24 +452,34 @@ class CouponForm(forms.ModelForm):
         # created — an existing coupon may legitimately have a valid_from
         # in the past (it already started) and editing it shouldn't be
         # blocked just because that field is untouched.
-        if not self.instance.pk:
-            now_str = timezone.localtime(timezone.now()).strftime("%Y-%m-%dT%H:%M")
-            self.fields["valid_from"].widget.attrs["min"] = now_str
-            self.fields["valid_until"].widget.attrs["min"] = now_str
+        now = timezone.localtime(timezone.now())
+        for field_name in ("valid_from", "valid_until"):
+            floor = now
+            current = getattr(self.instance, field_name, None)
+            if current is not None:
+                current = timezone.localtime(current)
+                if current < floor:
+                    floor = current
+            self.fields[field_name].widget.attrs["min"] = floor.strftime("%Y-%m-%dT%H:%M")
 
     def clean(self):
         cleaned = super().clean()
-        if self.instance.pk:
-            return cleaned
 
         now = timezone.now()
+        for field_name, label in (("valid_from", "Valid From"), ("valid_until", "Valid To")):
+            value = cleaned.get(field_name)
+            if value is None:
+                continue
+            original = getattr(self.instance, field_name, None) if self.instance.pk else None
+            if original is not None and original < now:
+
+                if value < original:
+                    self.add_error(field_name, f"{label} date can't be set earlier than its current value.")
+            elif value < now:
+                self.add_error(field_name, f"{label} date cannot be in the past.")
+
         valid_from = cleaned.get("valid_from")
         valid_until = cleaned.get("valid_until")
-
-        if valid_from and valid_from < now:
-            self.add_error("valid_from", "Valid From date cannot be in the past.")
-        if valid_until and valid_until < now:
-            self.add_error("valid_until", "Valid To date cannot be in the past.")
         if valid_from and valid_until and valid_until < valid_from:
             self.add_error("valid_until", "Valid To date cannot be earlier than Valid From date.")
 
@@ -446,24 +497,33 @@ class FlashSaleForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Same reasoning as CouponForm: only enforce "no past dates" on
         # creation so an in-progress flash sale can still be edited.
-        if not self.instance.pk:
-            now_str = timezone.localtime(timezone.now()).strftime("%Y-%m-%dT%H:%M")
-            self.fields["starts_at"].widget.attrs["min"] = now_str
-            self.fields["ends_at"].widget.attrs["min"] = now_str
+        now = timezone.localtime(timezone.now())
+        for field_name in ("starts_at", "ends_at"):
+            floor = now
+            current = getattr(self.instance, field_name, None)
+            if current is not None:
+                current = timezone.localtime(current)
+                if current < floor:
+                    floor = current
+            self.fields[field_name].widget.attrs["min"] = floor.strftime("%Y-%m-%dT%H:%M")
 
     def clean(self):
         cleaned = super().clean()
-        if self.instance.pk:
-            return cleaned
 
         now = timezone.now()
+        for field_name, label in (("starts_at", "Start"), ("ends_at", "End")):
+            value = cleaned.get(field_name)
+            if value is None:
+                continue
+            original = getattr(self.instance, field_name, None) if self.instance.pk else None
+            if original is not None and original < now:
+                if value < original:
+                    self.add_error(field_name, f"{label} date can't be set earlier than its current value.")
+            elif value < now:
+                self.add_error(field_name, f"{label} date cannot be in the past.")
+
         starts_at = cleaned.get("starts_at")
         ends_at = cleaned.get("ends_at")
-
-        if starts_at and starts_at < now:
-            self.add_error("starts_at", "Start date cannot be in the past.")
-        if ends_at and ends_at < now:
-            self.add_error("ends_at", "End date cannot be in the past.")
         if starts_at and ends_at and ends_at < starts_at:
             self.add_error("ends_at", "End date cannot be earlier than start date.")
 
