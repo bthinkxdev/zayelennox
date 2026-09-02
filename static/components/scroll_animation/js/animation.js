@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const context = canvas.getContext("2d");
 
-    const frameCount = 96;
+    const frameCount = 83;
 
     const currentFrame = index => (
         `/static/components/scroll_animation/images/frame_${index.toString().padStart(3, '0')}.png`
