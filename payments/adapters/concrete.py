@@ -5,11 +5,14 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import uuid
 from decimal import Decimal
 from typing import Any
 
 from payments.adapters.base import PaymentCaptureResult, PaymentGatewayAdapter, PaymentIntentResult
+
+logger = logging.getLogger(__name__)
 
 
 class CardGatewayAdapter(PaymentGatewayAdapter):
@@ -151,43 +154,12 @@ class GooglePayAdapter(PaymentGatewayAdapter):
         return PaymentCaptureResult(success=True, transaction_id=f"gp_refund_{transaction_id}")
 
 
-class CashOnDeliveryAdapter(PaymentGatewayAdapter):
-    """
-    Cash on Delivery (COD) payment adapter.
-    """
-
-    key = "cod"
-    display_name = "Cash on Delivery (COD)"
-    is_async = False
-
-    def create_payment_intent(
-        self,
-        *,
-        amount: Decimal,
-        currency: str,
-        metadata: dict[str, Any],
-    ) -> PaymentIntentResult:
-        intent_id = f"cod_pi_{uuid.uuid4().hex[:16]}"
-        return PaymentIntentResult(
-            intent_id=intent_id,
-            metadata={"amount": str(amount), "currency": currency, **metadata},
-        )
-
-    def verify_webhook(self, *, payload: bytes, signature: str) -> dict[str, Any]:
-        raise NotImplementedError("Cash on Delivery does not use webhooks.")
-
-    def capture(self, *, intent_id: str) -> PaymentCaptureResult:
-        return PaymentCaptureResult(
-            success=True,
-            transaction_id=f"cod_tx_{intent_id}",
-            metadata={"gateway": self.key},
-        )
-
-    def refund(self, *, transaction_id: str, amount: Decimal) -> PaymentCaptureResult:
-        return PaymentCaptureResult(success=True, transaction_id=f"cod_refund_{transaction_id}")
-
 
 def _get_razorpay_credentials() -> tuple[str, str]:
+    """
+    Resolve Razorpay credentials.
+
+    """
     try:
         from core.models import SiteSettings
         settings_inst = SiteSettings.objects.first()
@@ -199,7 +171,9 @@ def _get_razorpay_credentials() -> tuple[str, str]:
     except Exception:
         pass
     import os
-    return os.getenv("RAZORPAY_KEY_ID", ""), os.getenv("RAZORPAY_KEY_SECRET", "")
+    key_id = os.getenv("RZP_CLIENT_ID") or os.getenv("RAZORPAY_KEY_ID", "")
+    key_secret = os.getenv("RZP_CLIENT_SECRET") or os.getenv("RAZORPAY_KEY_SECRET", "")
+    return key_id, key_secret
 
 
 class RazorpayAdapter(PaymentGatewayAdapter):
@@ -230,6 +204,7 @@ class RazorpayAdapter(PaymentGatewayAdapter):
                         "amount": amount_in_paise,
                         "currency": currency,
                         "receipt": f"ord_{metadata.get('order_id', '')}",
+                        "payment_capture": 1,
                         "notes": {
                             "order_id": str(metadata.get("order_id", "")),
                             "order_number": str(metadata.get("order_number", "")),
@@ -245,8 +220,13 @@ class RazorpayAdapter(PaymentGatewayAdapter):
                         requires_webhook=True,
                         metadata={"key_id": key_id, "razorpay_order_id": intent_id, **metadata},
                     )
+                logger.error(
+                    "Razorpay order creation failed (status=%s): %s",
+                    response.status_code,
+                    response.text,
+                )
             except Exception:
-                pass
+                logger.exception("Razorpay order creation request failed; falling back to mock intent.")
 
         intent_id = f"rzp_order_{uuid.uuid4().hex[:16]}"
         return PaymentIntentResult(
@@ -281,6 +261,7 @@ class RazorpayAdapter(PaymentGatewayAdapter):
         self,
         *,
         razorpay_payment_id: str,
+        amount: Decimal,
         currency: str = None,
     ) -> bool:
         if not currency:
@@ -298,9 +279,18 @@ class RazorpayAdapter(PaymentGatewayAdapter):
                     json={"amount": amount_in_paise, "currency": currency},
                     timeout=10,
                 )
-                return resp.status_code in (200, 201)
+                if resp.status_code in (200, 201):
+                    return True
+                logger.warning(
+                    "Razorpay capture for %s returned status=%s: %s",
+                    razorpay_payment_id,
+                    resp.status_code,
+                    resp.text,
+                )
+                return "already" in resp.text.lower() or "captured" in resp.text.lower()
             except Exception:
-                pass
+                logger.exception("Razorpay capture request failed for payment %s.", razorpay_payment_id)
+                return False
         return True
 
     def capture(self, *, intent_id: str) -> PaymentCaptureResult:

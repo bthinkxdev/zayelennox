@@ -61,6 +61,22 @@ def status_pill(value):
     return _STATUS_PILL.get(str(value).lower(), "pill-gray")
 
 
+_LEGACY_GATEWAY_NAMES = {
+    "cod": "Cash on Delivery (legacy)",
+}
+
+
+@register.filter
+def gateway_display_name(gateway_key):
+
+    from payments.registry import PAYMENT_GATEWAYS
+
+    adapter = PAYMENT_GATEWAYS.get(gateway_key)
+    if adapter is not None:
+        return adapter.display_name
+    return _LEGACY_GATEWAY_NAMES.get(gateway_key, gateway_key)
+
+
 @register.filter
 def primary_image(product):
     """Return the URL of a product's primary (or first) image, else empty string."""

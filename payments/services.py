@@ -63,22 +63,6 @@ def confirm_payment_failed(*, payment_transaction: PaymentTransaction) -> Paymen
 
 
 @transaction.atomic
-def mark_cod_payment_collected(*, order: "Order") -> None:
-    """
-    Flip a Cash-on-Delivery order's payment transaction(s) to Success.
-
-    """
-    pending_cod_txs = PaymentTransaction.objects.filter(
-        order=order,
-        gateway_key="cod",
-        status=PaymentStatus.PENDING,
-    )
-    for payment_tx in pending_cod_txs:
-        payment_tx.status = PaymentStatus.SUCCESS
-        payment_tx.save(update_fields=["status", "updated_at"])
-
-
-@transaction.atomic
 def transition_payment_status(
     *, payment_transaction: PaymentTransaction, new_status: str
 ) -> PaymentTransaction:
@@ -171,10 +155,6 @@ def process_payment(
 
     if capture.success:
         confirm_payment_success(payment_transaction=payment_tx)
-        #COD checkouts are successful, but the payment itself should remain Pending until the admin manually collects the cash and marks it as Success.
-        if gateway_key == "cod":
-            payment_tx.status = PaymentStatus.PENDING
-            payment_tx.save(update_fields=["status", "updated_at"])
     else:
         confirm_payment_failed(payment_transaction=payment_tx)
 

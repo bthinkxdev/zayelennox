@@ -643,10 +643,16 @@ def razorpay_callback_view(request: HttpRequest) -> HttpResponse:
     )
 
     if is_valid and payment_tx:
+        if payment_tx.currency:
+            currency_code = payment_tx.currency.code
+        else:
+            from core.selectors import get_default_currency
+            default_curr = get_default_currency()
+            currency_code = default_curr.code if default_curr else "INR"
         adapter.capture_payment(
             razorpay_payment_id=razorpay_payment_id,
             amount=payment_tx.amount,
-            currency=payment_tx.currency.code if payment_tx.currency else (default_curr.code if default_curr else "INR"),
+            currency=currency_code,
         )
         payment_tx.external_transaction_id = razorpay_payment_id
         payment_tx.save(update_fields=["external_transaction_id", "updated_at"])

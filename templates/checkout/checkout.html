@@ -145,6 +145,8 @@
               {% if selected_gateway_key == key %}checked{% elif not selected_gateway_key and forloop.first %}checked{% endif %}>
             <label class="form-check-label small" for="gw-{{ key }}">{{ adapter.display_name }}</label>
           </div>
+          {% empty %}
+          <div class="text-danger small">{% trans "Online payment is temporarily unavailable. Please try again shortly or contact support." %}</div>
           {% endfor %}
           <div id="error-gateway_key" class="text-danger small mt-1"></div>
 
@@ -294,6 +296,9 @@
         {% else %}
         <div class="text-danger small mt-2 text-center">{% trans "Some items exceed available quantity. Please click 'Cart' to reduce quantity." %}</div>
         {% endif %}
+        {% elif not payment_gateways %}
+        <button type="button" class="btn btn-floward w-100 py-2 mt-3" disabled style="cursor: not-allowed;">{% trans "Place Order & Pay" %}</button>
+        <div class="text-danger small mt-2 text-center">{% trans "Online payment is temporarily unavailable. Please try again shortly." %}</div>
         {% else %}
         <button type="submit" form="checkout-form" class="btn btn-floward w-100 py-2 mt-3">{% trans "Place Order & Pay" %}</button>
         {% endif %}
@@ -319,10 +324,7 @@
     var checkoutForm = document.getElementById('checkout-form');
     if (checkoutForm) {
       checkoutForm.addEventListener('htmx:beforeSend', function(event) {
-        var selectedGateway = document.querySelector('input[name="gateway_key"]:checked');
-        if (selectedGateway && selectedGateway.value === 'cod') {
-          document.getElementById('order-processing-overlay').classList.remove('d-none');
-        }
+        document.getElementById('order-processing-overlay').classList.remove('d-none');
       });
       checkoutForm.addEventListener('htmx:afterSwap', function(event) {
         document.getElementById('order-processing-overlay').classList.add('d-none');

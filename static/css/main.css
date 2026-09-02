@@ -883,8 +883,7 @@ body.mobile-search-open {
 
 
 .product-card-img--placeholder {
-  object-fit: contain !important;
-  padding: 22%;
+  object-fit: cover !important;
   background: var(--floward-primary-light);
 }
 
@@ -3052,8 +3051,8 @@ body.mobile-search-open {
 }
 
 .jm-logo__mark {
-  width: 40px;
-  height: 40px;
+  width: 52px;
+  height: 52px;
   object-fit: contain;
   border-radius: 50%;
 }
@@ -3067,7 +3066,7 @@ body.mobile-search-open {
 
 .jm-logo__text span {
   font-weight: 600;
-  color: var(--jm-slate);
+  color: var(--jm-gold-dark);
 }
 
 .jm-search {
@@ -3694,10 +3693,6 @@ body.mobile-search-open .jm-wa-float {
   .jm-header__main-inner {
     grid-template-columns: auto 1fr auto;
     min-height: 64px;
-  }
-
-  .jm-logo__text span {
-    display: none;
   }
 }
 
@@ -4435,8 +4430,7 @@ body.mobile-search-open .jm-wa-float {
 }
 
 .jm-product-card__media img {
-  object-fit: contain !important;
-  padding: 1rem;
+  object-fit: cover !important;
   transition: transform 0.35s ease;
 }
 
@@ -4936,7 +4930,6 @@ body.mobile-search-open .jm-wa-float {
   height: 36px;
   object-fit: contain;
   border-radius: 50%;
-  background: #fff;
 }
 
 .jm-footer__tagline {
@@ -5435,17 +5428,16 @@ body.mobile-search-open .jm-wa-float {
   }
 
   .jm-logo__mark {
-    width: 30px;
-    height: 30px;
+    width: 38px;
+    height: 38px;
   }
 
   .jm-logo__text {
     font-size: 0.92rem;
     white-space: nowrap;
-  }
-
-  .jm-logo__text span {
-    display: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 
   .jm-header__actions {
@@ -5776,10 +5768,6 @@ body.mobile-search-open .jm-wa-float {
   /* ----- Product cards (compact Flipkart style) ----- */
   .jm-product-card {
     border-radius: 10px !important;
-  }
-
-  .jm-product-card__media img {
-    padding: 0.55rem;
   }
 
   .jm-product-card__hover {

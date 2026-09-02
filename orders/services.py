@@ -41,7 +41,7 @@ HARD_BLOCKED_TRANSITIONS: dict[str, dict[str, str]] = {
 
 def generate_order_number() -> str:
     """Return a unique human-readable order number."""
-    return f"FLW-{uuid.uuid4().hex[:12].upper()}"
+    return f"ZYL-{uuid.uuid4().hex[:12].upper()}"
 
 
 @transaction.atomic

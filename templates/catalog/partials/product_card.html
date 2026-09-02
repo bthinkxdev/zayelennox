@@ -16,12 +16,12 @@
     <a href="{% url 'catalog:pdp' slug=product.slug %}" class="jm-product-card__img-link ratio ratio-1x1" tabindex="-1" aria-hidden="true">
       {% with img=product.primary_images.0 %}
       {% if img and img.image %}
-      <img src="{{ img.image.url }}" alt="{{ img.alt_text|default:product.name }}" class="object-fit-contain" width="400"
+      <img src="{{ img.image.url }}" alt="{{ img.alt_text|default:product.name }}" class="object-fit-cover" width="400"
         height="400" loading="lazy"
         onerror="this.onerror=null;this.src='{% static 'img/product-placeholder.svg' %}';this.classList.add('product-card-img--placeholder');">
       {% else %}
       <img src="{% static 'img/product-placeholder.svg' %}" alt="{{ product.name }}"
-        class="object-fit-contain product-card-img--placeholder" width="400" height="400" loading="lazy">
+        class="object-fit-cover product-card-img--placeholder" width="400" height="400" loading="lazy">
       {% endif %}
       {% endwith %}
     </a>

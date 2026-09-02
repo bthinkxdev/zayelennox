@@ -118,9 +118,9 @@ def plp_view(request: HttpRequest, category_slug: str | None = None) -> HttpResp
         else "Shop All | ZAYE LENNOX"
     )
     description = (
-        f"Browse {active_cat.name} — Herbal Products & Natural Skincare, and more in Kerala."
+        f"Browse {active_cat.name} — Herbal Products & Skincare, and more in Kerala."
         if active_cat
-        else "Browse herbal remedies, natural skincare, and wellness products available in Kerala."
+        else "Browse herbal remedies, skincare, and wellness products available in Kerala."
     )
 
     context = seo_context(
@@ -247,7 +247,7 @@ def pdp_view(request: HttpRequest, slug: str) -> HttpResponse:
         request=request,
         obj=product,
         title=f"{product.name} | ZAYE LENNOX",
-        description=f"{product.name} — Herbal Products & Natural Skincare from ZAYE LENNOX, Kerala.",
+        description=f"{product.name} — Herbal Products & Skincare from ZAYE LENNOX, Kerala.",
     )
     context.update(
         {

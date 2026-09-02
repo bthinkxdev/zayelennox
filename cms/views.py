@@ -38,8 +38,8 @@ def homepage_view(request: HttpRequest) -> HttpResponse:
     ]
     context = seo_context(
         request=request,
-        title="Herbal Products & Natural Skincare | ZAYE LENNOX",
-        description="Browse herbal remedies, natural skincare, and wellness products available in Kerala.",
+        title="Herbal Products & Skincare | ZAYE LENNOX",
+        description="Browse herbal remedies, skincare, and wellness products available in Kerala.",
     )
     context["section_contexts"] = section_contexts
     return render(request, "cms/homepage.html", context)

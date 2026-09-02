@@ -34,7 +34,7 @@ def about_us_view(request: HttpRequest) -> HttpResponse:
     context = seo_context(
         request=request,
         title=_("About Us | ZAYE LENNOX"),
-        description=_("Learn more about ZAYE LENNOX and our mission to deliver natural herbal remedies and skincare products."),
+        description=_("Learn more about ZAYE LENNOX and our mission to deliver herbal remedies and skincare products."),
     )
     return render(request, "core/about_us.html", context)
 

@@ -53,7 +53,7 @@
 
             var galleryRoot = document.querySelector('[data-jm-pdp-gallery]');
             var thumbsWrap = galleryRoot ? galleryRoot.querySelector('.jm-pdp-gallery__thumbs') : null;
-            if (galleryRoot && data.images.length > 1) {
+            if (galleryRoot && data.images.length > 0) {
               if (!thumbsWrap) {
                 thumbsWrap = document.createElement('div');
                 thumbsWrap.className = 'jm-pdp-gallery__thumbs';

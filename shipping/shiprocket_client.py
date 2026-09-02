@@ -136,14 +136,6 @@ class ShiprocketClient:
             )
 
         payment_method = "Prepaid"
-        try:
-            tx = order.payment_transactions.filter(status="success").last()
-            if tx is None:
-                tx = order.payment_transactions.last()
-            if tx and tx.gateway_key == "cod":
-                payment_method = "COD"
-        except Exception:
-            pass
 
         payload = {
             "order_id": str(order.order_number),

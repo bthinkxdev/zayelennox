@@ -1,4 +1,5 @@
 {% extends "dashboard/base.html" %}
+{% load dashboard_extras %}
 
 {% block title %}Order {{ order.order_number }}{% endblock %}
 {% block page_title %}Order {{ order.order_number }}{% endblock %}
@@ -66,7 +67,7 @@
           <tbody>
             {% for pay in payments %}
             <tr>
-              <td>{{ pay.gateway_key }}</td>
+              <td>{{ pay.gateway_key|gateway_display_name }}</td>
               <td>{{ pay.amount|floatformat:2 }} {{ pay.currency.code }}</td>
               <td><span class="badge bg-secondary-subtle text-secondary">{{ pay.get_status_display }}</span></td>
               <td class="small text-muted">{{ pay.external_transaction_id|default:"—" }}</td>

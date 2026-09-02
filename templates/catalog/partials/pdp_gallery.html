@@ -13,7 +13,7 @@
     {% endif %}
     {% endwith %}
   </div>
-  {% if price_data.images|length > 1 %}
+  {% if price_data.images %}
   <div class="jm-pdp-gallery__thumbs" role="list">
     {% for image in price_data.images %}
     <button type="button"
