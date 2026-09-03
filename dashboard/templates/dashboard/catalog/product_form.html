@@ -88,7 +88,10 @@
                 </tr>
                 {% for vform in variants %}
                 <tr data-variant-row data-prefix="{{ vform.prefix }}">
-                  <td class="d-none">{{ vform.id }}</td>
+                  <td class="d-none">
+                    {{ vform.id }}
+                    {% if vform.instance.pk %}{{ vform.DELETE }}{% endif %}
+                  </td>
                   <td data-summary="variant_type">{{ vform.instance.variant_type }}</td>
                   <td data-summary="name">{{ vform.instance.name }}</td>
                   <td data-summary="price">{% if vform.instance.pk %}{{ product.base_price|add:vform.instance.price_delta|default_if_none:"" }}{% endif %}</td>
@@ -96,11 +99,7 @@
                   <td data-summary="image_count">{% if vform.instance.pk %}{{ vform.instance.images.count }} image{{ vform.instance.images.count|pluralize }}{% else %}0 images{% endif %}</td>
                   <td class="text-end">
                     <button type="button" class="btn btn-sm btn-outline-secondary" data-open-variant-modal><i class="ti ti-pencil me-1"></i>Edit</button>
-                    {% if vform.instance.pk %}
-                    <label class="form-check d-inline-flex m-0 ms-1" title="Delete on save">{{ vform.DELETE }}</label>
-                    {% else %}
                     <button type="button" class="btn btn-icon btn-sm btn-light text-danger" data-row-remove title="Remove"><i class="ti ti-trash"></i></button>
-                    {% endif %}
                   </td>
                   <td class="d-none" data-variant-fields>
                     <div data-field="variant_type">
@@ -196,7 +195,10 @@
           <p class="text-muted small px-3 pt-2 mb-0">Price is required for every variant kept on save. MRP, Purchase price, Weight/Length/Width/Height and Images are all optional per variant.</p>
           <template data-formset-empty>
             <tr data-variant-row data-prefix="variants-__prefix__">
-              <td class="d-none">{{ variant_empty_form.id }}</td>
+              <td class="d-none">
+                {{ variant_empty_form.id }}
+                {{ variant_empty_form.DELETE }}
+              </td>
               <td data-summary="variant_type"></td>
               <td data-summary="name"></td>
               <td data-summary="price"></td>

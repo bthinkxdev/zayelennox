@@ -48,7 +48,7 @@
   <div class="col-xl-3 col-md-6">
     <div class="kpi-tile tile-amber">
       <div class="kpi-icon"><i class="ti ti-alert-triangle"></i></div>
-      <p class="kpi-label">Low Stock</p>
+      <p class="kpi-label">Low Stock &amp; Out of Stock</p>
       <h3 class="kpi-value">{{ summary.low_stock_alert_count }}</h3>
       <span class="kpi-sub">{{ counts.product_count }} active products</span>
     </div>
@@ -156,7 +156,7 @@
   <div class="col-lg-4">
     <div class="card h-100">
       <div class="card-header panel-header">
-        <h4 class="panel-title">Low Stock Products</h4>
+        <h4 class="panel-title">Low Stock &amp; Out of Stock Products</h4>
         <a href="{% url 'dashboard:product-list' %}?status=low" class="panel-link">View all</a>
       </div>
       <div class="card-body p-0">
