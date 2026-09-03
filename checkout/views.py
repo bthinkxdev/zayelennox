@@ -136,7 +136,12 @@ def checkout_view(request: HttpRequest) -> HttpResponse:
     cart, buy_now_mode = _resolve_checkout_cart(request)
     summary = get_cart_summary(cart=cart)
     if not summary.lines:
-        return redirect(f"{reverse('cms:homepage')}?open_cart=1")
+        homepage_url = f"{reverse('cms:homepage')}?open_cart=1"
+        if request.headers.get("HX-Request"):
+            response = HttpResponse(status=204)
+            response["HX-Redirect"] = homepage_url
+            return response
+        return redirect(homepage_url)
 
     if request.user.is_authenticated:
         from accounts.services import ensure_customer_profile_for_user
