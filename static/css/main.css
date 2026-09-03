@@ -3065,11 +3065,6 @@ body.mobile-search-open {
   color: var(--jm-gold-dark);
 }
 
-.jm-logo__text span {
-  font-weight: 600;
-  color: var(--jm-gold-dark);
-}
-
 .jm-search {
   display: flex;
   align-items: stretch;
