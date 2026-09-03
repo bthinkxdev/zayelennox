@@ -3062,6 +3062,7 @@ body.mobile-search-open {
   font-size: 1rem;
   letter-spacing: 0.02em;
   line-height: 1.1;
+  color: var(--jm-gold-dark);
 }
 
 .jm-logo__text span {
@@ -4038,7 +4039,7 @@ body.mobile-search-open .jm-wa-float {
 
 .jm-trust__grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1rem;
   list-style: none;
   margin: 0;
@@ -4051,29 +4052,14 @@ body.mobile-search-open .jm-wa-float {
 .jm-trust__item {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-}
-
-.jm-trust__icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: var(--jm-white);
-  color: var(--jm-ink);
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  box-shadow: var(--jm-shadow-sm);
-}
-
-.jm-trust__icon svg {
-  width: 18px;
-  height: 18px;
+  justify-content: center;
 }
 
 .jm-trust__copy {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  text-align: center;
   line-height: 1.25;
 }
 
@@ -5592,22 +5578,11 @@ body.mobile-search-open .jm-wa-float {
 
   .jm-trust__item {
     flex: 0 0 auto;
-    min-width: 152px;
+    min-width: 128px;
     scroll-snap-align: start;
     padding: 0.55rem 0.65rem;
     background: rgba(255, 255, 255, 0.85);
     border-radius: 10px;
-  }
-
-  .jm-trust__icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-  }
-
-  .jm-trust__icon svg {
-    width: 15px;
-    height: 15px;
   }
 
   .jm-trust__copy strong {

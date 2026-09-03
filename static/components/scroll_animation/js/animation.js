@@ -10,6 +10,12 @@ document.addEventListener("DOMContentLoaded", function () {
         `/static/components/scroll_animation/images/frame_${index.toString().padStart(3, '0')}.png`
     );
 
+    // On mobile/tablet the canvas is full-bleed (object-fit: cover, no radial
+    // mask) — letting the zoom scale dip below 1 shrinks it smaller than the
+    // viewport and exposes the page background as left/right gutters. Desktop
+    // keeps its full zoom-out since the mask/centered layout hides that edge.
+    const isNarrowViewport = () => window.matchMedia('(max-width: 991px)').matches;
+
     // Preload images to prevent flickering
     const images = [];
     const preloadImages = () => {
@@ -61,7 +67,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
             // Calculate dynamic zoom effect
             const startScale = 1.1;
-            const endScale = 0.9;
+            const endScale = isNarrowViewport() ? 1.0 : 0.9;
             const currentScale = startScale - (scrollFraction * (startScale - endScale));
 
             const startY = 0;
@@ -89,7 +95,7 @@ document.addEventListener("DOMContentLoaded", function () {
             document.querySelector('.animation-text-blocks')?.classList.remove('visible');
         } else if (scrollPosition > scrollEnd) {
             // Keep it zoomed out when scrolled below
-            canvas.style.transform = `scale(0.9) translateY(0%)`;
+            canvas.style.transform = `scale(${isNarrowViewport() ? 1.0 : 0.9}) translateY(0%)`;
             requestAnimationFrame(() => updateImage(frameCount - 1));
             document.querySelector('.animation-text-blocks')?.classList.add('visible');
         }

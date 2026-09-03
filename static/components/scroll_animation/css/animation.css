@@ -114,15 +114,16 @@
     }
 
     #animation-canvas {
-        height: 80vh;
+        height: 60vh;
         object-fit: cover;
         transform: scale(1.1) translateY(0%);
         -webkit-mask-image: none;
         mask-image: none;
     }
 
-    /* Overlay the text as compact cards in the four corners of the animation,
-       same scroll-triggered reveal as desktop, instead of a separate static block. */
+    /* Canvas is shrunk to 60vh and centered (flex) inside the 80vh sticky
+       container, leaving genuinely empty ~10vh bands above and below it.
+       Cards sit in those bands instead of overlapping the product image. */
     .text-block {
         max-width: 46%;
         padding: 8px 10px;
@@ -140,12 +141,12 @@
     }
 
     .text-top {
-        top: 4%;
+        top: 1%;
     }
 
     .text-bottom {
         top: auto;
-        bottom: 4%;
+        bottom: 1%;
     }
 
     .text-block h3 {

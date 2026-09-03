@@ -102,6 +102,15 @@ def card_original_price(product) -> Decimal:
 
 
 @register.filter
+def card_mrp(product):
+    """MRP to pair with card_display_price on a product card, or None if unset."""
+    variants = getattr(product, "variant_list", None)
+    if not variants:
+        return getattr(product, "mrp", None)
+    return _cheapest_variant(variants).effective_mrp
+
+
+@register.filter
 def discount_percent(mrp, price) -> int:
     """Return the whole-number discount percent off mrp, or 0 if not discounted."""
     try:
