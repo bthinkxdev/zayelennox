@@ -264,3 +264,7 @@ SHIPROCKET_BASE_URL = env("SHIPROCKET_BASE_URL", default="https://apiv2.shiprock
 SHIPROCKET_PICKUP_LOCATION = env("SHIPROCKET_PICKUP_LOCATION", default="Primary")
 SHIPROCKET_PICKUP_PINCODE = env("SHIPROCKET_PICKUP_PINCODE", default="")
 SHIPROCKET_WEBHOOK_TOKEN = env("SHIPROCKET_WEBHOOK_TOKEN", default="")
+
+#razorpay webhook — separate from the razorpay_key_id/secret stored on SiteSettings,
+#this is deployment-only config for verifying payments.views.razorpay_webhook_view
+RAZORPAY_WEBHOOK_SECRET = env("RAZORPAY_WEBHOOK_SECRET", default="")

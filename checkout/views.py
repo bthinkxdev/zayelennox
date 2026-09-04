@@ -366,15 +366,10 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
     from cart.selectors import get_cart_summary
     summary = get_cart_summary(cart=cart)
     if summary.has_stock_issues:
-        from django.utils.translation import gettext as _
-        if summary.has_out_of_stock_items:
-            message = _("Some items in your cart are out of stock. Please remove them to proceed.")
-        else:
-            message = _("Some items in your cart exceed available quantity. Please reduce quantity to proceed.")
         return render(
             request,
-            "checkout/partials/errors.html",
-            {"errors": {"__all__": [message]}},
+            "checkout/partials/_place_order_button_oob.html",
+            {"summary": summary},
             status=200,
         )
 
@@ -399,11 +394,12 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
             customer_profile=profile,
             shipping_charge_override=shipping_charge_override,
         )
-    except InsufficientStockError as exc:
+    except InsufficientStockError:
+        summary = get_cart_summary(cart=cart)
         return render(
             request,
-            "checkout/partials/errors.html",
-            {"errors": {"__all__": [str(exc)]}},
+            "checkout/partials/_place_order_button_oob.html",
+            {"summary": summary},
             status=200,
         )
 
@@ -658,14 +654,19 @@ def razorpay_callback_view(request: HttpRequest) -> HttpResponse:
             from core.selectors import get_default_currency
             default_curr = get_default_currency()
             currency_code = default_curr.code if default_curr else "INR"
-        adapter.capture_payment(
+        capture_succeeded = adapter.capture_payment(
             razorpay_payment_id=razorpay_payment_id,
             amount=payment_tx.amount,
             currency=currency_code,
         )
-        payment_tx.external_transaction_id = razorpay_payment_id
-        payment_tx.save(update_fields=["external_transaction_id", "updated_at"])
-        confirm_payment_success(payment_transaction=payment_tx)
+        if not capture_succeeded:
+            confirm_payment_failed(payment_transaction=payment_tx)
+            order_was_buy_now = bool(order.cart_id and getattr(order.cart, "is_buy_now", False))
+            return redirect(_checkout_url(buy_now_mode=order_was_buy_now))
+
+        #confirm_payment_success is idempotent (see payments.services) — safe
+        #even if the Razorpay webhook already confirmed this same payment.
+        confirm_payment_success(payment_transaction=payment_tx, external_transaction_id=razorpay_payment_id)
         return redirect("checkout:confirmation", order_id=order.pk)
     else:
         if payment_tx:

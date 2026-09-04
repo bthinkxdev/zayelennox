@@ -289,19 +289,9 @@
           <span>{% trans "Total" %}</span>
           <span class="text-floward" id="summary-total" data-value="{{ summary.grand_total|stringformat:'f' }}">{{ display_currency.symbol }} {{ summary.grand_total }}</span>
         </div>
-        {% if summary.has_stock_issues %}
-        <button type="button" class="btn btn-floward w-100 py-2 mt-3" disabled style="cursor: not-allowed;">{% trans "Place Order & Pay" %}</button>
-        {% if summary.has_out_of_stock_items %}
-        <div class="text-danger small mt-2 text-center">{% trans "Some items are out of stock. Please click 'Edit Cart' to remove them." %}</div>
-        {% else %}
-        <div class="text-danger small mt-2 text-center">{% trans "Some items exceed available quantity. Please click 'Cart' to reduce quantity." %}</div>
-        {% endif %}
-        {% elif not payment_gateways %}
-        <button type="button" class="btn btn-floward w-100 py-2 mt-3" disabled style="cursor: not-allowed;">{% trans "Place Order & Pay" %}</button>
-        <div class="text-danger small mt-2 text-center">{% trans "Online payment is temporarily unavailable. Please try again shortly." %}</div>
-        {% else %}
-        <button type="submit" form="checkout-form" class="btn btn-floward w-100 py-2 mt-3">{% trans "Place Order & Pay" %}</button>
-        {% endif %}
+        <div id="checkout-place-order-area">
+          {% include "checkout/partials/_place_order_button.html" %}
+        </div>
       </div>
 
     </div>

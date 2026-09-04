@@ -1,14 +1,3 @@
-<!-- {% load i18n %}
-<div class="alert alert-danger small mb-0" role="alert">
-  <strong>{% trans "Please fix the following:" %}</strong>
-  <ul class="mb-0 mt-2">
-    {% for field, messages in errors.items %}
-      {% for msg in messages %}
-      <li>{{ field }}: {{ msg }}</li>
-      {% endfor %}
-    {% endfor %}
-  </ul>
-</div> -->
 
 <div id="error-guest_name" hx-swap-oob="true" class="text-danger small mt-1">{% for msg in errors.guest_name %}{{ msg }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
 <div id="error-guest_email" hx-swap-oob="true" class="text-danger small mt-1">{% for msg in errors.guest_email %}{{ msg }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
