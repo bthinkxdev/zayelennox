@@ -12,7 +12,6 @@ from accounts.models import Address, CustomerProfile
 from cart.models import Cart, CartItem
 from cart.selectors import get_cart_summary
 from cart.services import reset_cart
-from catalog.services import adjust_stock
 from checkout.exceptions import CheckoutSessionError
 from checkout.models import CheckoutSession, CheckoutSessionStatus
 
@@ -137,10 +136,6 @@ def place_order(
             summary.subtotal - summary.coupon_discount + delivery_charge,
             Decimal("0.00"),
         )
-
-    for line in summary.lines:
-        target = line.variant if line.variant else line.product
-        adjust_stock(target=target, delta=-line.quantity, reason=f"order:{idempotency_key}")
 
     address_snapshot: dict[str, Any] = {}
     if session.address_id:

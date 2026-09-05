@@ -4,9 +4,21 @@
 {% block page_title %}Orders{% endblock %}
 
 {% block content %}
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <a class="nav-link {% if current_view == 'orders' %}active{% endif %}" href="{% url 'dashboard:order-list' %}">Orders</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if current_view == 'abandoned' %}active{% endif %}" href="{% url 'dashboard:order-list' %}?view=abandoned">
+      Abandoned Checkouts
+      {% if abandoned_count %}<span class="badge bg-secondary-subtle text-secondary ms-1">{{ abandoned_count }}</span>{% endif %}
+    </a>
+  </li>
+</ul>
 <div class="row">
   <div class="col-12">
     <form method="get" class="row g-2 align-items-center mb-3">
+      {% if current_view == "abandoned" %}<input type="hidden" name="view" value="abandoned">{% endif %}
       <div class="col-12 col-md" style="max-width: 340px;">
         <div class="input-group">
           <span class="input-group-text bg-transparent border-end-0"><i class="ti ti-search text-secondary"></i></span>
@@ -15,6 +27,7 @@
           <button type="submit" class="btn btn-outline-secondary">Search</button>
         </div>
       </div>
+      {% if current_view != "abandoned" %}
       <div class="col-6 col-md-auto">
         <select name="status" class="form-select" style="max-width: 220px;" onchange="this.form.submit()">
           <option value="">All statuses</option>
@@ -23,9 +36,18 @@
           {% endfor %}
         </select>
       </div>
-      {% if search_query or current_status %}
+      {% endif %}
+      <div class="col-6 col-md-auto">
+        <select name="payment_status" class="form-select" style="max-width: 220px;" onchange="this.form.submit()">
+          <option value="">All payment statuses</option>
+          {% for value, label in payment_statuses %}
+          <option value="{{ value }}" {% if value == current_payment_status %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if search_query or current_status or current_payment_status %}
       <div class="col-12 col-md-auto d-grid d-md-block">
-        <a href="{% url 'dashboard:order-list' %}" class="btn btn-link text-secondary">Clear</a>
+        <a href="{% url 'dashboard:order-list' %}{% if current_view == 'abandoned' %}?view=abandoned{% endif %}" class="btn btn-link text-secondary">Clear</a>
       </div>
       {% endif %}
     </form>
@@ -72,7 +94,9 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="8" class="text-center text-secondary py-5">No orders found.</td></tr>
+          <tr><td colspan="8" class="text-center text-secondary py-5">
+            {% if current_view == "abandoned" %}No abandoned checkouts found.{% else %}No orders found.{% endif %}
+          </td></tr>
           {% endfor %}
         </tbody>
       </table>

@@ -18,12 +18,31 @@ from orders.services import ALLOWED_STATUS_TRANSITIONS, transition_order_status
 @dashboard_required
 @require_http_methods(["GET"])
 def order_list(request: HttpRequest) -> HttpResponse:
-    """Paginated, status-filterable, searchable order list."""
-    qs = Order.objects.select_related("customer_profile__user", "currency").order_by("-created_at")
+    """
+    Paginated, status-filterable, searchable order list.
+
+    """
+    from payments.models import PaymentStatus
+
+    view = request.GET.get("view", "orders").strip()
+    if view not in ("orders", "abandoned"):
+        view = "orders"
+
+    base_qs = Order.objects.select_related("customer_profile__user", "currency")
+    unpaid_qs = base_qs.exclude(payment_transactions__status=PaymentStatus.SUCCESS).exclude(
+        payment_transactions__gateway_key="cod"
+    )
+
+    if view == "abandoned":
+        qs = unpaid_qs
+    else:
+        qs = base_qs.exclude(pk__in=unpaid_qs.values("pk"))
+    qs = qs.order_by("-created_at")
 
     status = request.GET.get("status", "").strip()
-    if status:
+    if status and view == "orders":
         qs = qs.filter(order_status=status)
+
     query = request.GET.get("q", "").strip()
     if query:
         qs = qs.filter(
@@ -32,11 +51,17 @@ def order_list(request: HttpRequest) -> HttpResponse:
             | Q(delivery_address_snapshot__phone__icontains=query)
         )
 
+    payment_status = request.GET.get("payment_status", "").strip()
+    if payment_status:
+        qs = qs.filter(payment_transactions__status=payment_status).distinct()
+
     paginator = Paginator(qs, 25)
     page_obj = paginator.get_page(request.GET.get("page"))
 
     params = request.GET.copy()
     params.pop("page", None)
+
+    abandoned_count = unpaid_qs.count()
 
     context = {
         "nav_section": "orders",
@@ -44,9 +69,13 @@ def order_list(request: HttpRequest) -> HttpResponse:
         "page_obj": page_obj,
         "objects": page_obj.object_list,
         "statuses": OrderStatus.choices,
+        "payment_statuses": PaymentStatus.choices,
         "current_status": status,
+        "current_payment_status": payment_status,
+        "current_view": view,
         "search_query": query,
         "querystring": params.urlencode(),
+        "abandoned_count": abandoned_count,
     }
     return render(request, "dashboard/orders/list.html", context)
 
