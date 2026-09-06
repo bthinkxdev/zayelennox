@@ -3,10 +3,25 @@
 from __future__ import annotations
 
 from django.contrib.sitemaps import Sitemap
+from django.urls import reverse
 from django.utils import timezone
 
 from catalog.models import Category, Product
 from cms.models import BlogPost, Page
+
+
+class StaticViewSitemap(Sitemap):
+    """High-value static storefront URLs."""
+
+    changefreq = "weekly"
+    priority = 1.0
+    i18n = True
+
+    def items(self):
+        return ["cms:homepage", "catalog:plp", "core:about-us", "core:contact-us", "core:faq"]
+
+    def location(self, item: str):
+        return reverse(item)
 
 
 class ProductSitemap(Sitemap):

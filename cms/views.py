@@ -35,11 +35,13 @@ def homepage_view(request: HttpRequest) -> HttpResponse:
             "context": get_section_render_context(section=section, product_rails=product_rails),
         }
         for section in sections
+        if section["section_type"] != "featured_brands"
     ]
     context = seo_context(
         request=request,
         title="Hair Care, Skin Care & Body Care | ZAYE LENNOX",
         description="Browse hair care, skin care, and body care products available in Kerala.",
+        include_storefront_json_ld=True,
     )
     context["section_contexts"] = section_contexts
     return render(request, "cms/homepage.html", context)

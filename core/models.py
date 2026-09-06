@@ -191,8 +191,8 @@ class SiteSettings(TimeStampedModel):
     """
     Singleton site configuration (fixed pk=1 via core.services.get_site_settings).
 
-    Secret payment keys stay in environment variables — only public key names
-    and template slugs are stored here.
+    Payment and shipping provider credentials are stored here (DB-first),
+    with the matching environment variables kept as a local-dev/fallback.
     """
 
     site_name = models.CharField(max_length=120, default="ZAYE LENNOX")
@@ -242,6 +242,36 @@ class SiteSettings(TimeStampedModel):
         blank=True,
         verbose_name="Razorpay Key Secret",
         help_text="Razorpay Key Secret / Test Key Secret for payment signature verification.",
+    )
+    shiprocket_email = models.EmailField(
+        blank=True,
+        verbose_name="Shiprocket Email",
+        help_text="Shiprocket account email used to authenticate with the Shiprocket API.",
+    )
+    shiprocket_password = models.CharField(
+        max_length=120,
+        blank=True,
+        verbose_name="Shiprocket Password",
+        help_text="Shiprocket account password used to authenticate with the Shiprocket API.",
+    )
+    shiprocket_pickup_location = models.CharField(
+        max_length=120,
+        blank=True,
+        verbose_name="Shiprocket Pickup Location",
+        help_text="Pickup location nickname configured in your Shiprocket account (e.g. Primary).",
+    )
+    shiprocket_pickup_pincode = models.CharField(
+        max_length=10,
+        blank=True,
+        verbose_name="Shiprocket Pickup Pincode",
+        help_text="Pincode used for serviceability/rate checks at checkout.",
+    )
+    shiprocket_webhook_token = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Shiprocket Webhook Token",
+        help_text="Secret token Shiprocket sends back on status webhooks (X-Api-Key header "
+        "or token query param) — must match what you configure in the Shiprocket dashboard.",
     )
 
     class Meta:

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from decimal import Decimal
 from typing import Any, Optional
 
 from django.conf import settings
 from django.http import HttpRequest
-from django.urls import translate_url
+from django.urls import reverse, translate_url
 from django.utils.translation import get_language
 
 
@@ -137,6 +138,77 @@ def build_product_json_ld(
     return data
 
 
+def build_storefront_json_ld(*, request: HttpRequest) -> list[dict[str, Any]]:
+    """Build Organization and WebSite schema for the public storefront."""
+    from core.services import get_site_settings
+
+    site_settings = get_site_settings()
+    site_name = site_settings.site_name or "ZAYE LENNOX"
+    home_url = request.build_absolute_uri(reverse("cms:homepage"))
+    shop_url = request.build_absolute_uri(reverse("catalog:plp"))
+    logo_url = ""
+    if site_settings.logo and getattr(site_settings.logo, "url", None):
+        logo_url = request.build_absolute_uri(site_settings.logo.url)
+
+    organization: dict[str, Any] = {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": site_name,
+        "url": home_url,
+    }
+    if logo_url:
+        organization["logo"] = logo_url
+
+    same_as = [
+        url
+        for url in (
+            site_settings.facebook_url,
+            site_settings.instagram_url,
+            site_settings.twitter_url,
+        )
+        if url
+    ]
+    if same_as:
+        organization["sameAs"] = same_as
+
+    contact_points: list[dict[str, Any]] = []
+    if site_settings.vendor_email:
+        contact_points.append(
+            {
+                "@type": "ContactPoint",
+                "email": site_settings.vendor_email,
+                "contactType": "customer support",
+                "areaServed": "IN",
+                "availableLanguage": ["English"],
+            }
+        )
+    if getattr(settings, "STORE_PHONE", ""):
+        contact_points.append(
+            {
+                "@type": "ContactPoint",
+                "telephone": settings.STORE_PHONE,
+                "contactType": "customer support",
+                "areaServed": "IN",
+                "availableLanguage": ["English"],
+            }
+        )
+    if contact_points:
+        organization["contactPoint"] = contact_points
+
+    website = {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": site_name,
+        "url": home_url,
+        "potentialAction": {
+            "@type": "SearchAction",
+            "target": f"{shop_url}?q={{search_term_string}}",
+            "query-input": "required name=search_term_string",
+        },
+    }
+    return [organization, website]
+
+
 def seo_context(
     *,
     request: HttpRequest,
@@ -144,6 +216,8 @@ def seo_context(
     title: str,
     description: str,
     canonical_url: str | None = None,
+    json_ld: list[dict[str, Any]] | None = None,
+    include_storefront_json_ld: bool = False,
 ) -> dict[str, Any]:
     """Assemble standard SEO template context for any page."""
     if obj is not None:
@@ -151,6 +225,10 @@ def seo_context(
         description = resolve_meta_description(obj=obj, fallback=description)
 
     canonical = canonical_url or request.build_absolute_uri(request.path)
+    structured_data = list(json_ld or [])
+    if include_storefront_json_ld:
+        structured_data.extend(build_storefront_json_ld(request=request))
+
     return {
         "seo_title": title,
         "seo_description": description,
@@ -158,4 +236,9 @@ def seo_context(
         "seo_og_image": resolve_og_image_url(obj=obj, request=request) if obj else "",
         "seo_hreflang_urls": build_hreflang_urls(request=request),
         "seo_lang": get_language() or settings.LANGUAGE_CODE,
+        "seo_robots": "index,follow",
+        "seo_json_ld": [
+            json.dumps(item, ensure_ascii=False, separators=(",", ":"))
+            for item in structured_data
+        ],
     }

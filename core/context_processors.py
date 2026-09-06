@@ -46,6 +46,9 @@ def storefront(request: HttpRequest) -> dict[str, Any]:
     """Inject navigation, cart, and locale data into every template."""
     if request.method == "GET":
         path = request.path_info
+        if path == "/robots.txt" or path == "/sitemap.xml" or path.startswith("/sitemap-"):
+            return {}
+
         is_checkout_or_payment = (
             path.startswith("/checkout/")
             or path.startswith("/payments/")

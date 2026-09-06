@@ -11,9 +11,11 @@ from core.sitemaps import (
     CategorySitemap,
     PageSitemap,
     ProductSitemap,
+    StaticViewSitemap,
 )
 
 sitemaps = {
+    "static": StaticViewSitemap,
     "products": ProductSitemap,
     "categories": CategorySitemap,
     "blog": BlogPostSitemap,

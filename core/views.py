@@ -10,6 +10,7 @@ from django.core.mail import EmailMessage
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.template.loader import render_to_string
 from django.utils import translation
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_GET, require_POST
@@ -26,6 +27,14 @@ from core.services import get_site_settings
 def health_view(request: HttpRequest) -> HttpResponse:
     """Return a simple 200 OK for load-balancer health probes."""
     return HttpResponse("ok", content_type="text/plain")
+
+
+@require_GET
+def robots_txt_view(request: HttpRequest) -> HttpResponse:
+    """Render robots.txt with the current absolute sitemap URL."""
+    context = {"sitemap_url": request.build_absolute_uri("/sitemap.xml")}
+    content = render_to_string("core/robots.txt", context)
+    return HttpResponse(content, content_type="text/plain")
 
 
 @require_GET
