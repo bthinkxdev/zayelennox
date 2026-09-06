@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from django.contrib import messages
+from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
 from core.models import SiteSettings
@@ -25,6 +27,10 @@ def settings_view(request: HttpRequest) -> HttpResponse:
         form = forms.SiteSettingsForm(request.POST, request.FILES, instance=instance)
         if form.is_valid():
             form.save()
+            # Shiprocket auth tokens are cached for up to 9 days (see
+            # ShiprocketClient.authenticate) — drop the cache so a credential
+            # change here takes effect on the very next API call.
+            cache.delete("shiprocket_token")
             messages.success(request, "Settings saved.")
             return redirect("dashboard:settings")
     else:
@@ -33,7 +39,13 @@ def settings_view(request: HttpRequest) -> HttpResponse:
     return render(
         request,
         "dashboard/settings.html",
-        {"nav_section": "settings", "page_title": "Settings", "form": form},
+        {
+            "nav_section": "settings",
+            "page_title": "Settings",
+            "form": form,
+            "razorpay_webhook_url": request.build_absolute_uri(reverse("payments:razorpay-webhook")),
+            "shiprocket_webhook_url": request.build_absolute_uri(reverse("shipping:shiprocket-webhook")),
+        },
     )
 
 

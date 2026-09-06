@@ -5,14 +5,13 @@ from __future__ import annotations
 import logging
 import re
 
-from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
 from cart.selectors import get_buy_now_cart_for_request, get_cart_for_request
 from shipping.exceptions import ShiprocketAPIError
 from shipping.parcel import calculate_parcel_from_cart
-from shipping.shiprocket_client import shiprocket_client
+from shipping.shiprocket_client import get_shiprocket_config, shiprocket_client
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +37,7 @@ def check_serviceability_view(request):
     if not _PINCODE_RE.match(pincode):
         return JsonResponse({"ok": False, "error": "Enter a valid 6-digit pincode."}, status=200)
 
-    pickup_pincode = getattr(settings, "SHIPROCKET_PICKUP_PINCODE", "")
+    pickup_pincode = get_shiprocket_config()["pickup_pincode"]
     if not pickup_pincode:
         logger.warning("SHIPROCKET_PICKUP_PINCODE is not configured; skipping serviceability check.")
         return JsonResponse(

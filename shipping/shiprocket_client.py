@@ -16,6 +16,35 @@ from shipping.parcel import calculate_parcel
 logger = logging.getLogger(__name__)
 
 
+def get_shiprocket_config() -> dict:
+    """
+    Resolve Shiprocket configuration DB-first (SiteSettings, admin-editable
+    from the dashboard settings page), falling back to the deployment env
+    vars for local dev or an install where the admin hasn't set it yet.
+    """
+    email = password = pickup_location = pickup_pincode = webhook_token = ""
+    try:
+        from core.models import SiteSettings
+
+        settings_inst = SiteSettings.objects.first()
+        if settings_inst:
+            email = settings_inst.shiprocket_email.strip()
+            password = settings_inst.shiprocket_password.strip()
+            pickup_location = settings_inst.shiprocket_pickup_location.strip()
+            pickup_pincode = settings_inst.shiprocket_pickup_pincode.strip()
+            webhook_token = settings_inst.shiprocket_webhook_token.strip()
+    except Exception:
+        pass
+
+    return {
+        "email": email or settings.SHIPROCKET_EMAIL,
+        "password": password or settings.SHIPROCKET_PASSWORD,
+        "pickup_location": pickup_location or getattr(settings, "SHIPROCKET_PICKUP_LOCATION", "Primary"),
+        "pickup_pincode": pickup_pincode or getattr(settings, "SHIPROCKET_PICKUP_PINCODE", ""),
+        "webhook_token": webhook_token or getattr(settings, "SHIPROCKET_WEBHOOK_TOKEN", ""),
+    }
+
+
 class ShiprocketClient:
     """Thin wrapper around the Shiprocket v1 external API."""
 
@@ -37,12 +66,13 @@ class ShiprocketClient:
         if token:
             return token
 
+        config = get_shiprocket_config()
         try:
             response = requests.post(
                 f"{self.base_url}/auth/login",
                 json={
-                    "email": settings.SHIPROCKET_EMAIL,
-                    "password": settings.SHIPROCKET_PASSWORD,
+                    "email": config["email"],
+                    "password": config["password"],
                 },
                 timeout=self.timeout,
             )
@@ -140,7 +170,7 @@ class ShiprocketClient:
         payload = {
             "order_id": str(order.order_number),
             "order_date": order.created_at.strftime("%Y-%m-%d %H:%M"),
-            "pickup_location": getattr(settings, "SHIPROCKET_PICKUP_LOCATION", "Primary"),
+            "pickup_location": get_shiprocket_config()["pickup_location"],
             "billing_customer_name": address.get("name", ""),
             "billing_last_name": "",
             "billing_address": address.get("line1", ""),

@@ -717,6 +717,11 @@ class SiteSettingsForm(forms.ModelForm):
         "default_shipping_charge",
         "razorpay_key_id",
         "razorpay_key_secret",
+        "shiprocket_email",
+        "shiprocket_password",
+        "shiprocket_pickup_location",
+        "shiprocket_pickup_pincode",
+        "shiprocket_webhook_token",
     ]
 
     class Meta:
@@ -736,6 +741,11 @@ class SiteSettingsForm(forms.ModelForm):
             "default_shipping_charge",
             "razorpay_key_id",
             "razorpay_key_secret",
+            "shiprocket_email",
+            "shiprocket_password",
+            "shiprocket_pickup_location",
+            "shiprocket_pickup_pincode",
+            "shiprocket_webhook_token",
         ]
         labels = {
             "vendor_email": "Email",

@@ -16,6 +16,27 @@
             <div class="col-12 mt-3 mb-2">
               <h5 class="border-bottom pb-2 fw-semibold text-dark">Payment Integration</h5>
             </div>
+            <div class="col-12 mb-3">
+              <label class="form-label">Razorpay Webhook URL</label>
+              <div class="input-group">
+                <input type="text" class="form-control webhook-url-field" value="{{ razorpay_webhook_url }}" readonly>
+                <button type="button" class="btn btn-outline-secondary webhook-copy-btn">Copy</button>
+              </div>
+              <div class="form-text">Paste this into your Razorpay dashboard's webhook settings.</div>
+            </div>
+            {% endif %}
+            {% if field.name == 'shiprocket_email' %}
+            <div class="col-12 mt-3 mb-2">
+              <h5 class="border-bottom pb-2 fw-semibold text-dark">Shipping Integration</h5>
+            </div>
+            <div class="col-12 mb-3">
+              <label class="form-label">Shiprocket Webhook URL</label>
+              <div class="input-group">
+                <input type="text" class="form-control webhook-url-field" value="{{ shiprocket_webhook_url }}" readonly>
+                <button type="button" class="btn btn-outline-secondary webhook-copy-btn">Copy</button>
+              </div>
+              <div class="form-text">Paste this into your Shiprocket dashboard's webhook settings, along with the webhook token below.</div>
+            </div>
             {% endif %}
             <div class="{% if field.field.widget.input_type == 'checkbox' %}col-12{% else %}col-md-6{% endif %} mb-3">
               {% if field.name == 'logo' %}
@@ -88,4 +109,19 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll(".webhook-copy-btn").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    var input = btn.closest(".input-group").querySelector(".webhook-url-field");
+    navigator.clipboard.writeText(input.value).then(function () {
+      var original = btn.textContent;
+      btn.textContent = "Copied!";
+      setTimeout(function () { btn.textContent = original; }, 1500);
+    });
+  });
+});
+</script>
 {% endblock %}

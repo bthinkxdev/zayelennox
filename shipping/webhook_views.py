@@ -5,13 +5,13 @@ from __future__ import annotations
 import json
 import logging
 
-from django.conf import settings
 from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
 from shipping.models import Shipment
+from shipping.shiprocket_client import get_shiprocket_config
 
 logger = logging.getLogger(__name__)
 
@@ -32,13 +32,14 @@ class ShiprocketWebhookView(View):
     """
     Handle Shiprocket status webhooks.
 
-    Configure this URL in the Shiprocket dashboard and set
-    ``SHIPROCKET_WEBHOOK_TOKEN`` to the same secret Shiprocket sends back,
-    either as an ``X-Api-Key`` header or a ``token`` query param.
+    Configure this URL in the Shiprocket dashboard and set the "Shiprocket
+    Webhook Token" on the site settings page (or ``SHIPROCKET_WEBHOOK_TOKEN``
+    as a fallback) to the same secret Shiprocket sends back, either as an
+    ``X-Api-Key`` header or a ``token`` query param.
     """
 
     def post(self, request, *args, **kwargs):
-        expected_token = getattr(settings, "SHIPROCKET_WEBHOOK_TOKEN", "")
+        expected_token = get_shiprocket_config()["webhook_token"]
         if expected_token:
             token = request.headers.get("X-Api-Key") or request.GET.get("token")
             if token != expected_token:
