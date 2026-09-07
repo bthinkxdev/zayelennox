@@ -50,6 +50,21 @@ class SlugAutoMixin(forms.ModelForm):
 _DIMENSION_FIELDS = ("weight_kg", "length_cm", "width_cm", "height_cm")
 
 
+def _getlist(mapping, key):
+    """
+    mapping.getlist(key), tolerant of a plain dict.
+
+    Django's BaseFormSet does ``self.files = files or {}``, so an empty
+    (falsy) QueryDict/MultiValueDict silently becomes a plain {} with no
+    .getlist — this falls back to a single-value lookup in that case.
+    """
+    getlist = getattr(mapping, "getlist", None)
+    if getlist is not None:
+        return getlist(key)
+    value = mapping.get(key)
+    return [value] if value is not None else []
+
+
 def get_active_variant_forms(formset):
     """
     Forms in a product's variants formset that represent a real, kept variant —
@@ -326,9 +341,9 @@ class ProductVariantForm(forms.ModelForm):
                     return True
             return False
 
-        if self.files.getlist(self.add_prefix("new_images")):
+        if _getlist(self.files, self.add_prefix("new_images")):
             return True
-        if self.data.getlist(self.add_prefix("delete_image_ids")):
+        if _getlist(self.data, self.add_prefix("delete_image_ids")):
             return True
         if self.data.get(self.add_prefix("primary_choice")):
             return True
