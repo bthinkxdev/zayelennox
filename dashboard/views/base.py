@@ -9,7 +9,8 @@ screen overrides ``form_valid``).
 from __future__ import annotations
 
 from django.contrib import messages
-from django.db.models import Q
+from django.db.models import ProtectedError, Q, RestrictedError
+from django.shortcuts import redirect
 from django.urls import reverse
 from django.views.generic import CreateView, DeleteView, ListView, UpdateView
 
@@ -154,6 +155,7 @@ class DashboardUpdateView(_FormStyleMixin, DashboardContextMixin, UpdateView):
 
 
 class DashboardDeleteView(DashboardContextMixin, DeleteView):
+
     template_name = "dashboard/crud/confirm_delete.html"
     url_basename = ""
     singular_name = ""
@@ -162,8 +164,35 @@ class DashboardDeleteView(DashboardContextMixin, DeleteView):
         return reverse(f"dashboard:{self.url_basename}-list")
 
     def form_valid(self, form):
+        try:
+            response = super().form_valid(form)
+        except (ProtectedError, RestrictedError) as exc:
+            messages.error(self.request, self._blocked_delete_message(exc))
+            return redirect(self.get_success_url())
         messages.success(self.request, f"{self.singular_name} deleted.")
-        return super().form_valid(form)
+        return response
+
+    def _blocked_delete_message(self, exc):
+
+        protected_objects = exc.args[1] if len(exc.args) > 1 else []
+        counts: dict[type, int] = {}
+        for obj in protected_objects:
+            counts[type(obj)] = counts.get(type(obj), 0) + 1
+
+        if counts:
+            parts = []
+            for model, count in counts.items():
+                label = model._meta.verbose_name if count == 1 else model._meta.verbose_name_plural
+                parts.append(f"{count} {label.title()}")
+            reference_desc = ", ".join(sorted(parts))
+        else:
+            reference_desc = "other existing records"
+
+        name = (self.singular_name or self.object._meta.verbose_name.title()).lower()
+        message = f"Can't delete this {name} because it's still referenced by {reference_desc}."
+        if hasattr(self.object, "is_active"):
+            message += " Mark it inactive instead if you want to hide it without deleting it."
+        return message
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

@@ -19,6 +19,19 @@ from reports.models import (
 )
 
 
+def compute_daily_customer_metrics(report_date: date) -> dict[str, int]:
+    orders = Order.objects.filter(created_at__date=report_date).exclude(
+        order_status=OrderStatus.CANCELLED,
+    )
+    new_customers = CustomerProfile.objects.filter(created_at__date=report_date).count()
+    returning = orders.values("customer_profile").distinct().count()
+    return {
+        "new_customers": new_customers,
+        "returning_customers": max(returning - new_customers, 0),
+        "total_active_customers": CustomerProfile.objects.count(),
+    }
+
+
 def aggregate_daily_reports(*, report_date: date | None = None) -> dict[str, int]:
     """
     Populate all pre-aggregated report tables for a single day.
@@ -69,15 +82,9 @@ def aggregate_daily_reports(*, report_date: date | None = None) -> dict[str, int
             revenue=row["revenue"] or Decimal("0"),
         )
 
-    new_customers = CustomerProfile.objects.filter(created_at__date=report_date).count()
-    returning = orders.values("customer_profile").distinct().count()
     DailyCustomerReport.objects.update_or_create(
         report_date=report_date,
-        defaults={
-            "new_customers": new_customers,
-            "returning_customers": max(returning - new_customers, 0),
-            "total_active_customers": CustomerProfile.objects.count(),
-        },
+        defaults=compute_daily_customer_metrics(report_date),
     )
 
     InventorySnapshot.objects.filter(report_date=report_date).delete()

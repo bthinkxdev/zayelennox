@@ -222,43 +222,9 @@
           <a href="#" class="text-decoration-none small text-floward fw-semibold" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">{% trans "Edit Cart" %}</a>
           {% endif %}
         </div>
-        {% for line in summary.lines %}
-        <div class="d-flex align-items-center justify-content-between py-2 border-bottom gap-2">
-          <div class="d-flex align-items-center gap-2 text-truncate" style="min-width: 0;">
-            {% with line.display_image as primary_image %}
-            <div class="flex-shrink-0 bg-light border rounded" style="width: 48px; height: 48px; overflow: hidden;">
-              {% if primary_image %}
-              <img src="{{ primary_image.image.url }}" alt="{{ primary_image.alt_text|default:line.product.name }}"
-                style="width: 100%; height: 100%; object-fit: cover;">
-              {% else %}
-              <svg width="48" height="48" class="text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="1" style="padding: 10px;">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <path d="M21 15l-5-5L5 21" />
-              </svg>
-              {% endif %}
-            </div>
-            {% endwith %}
-            <div class="text-truncate" style="min-width: 0;">
-              <div class="text-truncate fw-medium" style="font-size: 0.875rem;">
-                {{ line.product.name }}
-              </div>
-              {% if line.variant %}
-              <div class="text-muted" style="font-size: 0.75rem;">{{ line.variant.name }}</div>
-              {% endif %}
-              <div class="text-muted" style="font-size: 0.75rem;">{% trans "Qty:" %} {{ line.quantity }} &times; {{ display_currency.symbol }} {{ line.unit_price_at_add }}</div>
-              
-              {% if not line.is_in_stock %}
-              <div class="text-danger fw-semibold mt-1" style="font-size: 0.75rem;">{% trans "Out of stock" %}</div>
-              {% elif line.quantity > line.available_stock %}
-              <div class="text-danger fw-semibold mt-1" style="font-size: 0.75rem;">{% trans "Only" %} {{ line.available_stock }} {% trans "items available in stock." %}</div>
-              {% endif %}
-            </div>
-          </div>
-          <span class="flex-shrink-0 fw-semibold" style="font-size: 0.875rem;">{{ display_currency.symbol }} {{ line.line_subtotal }}</span>
+        <div id="checkout-order-summary-lines">
+          {% include "checkout/partials/_order_summary_lines.html" %}
         </div>
-        {% endfor %}
 
         {% if summary.coupon_code %}
         <div class="d-flex align-items-center justify-content-between py-2 border-bottom">
@@ -313,18 +279,37 @@
   document.addEventListener("DOMContentLoaded", function () {
     var checkoutForm = document.getElementById('checkout-form');
     if (checkoutForm) {
+      function hideOrderProcessingOverlay() {
+        document.getElementById('order-processing-overlay').classList.add('d-none');
+      }
+
       checkoutForm.addEventListener('htmx:beforeSend', function(event) {
         document.getElementById('order-processing-overlay').classList.remove('d-none');
       });
-      checkoutForm.addEventListener('htmx:afterSwap', function(event) {
-        document.getElementById('order-processing-overlay').classList.add('d-none');
+      // htmx:afterSwap fires on the swap TARGET element (hx-target, i.e.
+      // #checkout-result below, or the OOB-swapped #checkout-place-order-area),
+      // not on the element that issued the request - and those targets sit
+      // outside <form id="checkout-form"> in the DOM, so a listener attached
+      // to checkoutForm never receives it and this overlay never got hidden
+      // for any 200 response that swaps content instead of redirecting (e.g.
+      // the out-of-stock / no-gateway partials rendered by
+      // checkout_place_order_view - a real redirect on success masks this,
+      // since navigating away tears the overlay down anyway). Also,
+      // event.detail.elt is NOT the requesting element here - htmx sets it to
+      // the swap target too. The requesting element is
+      // event.detail.requestConfig.elt (confirmed via a live capture: for a
+      // checkout-form submission, requestConfig.elt.id === 'checkout-form'
+      // for both the empty #checkout-result swap and the OOB
+      // #checkout-place-order-area swap). Listen on the document and check
+      // that instead, so both swaps triggered by this form's own submission
+      // hide the overlay.
+      document.body.addEventListener('htmx:afterSwap', function(event) {
+        if (event.detail && event.detail.requestConfig && event.detail.requestConfig.elt === checkoutForm) {
+          hideOrderProcessingOverlay();
+        }
       });
-      checkoutForm.addEventListener('htmx:responseError', function(event) {
-        document.getElementById('order-processing-overlay').classList.add('d-none');
-      });
-      checkoutForm.addEventListener('htmx:sendError', function(event) {
-        document.getElementById('order-processing-overlay').classList.add('d-none');
-      });
+      checkoutForm.addEventListener('htmx:responseError', hideOrderProcessingOverlay);
+      checkoutForm.addEventListener('htmx:sendError', hideOrderProcessingOverlay);
     }
 
     // ---- New delivery address validation --------------------------------

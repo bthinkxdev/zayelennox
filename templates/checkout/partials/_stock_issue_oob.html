@@ -1,0 +1,15 @@
+{% comment %}
+OOB response for any checkout submission blocked by stock issues
+(has_stock_issues before place_order, or InsufficientStockError raised by
+place_order itself - see checkout/views.py checkout_place_order_view).
+
+Updates two areas at once so the customer sees BOTH:
+  1) which specific line item is the problem (out of stock / qty exceeds
+     stock) - previously this only updated on a full page reload, since the
+     place-order response only swapped the button area, leaving a stale
+     "still looks purchasable" line item even though the button below it
+     had already flipped to disabled with an error.
+  2) the button/action area itself (existing behavior, unchanged).
+{% endcomment %}
+<div id="checkout-order-summary-lines" hx-swap-oob="true">{% include "checkout/partials/_order_summary_lines.html" %}</div>
+<div id="checkout-place-order-area" hx-swap-oob="true">{% include "checkout/partials/_place_order_button.html" %}</div>

@@ -297,6 +297,32 @@
   // field read-only while variant rows exist, so the vendor isn't asked to
   // enter stock twice, and hand control straight back the moment the last
   // variant is removed so the field can't be left stale/unreachable.
+  //the formset always renders one blank "extra" row (extra=1) even for a
+  //brand-new product with zero real variants, so merely counting rows in
+  //the DOM treats every new product as having variants. A row only
+  //represents a real variant once it's an existing saved row (has an id)
+  //or the vendor has actually started typing a type/name into it.
+  function variantRowHasData(row) {
+    var idInput = row.querySelector("input[name$='-id']");
+    var typeInput = row.querySelector("input[name$='-variant_type']");
+    var nameInput = row.querySelector("input[name$='-name']");
+    return !!(
+      (idInput && idInput.value) ||
+      (typeInput && typeInput.value.trim()) ||
+      (nameInput && nameInput.value.trim())
+    );
+  }
+
+  function hasLiveVariantData(body) {
+    var rows = body.querySelectorAll("tr");
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      if (row.style.display === "none") continue;
+      if (variantRowHasData(row)) return true;
+    }
+    return false;
+  }
+
   function initVariantStockToggle() {
     var variantsWrap = document.querySelector('[data-formset="variants"]');
     var stockInput = document.getElementById("id_stock_quantity");
@@ -306,34 +332,8 @@
     var body = variantsWrap.querySelector("[data-formset-body]");
     if (!body) return;
 
-    //the formset always renders one blank "extra" row (extra=1) even for a
-    //brand-new product with zero real variants, so merely counting rows in
-    //the DOM treats every new product as having variants. A row only
-    //represents a real variant once it's an existing saved row (has an id)
-    //or the vendor has actually started typing a type/name into it.
-    function rowHasData(row) {
-      var idInput = row.querySelector("input[name$='-id']");
-      var typeInput = row.querySelector("input[name$='-variant_type']");
-      var nameInput = row.querySelector("input[name$='-name']");
-      return !!(
-        (idInput && idInput.value) ||
-        (typeInput && typeInput.value.trim()) ||
-        (nameInput && nameInput.value.trim())
-      );
-    }
-
-    function hasLiveVariantData() {
-      var rows = body.querySelectorAll("tr");
-      for (var i = 0; i < rows.length; i++) {
-        var row = rows[i];
-        if (row.style.display === "none") continue;
-        if (rowHasData(row)) return true;
-      }
-      return false;
-    }
-
     function refresh() {
-      var hasVariants = hasLiveVariantData();
+      var hasVariants = hasLiveVariantData(body);
       stockInput.readOnly = hasVariants;
       stockInput.classList.toggle("bg-light", hasVariants);
       note.classList.toggle("d-none", !hasVariants);
@@ -541,7 +541,7 @@
 
     var formsetBody = variantsWrap.querySelector("[data-formset-body]");
     var erroredField = formsetBody
-      ? formsetBody.querySelector('tr[data-variant-row] [data-variant-fields] .text-danger')
+      ? formsetBody.querySelector('tr[data-variant-row] [data-variant-fields] .variant-field-error')
       : null;
     if (erroredField) {
       var erroredRow = erroredField.closest("tr[data-variant-row]");
@@ -559,32 +559,38 @@
     var body = variantsWrap.querySelector("[data-formset-body]");
     if (!body) return;
 
-    function rowHasData(row) {
-      var idInput = row.querySelector("input[name$='-id']");
-      var typeInput = row.querySelector("input[name$='-variant_type']");
-      var nameInput = row.querySelector("input[name$='-name']");
-      return !!(
-        (idInput && idInput.value) ||
-        (typeInput && typeInput.value.trim()) ||
-        (nameInput && nameInput.value.trim())
-      );
-    }
-
-    function hasLiveVariantData() {
-      var rows = body.querySelectorAll("tr");
-      for (var i = 0; i < rows.length; i++) {
-        var row = rows[i];
-        if (row.style.display === "none") continue;
-        if (rowHasData(row)) return true;
-      }
-      return false;
-    }
-
     function refresh() {
-      var hasVariants = hasLiveVariantData();
+      var hasVariants = hasLiveVariantData(body);
       addImageBtn.disabled = hasVariants;
       addImageBtn.classList.toggle("disabled", hasVariants);
       note.classList.toggle("d-none", !hasVariants);
+    }
+
+    refresh();
+    var observer = new MutationObserver(refresh);
+    observer.observe(body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["style"],
+    });
+    body.addEventListener("input", refresh);
+    body.addEventListener("change", refresh);
+  }
+
+  function initSimpleProductRequiredMarkers() {
+    var variantsWrap = document.querySelector('[data-formset="variants"]');
+    var markers = document.querySelectorAll(".simple-product-required-marker");
+    if (!variantsWrap || !markers.length) return;
+
+    var body = variantsWrap.querySelector("[data-formset-body]");
+    if (!body) return;
+
+    function refresh() {
+      var hasVariants = hasLiveVariantData(body);
+      Array.prototype.forEach.call(markers, function (marker) {
+        marker.classList.toggle("d-none", hasVariants);
+      });
     }
 
     refresh();
@@ -633,6 +639,7 @@
     initVariantStockToggle();
     initVariantModal();
     initVariantImagesToggle();
+    initSimpleProductRequiredMarkers();
     initVariantEmptyState();
     initProductFormPersistFiles();
     initOrderStatusGuard();
@@ -772,6 +779,7 @@
           initVariantStockToggle();
           initVariantModal();
           initVariantImagesToggle();
+          initSimpleProductRequiredMarkers();
           initVariantEmptyState();
           initProductFormPersistFiles();
           window.scrollTo({ top: 0, behavior: "smooth" });

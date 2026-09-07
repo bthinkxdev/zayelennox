@@ -109,6 +109,18 @@
 
     document.getElementById('rzp-button').onclick = function (e) {
       e.preventDefault();
+      // Tell the server a real payment attempt is starting (as opposed to
+      // the pending intent already created when the order was placed) so
+      // this order counts as "abandoned", not just "pending", if the
+      // customer bails from here. Best-effort: never blocks opening the
+      // widget, and only needs to succeed once.
+      try {
+        fetch("{% url 'checkout:razorpay-attempt' order.pk %}", {
+          method: "POST",
+          headers: { "X-CSRFToken": "{{ csrf_token }}" },
+          keepalive: true,
+        }).catch(function () {});
+      } catch (err) {}
       rzp.open();
     };
   });

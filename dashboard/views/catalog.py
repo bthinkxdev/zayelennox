@@ -116,7 +116,9 @@ class ProductDeleteView(DashboardDeleteView):
 def _render_product_form(request, product, mode):
     if request.method == "POST":
 
-        variants = forms.ProductVariantFormSet(request.POST, instance=product, prefix="variants")
+        variants = forms.ProductVariantFormSet(
+            request.POST, request.FILES, instance=product, prefix="variants"
+        )
         form = forms.ProductForm(
             request.POST, request.FILES, instance=product, variants_formset=variants
         )

@@ -775,8 +775,18 @@ def email_otp_request_view(request: HttpRequest) -> HttpResponse:
                 pass
 
     if request.method == "GET":
+        if request.user.is_authenticated:
+            from django.utils.http import url_has_allowed_host_and_scheme
+            if next_url and url_has_allowed_host_and_scheme(url=next_url, allowed_hosts={request.get_host()}):
+                return redirect(next_url)
+            return redirect("cms:homepage")
+
         import time
-        return render(request, "accounts/email_otp_request.html", {"form": EmailOTPRequestForm(), "next": next_url, "captcha_bust": int(time.time() * 1000)})
+        response = render(request, "accounts/email_otp_request.html", {"form": EmailOTPRequestForm(), "next": next_url, "captcha_bust": int(time.time() * 1000)})
+
+        response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response["Pragma"] = "no-cache"
+        return response
 
     data = _json_body(request) or request.POST.dict()
     form = EmailOTPRequestForm(data)

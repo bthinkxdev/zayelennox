@@ -368,7 +368,7 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
     if summary.has_stock_issues:
         return render(
             request,
-            "checkout/partials/_place_order_button_oob.html",
+            "checkout/partials/_stock_issue_oob.html",
             {"summary": summary},
             status=200,
         )
@@ -398,7 +398,7 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
         summary = get_cart_summary(cart=cart)
         return render(
             request,
-            "checkout/partials/_place_order_button_oob.html",
+            "checkout/partials/_stock_issue_oob.html",
             {"summary": summary},
             status=200,
         )
@@ -596,6 +596,25 @@ def razorpay_pay_view(request: HttpRequest, order_id: int) -> HttpResponse:
             "payment_method_name": payment_method_name,
         },
     )
+
+
+@require_POST
+def razorpay_attempt_view(request: HttpRequest, order_id: int) -> HttpResponse:
+    """
+    Beacon hit by the payment page's "Pay Now" button right before it opens
+    the Razorpay checkout widget — records that the customer actually
+    attempted payment (see payments.services.mark_payment_attempted), which
+    is what the dashboard's Abandoned Checkout list keys off instead of just
+    "an order exists with no successful payment". Best-effort and silent:
+    always 204, so a failure here never blocks the customer from paying.
+    """
+    from orders.models import Order
+    from django.shortcuts import get_object_or_404
+    from payments.services import mark_payment_attempted
+
+    get_object_or_404(Order, pk=order_id)
+    mark_payment_attempted(order_id=order_id)
+    return HttpResponse(status=204)
 
 
 from django.views.decorators.csrf import csrf_exempt

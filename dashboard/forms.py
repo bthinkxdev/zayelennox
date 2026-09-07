@@ -121,8 +121,8 @@ class ProductForm(SlugAutoMixin):
         fs = self._variants_formset
         if fs is None:
             return None
-        if not fs.is_valid():
-            return None
+
+        fs.errors
         return get_active_variant_forms(fs)
 
     def _check_variant_sku_uniqueness(self, active_variants):
@@ -168,10 +168,6 @@ class ProductForm(SlugAutoMixin):
         cleaned = super().clean()
         active_variants = self._active_variant_forms()
 
-        if active_variants is None and self._variants_formset is not None:
-            
-            return cleaned
-
         has_variants = bool(active_variants) if active_variants is not None else (
             bool(self.instance.pk) and self.instance.variants.exists()
         )
@@ -187,6 +183,10 @@ class ProductForm(SlugAutoMixin):
                     vform.add_error("price", "Price is required for each variant.")
                 else:
                     prices.append(price)
+
+                mrp = vform.cleaned_data.get("mrp")
+                if mrp in (None, ""):
+                    vform.add_error("mrp", "MRP is required for each variant.")
             if prices:
                 cleaned["base_price"] = min(prices)
 
@@ -195,20 +195,24 @@ class ProductForm(SlugAutoMixin):
                 all(vform.cleaned_data.get(f) not in (None, "") for f in _DIMENSION_FIELDS)
                 for vform in active_variants
             )
-            if not all_variants_have_dims:
-                for f in _DIMENSION_FIELDS:
-                    if cleaned.get(f) in (None, ""):
-                        self.add_error(
-                            f,
-                            "Required unless every variant below supplies its own "
-                            "weight/length/width/height.",
-                        )
+            product_level_dims_complete = all(
+                cleaned.get(f) not in (None, "") for f in _DIMENSION_FIELDS
+            )
+            if not all_variants_have_dims and not product_level_dims_complete:
+
+                for vform in active_variants:
+                    for f in _DIMENSION_FIELDS:
+                        if vform.cleaned_data.get(f) in (None, ""):
+                            vform.add_error(
+                                f,
+                                "Required unless a default is set in the "
+                                "Shipping section above.",
+                            )
         else:
             
             for field_name, label in (
                 ("base_price", "Base price"),
                 ("mrp", "MRP"),
-                ("purchase_price", "Purchase price"),
             ):
                 if cleaned.get(field_name) in (None, ""):
                     self.add_error(field_name, f"{label} is required.")
@@ -288,7 +292,7 @@ class ProductVariantForm(forms.ModelForm):
                 "class": "form-control",
                 "placeholder": "e.g. Size, Packaging, Color"
             }),
-            "mrp": forms.NumberInput(attrs={"placeholder": "Optional", "step": "0.01"}),
+            "mrp": forms.NumberInput(attrs={"placeholder": "e.g. 599.00", "step": "0.01"}),
             "purchase_price": forms.NumberInput(attrs={"placeholder": "Optional", "step": "0.01"}),
             "weight_kg": forms.NumberInput(attrs={"placeholder": "Product default", "step": "0.001"}),
             "length_cm": forms.NumberInput(attrs={"placeholder": "Product default", "step": "0.01"}),
@@ -321,6 +325,13 @@ class ProductVariantForm(forms.ModelForm):
                 if val:  #any non-empty string means user interacted
                     return True
             return False
+
+        if self.files.getlist(self.add_prefix("new_images")):
+            return True
+        if self.data.getlist(self.add_prefix("delete_image_ids")):
+            return True
+        if self.data.get(self.add_prefix("primary_choice")):
+            return True
         return changed
 
 ProductVariantFormSet = forms.inlineformset_factory(

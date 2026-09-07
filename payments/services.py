@@ -11,6 +11,7 @@ from decimal import InvalidOperation
 
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 
 from orders.models import OrderStatus
 from payments.exceptions import InvalidPaymentStatusTransitionError
@@ -91,8 +92,8 @@ def confirm_payment_success(
 
         if order.cart:
             cart = order.cart
-            from cart.models import CartItem
-            CartItem.objects.filter(cart=cart).delete()
+            from cart.services import reset_cart
+            reset_cart(cart=cart)
 
         #send order placement confirmation email
         from notifications.tasks import dispatch_order_confirmation_notification
@@ -101,6 +102,23 @@ def confirm_payment_success(
         )
 
     return payment_transaction
+
+
+@transaction.atomic
+def mark_payment_attempted(*, order_id: int) -> PaymentTransaction | None:
+
+    payment_tx = (
+        PaymentTransaction.objects.select_for_update()
+        .filter(order_id=order_id, status=PaymentStatus.PENDING)
+        .order_by("-created_at")
+        .first()
+    )
+    if payment_tx is None:
+        return None
+    if payment_tx.attempted_at is None:
+        payment_tx.attempted_at = timezone.now()
+        payment_tx.save(update_fields=["attempted_at", "updated_at"])
+    return payment_tx
 
 
 @transaction.atomic

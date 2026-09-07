@@ -11,7 +11,6 @@ from django.db import IntegrityError, transaction
 from accounts.models import Address, CustomerProfile
 from cart.models import Cart, CartItem
 from cart.selectors import get_cart_summary
-from cart.services import reset_cart
 from checkout.exceptions import CheckoutSessionError
 from checkout.models import CheckoutSession, CheckoutSessionStatus
 
@@ -207,6 +206,6 @@ def place_order(
         ]
     )
 
-    reset_cart(cart=session.cart)
+
 
     return order

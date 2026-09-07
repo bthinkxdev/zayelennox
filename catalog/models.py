@@ -125,7 +125,7 @@ class Product(TimeStampedModel):
     )
     brand = models.ForeignKey(
         Brand,
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name="products",
@@ -152,8 +152,7 @@ class Product(TimeStampedModel):
         null=True,
         blank=True,
         verbose_name="Purchase Price",
-        help_text="Required for simple products. Optional when the product has variants — "
-        "each variant may carry its own purchase price instead.",
+        help_text="Optional",
     )
     is_rental = models.BooleanField(default=False, db_index=True, verbose_name="Is Rental Eligible")
     rental_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Rental Price")

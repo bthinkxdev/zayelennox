@@ -29,14 +29,23 @@ def order_list(request: HttpRequest) -> HttpResponse:
         view = "orders"
 
     base_qs = Order.objects.select_related("customer_profile__user", "currency")
-    unpaid_qs = base_qs.exclude(payment_transactions__status=PaymentStatus.SUCCESS).exclude(
-        payment_transactions__gateway_key="cod"
+
+
+    paid_qs = base_qs.filter(
+        Q(payment_transactions__status=PaymentStatus.SUCCESS)
+        | Q(payment_transactions__gateway_key="cod")
+    ).distinct()
+
+    abandoned_qs = (
+        base_qs.exclude(pk__in=paid_qs.values("pk"))
+        .filter(payment_transactions__attempted_at__isnull=False)
+        .distinct()
     )
 
     if view == "abandoned":
-        qs = unpaid_qs
+        qs = abandoned_qs
     else:
-        qs = base_qs.exclude(pk__in=unpaid_qs.values("pk"))
+        qs = paid_qs
     qs = qs.order_by("-created_at")
 
     status = request.GET.get("status", "").strip()
@@ -61,7 +70,7 @@ def order_list(request: HttpRequest) -> HttpResponse:
     params = request.GET.copy()
     params.pop("page", None)
 
-    abandoned_count = unpaid_qs.count()
+    abandoned_count = abandoned_qs.count()
 
     context = {
         "nav_section": "orders",

@@ -50,6 +50,17 @@ class PaymentTransaction(TimeStampedModel):
         blank=True,
         verbose_name="External transaction ID",
     )
+    attempted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        verbose_name="Attempted at",
+        help_text="When the customer actually engaged the gateway's checkout "
+        "widget (e.g. clicked Pay Now), as opposed to just having a pending "
+        "intent created server-side at order placement. Null means the customer "
+        "never made it this far — used to keep such orders out of the "
+        "Abandoned Checkout list until there was something to actually abandon.",
+    )
     metadata = models.JSONField(default=dict, verbose_name="Metadata")
 
     class Meta:

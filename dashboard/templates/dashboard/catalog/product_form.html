@@ -16,7 +16,7 @@
         <div class="card-header panel-header">
           <div>
             <h3 class="panel-title">Product details</h3>
-            <p class="panel-sub">Base price, MRP and Purchase price below are only required for a simple product with no variants. Add variants in the table below instead, and give each one its own actual price — these three fields become optional.</p>
+            <p class="panel-sub">Base price and MRP below are only required for a simple product with no variants — add variants in the table below instead, and give each one its own actual price and MRP, and these two product-level fields become optional instead. Purchase price is always optional; it's only used for margin reporting.</p>
           </div>
         </div>
         <div class="card-body">
@@ -26,8 +26,8 @@
             <div class="col-md-6">{% include "dashboard/partials/_field.html" with field=form.slug %}</div>
             <div class="col-md-6">{% include "dashboard/partials/_field.html" with field=form.category %}</div>
             <div class="col-md-6">{% include "dashboard/partials/_field.html" with field=form.brand %}</div>
-            <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.base_price %}</div>
-            <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.mrp %}</div>
+            <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.base_price simple_product_required=True %}</div>
+            <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.mrp simple_product_required=True %}</div>
             <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.purchase_price %}</div>
             <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.color %}</div>
           </div>
@@ -43,261 +43,10 @@
         </div>
         <div class="card-body">
           <div class="row">
-            <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.weight_kg %}</div>
-            <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.length_cm %}</div>
-            <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.width_cm %}</div>
-            <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.height_cm %}</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card mb-3" data-formset="variants">
-        <div class="card-header panel-header">
-          <div>
-            <h3 class="panel-title">Variants</h3>
-            <p class="panel-sub">Size or packaging options. Click a variant to set its price, stock, dimensions and its own images — leave images blank to just use the product's photos above.</p>
-          </div>
-          <button type="button" class="btn btn-sm btn-outline-primary" data-formset-add data-open-variant-modal><i
-              class="ti ti-plus me-1"></i>Add variant</button>
-        </div>
-        <div class="card-body p-0">
-          {{ variants.management_form }}
-          {% if variants.non_form_errors %}
-          <div class="alert alert-danger mx-3 mt-3 mb-0">{{ variants.non_form_errors|join:", " }}</div>
-          {% endif %}
-          <datalist id="variant-type-list">
-            {% for vtype in existing_variant_types %}
-            <option value="{{ vtype }}">{{ vtype }}</option>
-            {% endfor %}
-          </datalist>
-          <div class="table-responsive">
-            <table class="table repeater variants-table align-middle mb-0">
-              <thead>
-                <tr>
-                  <th>Type</th>
-                  <th>Name</th>
-                  <th>Price</th>
-                  <th>Stock</th>
-                  <th>Images</th>
-                  <th class="text-end">Actions</th>
-                </tr>
-              </thead>
-              <tbody data-formset-body>
-                <tr data-variant-empty-state{% if variants.forms %} class="d-none"{% endif %}>
-                  <td colspan="6" class="text-center text-muted py-3">No variants yet — click <strong>Add variant</strong> above to create one.</td>
-                </tr>
-                {% for vform in variants %}
-                <tr data-variant-row data-prefix="{{ vform.prefix }}">
-                  <td class="d-none">
-                    {{ vform.id }}
-                    {% if vform.instance.pk %}{{ vform.DELETE }}{% endif %}
-                  </td>
-                  <td data-summary="variant_type">{{ vform.instance.variant_type }}</td>
-                  <td data-summary="name">{{ vform.instance.name }}</td>
-                  <td data-summary="price">{% if vform.instance.pk %}{{ product.base_price|add:vform.instance.price_delta|default_if_none:"" }}{% endif %}</td>
-                  <td data-summary="stock_quantity">{{ vform.instance.stock_quantity|default_if_none:"" }}</td>
-                  <td data-summary="image_count">{% if vform.instance.pk %}{{ vform.instance.images.count }} image{{ vform.instance.images.count|pluralize }}{% else %}0 images{% endif %}</td>
-                  <td class="text-end">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" data-open-variant-modal><i class="ti ti-pencil me-1"></i>Edit</button>
-                    <button type="button" class="btn btn-icon btn-sm btn-light text-danger" data-row-remove title="Remove"><i class="ti ti-trash"></i></button>
-                  </td>
-                  <td class="d-none" data-variant-fields>
-                    <div data-field="variant_type">
-                      <label class="form-label">Type</label>
-                      {{ vform.variant_type }}
-                      {% if vform.variant_type.errors %}<div class="text-danger small mt-1">{{ vform.variant_type.errors|join:", " }}</div>{% endif %}
-                    </div>
-                    <div data-field="name">
-                      <label class="form-label">Name</label>
-                      {{ vform.name }}
-                      {% if vform.name.errors %}<div class="text-danger small mt-1">{{ vform.name.errors|join:", " }}</div>{% endif %}
-                    </div>
-                    <div data-field="price">
-                      <label class="form-label">Price</label>
-                      {{ vform.price }}
-                      {% if vform.price.errors %}<div class="text-danger small mt-1">{{ vform.price.errors|join:", " }}</div>{% endif %}
-                    </div>
-                    <div data-field="mrp">
-                      <label class="form-label">MRP</label>
-                      {{ vform.mrp }}
-                      {% if vform.mrp.errors %}<div class="text-danger small mt-1">{{ vform.mrp.errors|join:", " }}</div>{% endif %}
-                    </div>
-                    <div data-field="purchase_price">
-                      <label class="form-label">Purchase price</label>
-                      {{ vform.purchase_price }}
-                      {% if vform.purchase_price.errors %}<div class="text-danger small mt-1">{{ vform.purchase_price.errors|join:", " }}</div>{% endif %}
-                    </div>
-                    <div data-field="sku_suffix">
-                      <label class="form-label">SKU suffix</label>
-                      {{ vform.sku_suffix }}
-                      {% if vform.sku_suffix.errors %}<div class="text-danger small mt-1">{{ vform.sku_suffix.errors|join:", " }}</div>{% endif %}
-                    </div>
-                    <div data-field="stock_quantity">
-                      <label class="form-label">Stock</label>
-                      {{ vform.stock_quantity }}
-                      {% if vform.stock_quantity.errors %}<div class="text-danger small mt-1">{{ vform.stock_quantity.errors|join:", " }}</div>{% endif %}
-                    </div>
-                    <div data-field="weight_kg">
-                      <label class="form-label">Weight (kg)</label>
-                      {{ vform.weight_kg }}
-                      {% if vform.weight_kg.errors %}<div class="text-danger small mt-1">{{ vform.weight_kg.errors|join:", " }}</div>{% endif %}
-                    </div>
-                    <div data-field="length_cm">
-                      <label class="form-label">Length (cm)</label>
-                      {{ vform.length_cm }}
-                      {% if vform.length_cm.errors %}<div class="text-danger small mt-1">{{ vform.length_cm.errors|join:", " }}</div>{% endif %}
-                    </div>
-                    <div data-field="width_cm">
-                      <label class="form-label">Width (cm)</label>
-                      {{ vform.width_cm }}
-                      {% if vform.width_cm.errors %}<div class="text-danger small mt-1">{{ vform.width_cm.errors|join:", " }}</div>{% endif %}
-                    </div>
-                    <div data-field="height_cm">
-                      <label class="form-label">Height (cm)</label>
-                      {{ vform.height_cm }}
-                      {% if vform.height_cm.errors %}<div class="text-danger small mt-1">{{ vform.height_cm.errors|join:", " }}</div>{% endif %}
-                    </div>
-                    <div data-field="existing_images">
-                      <label class="form-label">Existing images <span class="text-muted fw-normal">— click the star to set the primary (shown first)</span></label>
-                      <div class="variant-image-grid" data-existing-image-grid>
-                        {% if vform.instance.pk %}
-                        {% for img in vform.instance.images.all %}
-                        <div class="variant-image-grid__item{% if img.is_primary %} is-primary{% endif %}" data-existing-image>
-                          <img src="{{ img.image.url }}" alt="">
-                          <label class="variant-image-grid__remove-toggle" title="Check to remove on save">
-                            <input type="checkbox" name="{{ vform.prefix }}-delete_image_ids" value="{{ img.pk }}">
-                            <span class="variant-image-grid__remove"><i class="ti ti-trash"></i></span>
-                          </label>
-                          <label class="variant-image-grid__primary-toggle" title="Set as primary image">
-                            <input type="radio" name="{{ vform.prefix }}-primary_choice" value="existing:{{ img.pk }}" {% if img.is_primary %}checked{% endif %}>
-                            <i class="ti ti-star-filled"></i>
-                          </label>
-                        </div>
-                        {% empty %}
-                        <span class="text-muted small" data-no-images-label>No images yet.</span>
-                        {% endfor %}
-                        {% else %}
-                        <span class="text-muted small" data-no-images-label>No images yet.</span>
-                        {% endif %}
-                      </div>
-                    </div>
-                    <div data-field="new_images">
-                      <label class="form-label">Add images <span class="text-muted fw-normal">— pick again to add more.</span></label>
-                      <input type="file" name="{{ vform.prefix }}-new_images" accept="image/*" multiple class="form-control" data-variant-file-input data-primary-field-name="{{ vform.prefix }}-primary_choice">
-                      <div class="variant-image-grid" data-new-image-preview></div>
-                    </div>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          <p class="text-muted small px-3 pt-2 mb-0">Price is required for every variant kept on save. MRP, Purchase price, Weight/Length/Width/Height and Images are all optional per variant.</p>
-          <template data-formset-empty>
-            <tr data-variant-row data-prefix="variants-__prefix__">
-              <td class="d-none">
-                {{ variant_empty_form.id }}
-                {{ variant_empty_form.DELETE }}
-              </td>
-              <td data-summary="variant_type"></td>
-              <td data-summary="name"></td>
-              <td data-summary="price"></td>
-              <td data-summary="stock_quantity"></td>
-              <td data-summary="image_count">0 images</td>
-              <td class="text-end">
-                <button type="button" class="btn btn-sm btn-outline-secondary" data-open-variant-modal><i class="ti ti-pencil me-1"></i>Edit</button>
-                <button type="button" class="btn btn-icon btn-sm btn-light text-danger" data-row-remove title="Remove"><i class="ti ti-trash"></i></button>
-              </td>
-              <td class="d-none" data-variant-fields>
-                <div data-field="variant_type">
-                  <label class="form-label">Type</label>
-                  {{ variant_empty_form.variant_type }}
-                </div>
-                <div data-field="name">
-                  <label class="form-label">Name</label>
-                  {{ variant_empty_form.name }}
-                </div>
-                <div data-field="price">
-                  <label class="form-label">Price</label>
-                  {{ variant_empty_form.price }}
-                </div>
-                <div data-field="mrp">
-                  <label class="form-label">MRP</label>
-                  {{ variant_empty_form.mrp }}
-                </div>
-                <div data-field="purchase_price">
-                  <label class="form-label">Purchase price</label>
-                  {{ variant_empty_form.purchase_price }}
-                </div>
-                <div data-field="sku_suffix">
-                  <label class="form-label">SKU suffix</label>
-                  {{ variant_empty_form.sku_suffix }}
-                </div>
-                <div data-field="stock_quantity">
-                  <label class="form-label">Stock</label>
-                  {{ variant_empty_form.stock_quantity }}
-                </div>
-                <div data-field="weight_kg">
-                  <label class="form-label">Weight (kg)</label>
-                  {{ variant_empty_form.weight_kg }}
-                </div>
-                <div data-field="length_cm">
-                  <label class="form-label">Length (cm)</label>
-                  {{ variant_empty_form.length_cm }}
-                </div>
-                <div data-field="width_cm">
-                  <label class="form-label">Width (cm)</label>
-                  {{ variant_empty_form.width_cm }}
-                </div>
-                <div data-field="height_cm">
-                  <label class="form-label">Height (cm)</label>
-                  {{ variant_empty_form.height_cm }}
-                </div>
-                <div data-field="existing_images">
-                  <label class="form-label">Existing images <span class="text-muted fw-normal">— click the star to set the primary (shown first)</span></label>
-                  <div class="variant-image-grid" data-existing-image-grid>
-                    <span class="text-muted small" data-no-images-label>No images yet.</span>
-                  </div>
-                </div>
-                <div data-field="new_images">
-                  <label class="form-label">Add images <span class="text-muted fw-normal">— pick again to add more.</span></label>
-                  <input type="file" name="variants-__prefix__-new_images" accept="image/*" multiple class="form-control" data-variant-file-input data-primary-field-name="variants-__prefix__-primary_choice">
-                  <div class="variant-image-grid" data-new-image-preview></div>
-                </div>
-              </td>
-            </tr>
-          </template>
-        </div>
-      </div>
-
-      <div class="modal fade" id="variant-edit-modal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title">Edit variant</h5>
-              <button type="button" class="btn-close" data-variant-modal-close data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-              <div class="row g-3" data-variant-modal-slots>
-                <div class="col-md-6" data-slot="variant_type"></div>
-                <div class="col-md-6" data-slot="name"></div>
-                <div class="col-md-4" data-slot="price"></div>
-                <div class="col-md-4" data-slot="mrp"></div>
-                <div class="col-md-4" data-slot="purchase_price"></div>
-                <div class="col-md-6" data-slot="sku_suffix"></div>
-                <div class="col-md-6" data-slot="stock_quantity"></div>
-                <div class="col-md-3" data-slot="weight_kg"></div>
-                <div class="col-md-3" data-slot="length_cm"></div>
-                <div class="col-md-3" data-slot="width_cm"></div>
-                <div class="col-md-3" data-slot="height_cm"></div>
-                <div class="col-12"><hr></div>
-                <div class="col-12" data-slot="existing_images"></div>
-                <div class="col-12" data-slot="new_images"></div>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-primary" data-variant-modal-done data-bs-dismiss="modal">Done</button>
-            </div>
+            <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.weight_kg simple_product_required=True %}</div>
+            <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.length_cm simple_product_required=True %}</div>
+            <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.width_cm simple_product_required=True %}</div>
+            <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.height_cm simple_product_required=True %}</div>
           </div>
         </div>
       </div>
@@ -382,6 +131,257 @@
                   data-row-remove><i class="ti ti-trash"></i></button></td>
             </tr>
           </template>
+        </div>
+      </div>
+
+      <div class="card mb-3" data-formset="variants">
+        <div class="card-header panel-header">
+          <div>
+            <h3 class="panel-title">Variants</h3>
+            <p class="panel-sub">Size or packaging options. Click a variant to set its price, stock, dimensions and its own images — leave images blank to just use the product's photos above.</p>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary" data-formset-add data-open-variant-modal><i
+              class="ti ti-plus me-1"></i>Add variant</button>
+        </div>
+        <div class="card-body p-0">
+          {{ variants.management_form }}
+          {% if variants.non_form_errors %}
+          <div class="alert alert-danger mx-3 mt-3 mb-0">{{ variants.non_form_errors|join:", " }}</div>
+          {% endif %}
+          <datalist id="variant-type-list">
+            {% for vtype in existing_variant_types %}
+            <option value="{{ vtype }}">{{ vtype }}</option>
+            {% endfor %}
+          </datalist>
+          <div class="table-responsive">
+            <table class="table repeater variants-table align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Name</th>
+                  <th>Price</th>
+                  <th>Stock</th>
+                  <th>Images</th>
+                  <th class="text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody data-formset-body>
+                <tr data-variant-empty-state{% if variants.forms %} class="d-none"{% endif %}>
+                  <td colspan="6" class="text-center text-muted py-3">No variants yet — click <strong>Add variant</strong> above to create one.</td>
+                </tr>
+                {% for vform in variants %}
+                <tr data-variant-row data-prefix="{{ vform.prefix }}">
+                  <td class="d-none">
+                    {{ vform.id }}
+                    {% if vform.instance.pk %}{{ vform.DELETE }}{% endif %}
+                  </td>
+                  <td data-summary="variant_type">{{ vform.instance.variant_type }}</td>
+                  <td data-summary="name">{{ vform.instance.name }}</td>
+                  <td data-summary="price">{% if vform.instance.pk %}{{ product.base_price|add:vform.instance.price_delta|default_if_none:"" }}{% endif %}</td>
+                  <td data-summary="stock_quantity">{{ vform.instance.stock_quantity|default_if_none:"" }}</td>
+                  <td data-summary="image_count">{% if vform.instance.pk %}{{ vform.instance.images.count }} image{{ vform.instance.images.count|pluralize }}{% else %}0 images{% endif %}</td>
+                  <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-open-variant-modal><i class="ti ti-pencil me-1"></i>Edit</button>
+                    <button type="button" class="btn btn-icon btn-sm btn-light text-danger" data-row-remove title="Remove"><i class="ti ti-trash"></i></button>
+                  </td>
+                  <td class="d-none" data-variant-fields>
+                    <div data-field="variant_type">
+                      <label class="form-label">Type <span class="text-danger">*</span></label>
+                      {{ vform.variant_type }}
+                      {% if vform.variant_type.errors %}<div class="text-danger variant-field-error small mt-1">{{ vform.variant_type.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="name">
+                      <label class="form-label">Name <span class="text-danger">*</span></label>
+                      {{ vform.name }}
+                      {% if vform.name.errors %}<div class="text-danger variant-field-error small mt-1">{{ vform.name.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="price">
+                      <label class="form-label">Price <span class="text-danger">*</span></label>
+                      {{ vform.price }}
+                      {% if vform.price.errors %}<div class="text-danger variant-field-error small mt-1">{{ vform.price.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="mrp">
+                      <label class="form-label">MRP <span class="text-danger">*</span></label>
+                      {{ vform.mrp }}
+                      {% if vform.mrp.errors %}<div class="text-danger variant-field-error small mt-1">{{ vform.mrp.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="purchase_price">
+                      <label class="form-label">Purchase price</label>
+                      {{ vform.purchase_price }}
+                      {% if vform.purchase_price.errors %}<div class="text-danger variant-field-error small mt-1">{{ vform.purchase_price.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="sku_suffix">
+                      <label class="form-label">SKU suffix <span class="text-danger">*</span></label>
+                      {{ vform.sku_suffix }}
+                      {% if vform.sku_suffix.errors %}<div class="text-danger variant-field-error small mt-1">{{ vform.sku_suffix.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="stock_quantity">
+                      <label class="form-label">Stock</label>
+                      {{ vform.stock_quantity }}
+                      {% if vform.stock_quantity.errors %}<div class="text-danger variant-field-error small mt-1">{{ vform.stock_quantity.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="weight_kg">
+                      <label class="form-label">Weight (kg) <span class="text-danger">*</span></label>
+                      {{ vform.weight_kg }}
+                      {% if vform.weight_kg.errors %}<div class="text-danger variant-field-error small mt-1">{{ vform.weight_kg.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="length_cm">
+                      <label class="form-label">Length (cm) <span class="text-danger">*</span></label>
+                      {{ vform.length_cm }}
+                      {% if vform.length_cm.errors %}<div class="text-danger variant-field-error small mt-1">{{ vform.length_cm.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="width_cm">
+                      <label class="form-label">Width (cm) <span class="text-danger">*</span></label>
+                      {{ vform.width_cm }}
+                      {% if vform.width_cm.errors %}<div class="text-danger variant-field-error small mt-1">{{ vform.width_cm.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="height_cm">
+                      <label class="form-label">Height (cm) <span class="text-danger">*</span></label>
+                      {{ vform.height_cm }}
+                      {% if vform.height_cm.errors %}<div class="text-danger variant-field-error small mt-1">{{ vform.height_cm.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="existing_images">
+                      <label class="form-label">Existing images <span class="text-muted fw-normal">— click the star to set the primary (shown first)</span></label>
+                      <div class="variant-image-grid" data-existing-image-grid>
+                        {% if vform.instance.pk %}
+                        {% for img in vform.instance.images.all %}
+                        <div class="variant-image-grid__item{% if img.is_primary %} is-primary{% endif %}" data-existing-image>
+                          <img src="{{ img.image.url }}" alt="">
+                          <label class="variant-image-grid__remove-toggle" title="Check to remove on save">
+                            <input type="checkbox" name="{{ vform.prefix }}-delete_image_ids" value="{{ img.pk }}">
+                            <span class="variant-image-grid__remove"><i class="ti ti-trash"></i></span>
+                          </label>
+                          <label class="variant-image-grid__primary-toggle" title="Set as primary image">
+                            <input type="radio" name="{{ vform.prefix }}-primary_choice" value="existing:{{ img.pk }}" {% if img.is_primary %}checked{% endif %}>
+                            <i class="ti ti-star-filled"></i>
+                          </label>
+                        </div>
+                        {% empty %}
+                        <span class="text-muted small" data-no-images-label>No images yet.</span>
+                        {% endfor %}
+                        {% else %}
+                        <span class="text-muted small" data-no-images-label>No images yet.</span>
+                        {% endif %}
+                      </div>
+                    </div>
+                    <div data-field="new_images">
+                      <label class="form-label">Add images <span class="text-muted fw-normal">— pick again to add more.</span></label>
+                      <input type="file" name="{{ vform.prefix }}-new_images" accept="image/*" multiple class="form-control" data-variant-file-input data-primary-field-name="{{ vform.prefix }}-primary_choice">
+                      <div class="variant-image-grid" data-new-image-preview></div>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="text-muted small px-3 pt-2 mb-0">Price and MRP are required for every variant kept on save. Purchase price, Weight/Length/Width/Height and Images are all optional per variant.</p>
+          <template data-formset-empty>
+            <tr data-variant-row data-prefix="variants-__prefix__">
+              <td class="d-none">
+                {{ variant_empty_form.id }}
+                {{ variant_empty_form.DELETE }}
+              </td>
+              <td data-summary="variant_type"></td>
+              <td data-summary="name"></td>
+              <td data-summary="price"></td>
+              <td data-summary="stock_quantity"></td>
+              <td data-summary="image_count">0 images</td>
+              <td class="text-end">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-open-variant-modal><i class="ti ti-pencil me-1"></i>Edit</button>
+                <button type="button" class="btn btn-icon btn-sm btn-light text-danger" data-row-remove title="Remove"><i class="ti ti-trash"></i></button>
+              </td>
+              <td class="d-none" data-variant-fields>
+                <div data-field="variant_type">
+                  <label class="form-label">Type <span class="text-danger">*</span></label>
+                  {{ variant_empty_form.variant_type }}
+                </div>
+                <div data-field="name">
+                  <label class="form-label">Name <span class="text-danger">*</span></label>
+                  {{ variant_empty_form.name }}
+                </div>
+                <div data-field="price">
+                  <label class="form-label">Price <span class="text-danger">*</span></label>
+                  {{ variant_empty_form.price }}
+                </div>
+                <div data-field="mrp">
+                  <label class="form-label">MRP <span class="text-danger">*</span></label>
+                  {{ variant_empty_form.mrp }}
+                </div>
+                <div data-field="purchase_price">
+                  <label class="form-label">Purchase price</label>
+                  {{ variant_empty_form.purchase_price }}
+                </div>
+                <div data-field="sku_suffix">
+                  <label class="form-label">SKU suffix <span class="text-danger">*</span></label>
+                  {{ variant_empty_form.sku_suffix }}
+                </div>
+                <div data-field="stock_quantity">
+                  <label class="form-label">Stock</label>
+                  {{ variant_empty_form.stock_quantity }}
+                </div>
+                <div data-field="weight_kg">
+                  <label class="form-label">Weight (kg) <span class="text-danger">*</span></label>
+                  {{ variant_empty_form.weight_kg }}
+                </div>
+                <div data-field="length_cm">
+                  <label class="form-label">Length (cm) <span class="text-danger">*</span></label>
+                  {{ variant_empty_form.length_cm }}
+                </div>
+                <div data-field="width_cm">
+                  <label class="form-label">Width (cm) <span class="text-danger">*</span></label>
+                  {{ variant_empty_form.width_cm }}
+                </div>
+                <div data-field="height_cm">
+                  <label class="form-label">Height (cm) <span class="text-danger">*</span></label>
+                  {{ variant_empty_form.height_cm }}
+                </div>
+                <div data-field="existing_images">
+                  <label class="form-label">Existing images <span class="text-muted fw-normal">— click the star to set the primary (shown first)</span></label>
+                  <div class="variant-image-grid" data-existing-image-grid>
+                    <span class="text-muted small" data-no-images-label>No images yet.</span>
+                  </div>
+                </div>
+                <div data-field="new_images">
+                  <label class="form-label">Add images <span class="text-muted fw-normal">— pick again to add more.</span></label>
+                  <input type="file" name="variants-__prefix__-new_images" accept="image/*" multiple class="form-control" data-variant-file-input data-primary-field-name="variants-__prefix__-primary_choice">
+                  <div class="variant-image-grid" data-new-image-preview></div>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </div>
+      </div>
+
+      <div class="modal fade" id="variant-edit-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Edit variant</h5>
+              <button type="button" class="btn-close" data-variant-modal-close data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="row g-3" data-variant-modal-slots>
+                <div class="col-md-6" data-slot="variant_type"></div>
+                <div class="col-md-6" data-slot="name"></div>
+                <div class="col-md-4" data-slot="price"></div>
+                <div class="col-md-4" data-slot="mrp"></div>
+                <div class="col-md-4" data-slot="purchase_price"></div>
+                <div class="col-md-6" data-slot="sku_suffix"></div>
+                <div class="col-md-6" data-slot="stock_quantity"></div>
+                <div class="col-md-3" data-slot="weight_kg"></div>
+                <div class="col-md-3" data-slot="length_cm"></div>
+                <div class="col-md-3" data-slot="width_cm"></div>
+                <div class="col-md-3" data-slot="height_cm"></div>
+                <div class="col-12"><hr></div>
+                <div class="col-12" data-slot="existing_images"></div>
+                <div class="col-12" data-slot="new_images"></div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-primary" data-variant-modal-done data-bs-dismiss="modal">Done</button>
+            </div>
+          </div>
         </div>
       </div>
 

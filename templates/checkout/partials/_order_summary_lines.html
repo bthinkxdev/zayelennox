@@ -1,0 +1,38 @@
+{% load i18n %}
+{% for line in summary.lines %}
+<div class="d-flex align-items-center justify-content-between py-2 border-bottom gap-2">
+  <div class="d-flex align-items-center gap-2 text-truncate" style="min-width: 0;">
+    {% with line.display_image as primary_image %}
+    <div class="flex-shrink-0 bg-light border rounded" style="width: 48px; height: 48px; overflow: hidden;">
+      {% if primary_image %}
+      <img src="{{ primary_image.image.url }}" alt="{{ primary_image.alt_text|default:line.product.name }}"
+        style="width: 100%; height: 100%; object-fit: cover;">
+      {% else %}
+      <svg width="48" height="48" class="text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="1" style="padding: 10px;">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <circle cx="8.5" cy="8.5" r="1.5" />
+        <path d="M21 15l-5-5L5 21" />
+      </svg>
+      {% endif %}
+    </div>
+    {% endwith %}
+    <div class="text-truncate" style="min-width: 0;">
+      <div class="text-truncate fw-medium" style="font-size: 0.875rem;">
+        {{ line.product.name }}
+      </div>
+      {% if line.variant %}
+      <div class="text-muted" style="font-size: 0.75rem;">{{ line.variant.name }}</div>
+      {% endif %}
+      <div class="text-muted" style="font-size: 0.75rem;">{% trans "Qty:" %} {{ line.quantity }} &times; {{ display_currency.symbol }} {{ line.unit_price_at_add }}</div>
+
+      {% if not line.is_in_stock %}
+      <div class="text-danger fw-semibold mt-1" style="font-size: 0.75rem;">{% trans "Out of stock" %}</div>
+      {% elif line.quantity > line.available_stock %}
+      <div class="text-danger fw-semibold mt-1" style="font-size: 0.75rem;">{% trans "Only" %} {{ line.available_stock }} {% trans "items available in stock." %}</div>
+      {% endif %}
+    </div>
+  </div>
+  <span class="flex-shrink-0 fw-semibold" style="font-size: 0.875rem;">{{ display_currency.symbol }} {{ line.line_subtotal }}</span>
+</div>
+{% endfor %}

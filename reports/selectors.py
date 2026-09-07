@@ -22,6 +22,23 @@ from reports.models import (
 ADMIN_DASHBOARD_CACHE_KEY = "reports:admin_dashboard:today"
 ADMIN_DASHBOARD_CACHE_TTL = 300
 
+CUSTOMER_REPORT_TODAY_CACHE_KEY = "reports:customer_report:today"
+CUSTOMER_REPORT_TODAY_CACHE_TTL = 300
+
+
+def _get_today_customer_report() -> DailyCustomerReport:
+
+    cached = cache.get(CUSTOMER_REPORT_TODAY_CACHE_KEY)
+    if cached is not None:
+        return cached
+
+    from reports.services import compute_daily_customer_metrics
+
+    today = timezone.localdate()
+    live_report = DailyCustomerReport(report_date=today, **compute_daily_customer_metrics(today))
+    cache.set(CUSTOMER_REPORT_TODAY_CACHE_KEY, live_report, CUSTOMER_REPORT_TODAY_CACHE_TTL)
+    return live_report
+
 
 def get_daily_sales_reports(
     *,
@@ -67,11 +84,28 @@ def get_daily_customer_reports(
     page_size: int = 30,
 ) -> dict[str, Any]:
     """Paginated customer reports from pre-aggregated table."""
+    today = timezone.localdate()
+    today_in_range = (start_date is None or start_date <= today) and (
+        end_date is None or end_date >= today
+    )
+
     qs = DailyCustomerReport.objects.all()
     if start_date:
         qs = qs.filter(report_date__gte=start_date)
     if end_date:
         qs = qs.filter(report_date__lte=end_date)
+    if today_in_range:
+
+        qs = qs.exclude(report_date=today)
+
+    if today_in_range and page == 1:
+        historical_page_size = page_size - 1
+        historical_rows = []
+        if historical_page_size > 0:
+            paginator = Paginator(qs.order_by("-report_date"), historical_page_size)
+            historical_rows = list(paginator.get_page(1).object_list)
+        return {"results": [_get_today_customer_report(), *historical_rows], "page": 1}
+
     paginator = Paginator(qs.order_by("-report_date"), page_size)
     page_obj = paginator.get_page(page)
     return {"results": list(page_obj.object_list), "page": page_obj.number}
