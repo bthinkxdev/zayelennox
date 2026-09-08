@@ -112,3 +112,57 @@ def dispatch_order_confirmation_notification(*, order_id: int) -> None:
         if profile.notify_via_whatsapp:
             send_whatsapp(phone=profile.phone, message=body)
 
+
+@shared_task(name="notifications.tasks.dispatch_vendor_order_notification")
+def dispatch_vendor_order_notification(*, order_id: int) -> None:
+
+    from django.contrib.auth.models import User
+    from django.db.models import Q
+
+    from core.services import get_site_settings
+    from dashboard.access import DASHBOARD_GROUPS
+    from orders.models import Order
+
+    order = (
+        Order.objects.select_related("customer_profile__user", "currency")
+        .prefetch_related("items__product")
+        .filter(pk=order_id)
+        .first()
+    )
+    if order is None:
+        return
+
+    items = list(order.items.all())
+    product_names = ", ".join(item.product.name for item in items[:3])
+    if len(items) > 3:
+        product_names += " and more"
+
+    if order.customer_profile and order.customer_profile.user:
+        customer_user = order.customer_profile.user
+        customer_name = customer_user.get_full_name() or customer_user.username
+    else:
+        customer_name = (order.delivery_address_snapshot or {}).get("name") or "Guest"
+
+    currency_symbol = order.currency.symbol if order.currency else ""
+
+    title = f"New order {order.order_number}"
+    body = (
+        f"New order {order.order_number} was just placed by {customer_name}.\n\n"
+        f"Items: {product_names}\n"
+        f"Total: {currency_symbol}{order.total_amount}\n\n"
+        f"View it in the dashboard under Orders."
+    )
+
+    #in-app notification for every dashboard staff user (same roles that can
+    #access the dashboard - see dashboard.access.user_can_access_dashboard).
+    staff_users = User.objects.filter(
+        Q(is_superuser=True) | Q(groups__name__in=DASHBOARD_GROUPS)
+    ).distinct()
+    for staff_user in staff_users:
+        create_notification(user=staff_user, title=title, body=body)
+
+    #email the vendor's registered inbox, if configured.
+    site_settings = get_site_settings()
+    if site_settings.vendor_email:
+        send_email(email=site_settings.vendor_email, subject=title, message=body)
+

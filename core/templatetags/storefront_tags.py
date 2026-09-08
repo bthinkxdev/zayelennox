@@ -69,6 +69,32 @@ def _cheapest_variant(variants):
 
 
 @register.filter
+def card_image(product):
+
+    primary_images = getattr(product, "primary_images", None)
+    if not primary_images:
+        return None
+
+    variants = getattr(product, "variant_list", None)
+    if not variants:
+        return primary_images[0]
+
+    cheapest_variant = _cheapest_variant(variants)
+    
+    # Try to find the image for the cheapest variant
+    for img in primary_images:
+        if img.variant_id == cheapest_variant.pk:
+            return img
+
+    # Fallback to general product image
+    for img in primary_images:
+        if img.variant_id is None:
+            return img
+            
+    # Ultimate fallback
+    return primary_images[0]
+
+@register.filter
 def card_display_price(product) -> Decimal:
     """
     Price to show on a product card (jm-product-card__pricing).

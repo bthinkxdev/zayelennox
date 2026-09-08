@@ -113,7 +113,6 @@ class ProductForm(SlugAutoMixin):
         ]
         error_messages = {
             "name": {"required": "Product name is required."},
-            "sku": {"required": "SKU is required."},
             "category": {"required": "Category is required."},
             "stock_quantity": {"required": "Stock quantity is required."},
         }
@@ -124,7 +123,7 @@ class ProductForm(SlugAutoMixin):
         self._variants_formset = variants_formset
         self.fields["slug"].required = False
         
-        for name in ("base_price", "mrp", "purchase_price", *_DIMENSION_FIELDS):
+        for name in ("sku", "base_price", "mrp", "purchase_price", *_DIMENSION_FIELDS):
             self.fields[name].required = False
         
         if not self.instance.pk:
@@ -226,6 +225,7 @@ class ProductForm(SlugAutoMixin):
         else:
             
             for field_name, label in (
+                ("sku", "SKU"),
                 ("base_price", "Base price"),
                 ("mrp", "MRP"),
             ):
@@ -235,7 +235,54 @@ class ProductForm(SlugAutoMixin):
                 if cleaned.get(f) in (None, ""):
                     self.add_error(f, "Required for courier booking.")
 
+        self._check_sku_cross_uniqueness(cleaned, active_variants or [])
+
         return cleaned
+
+    def _check_sku_cross_uniqueness(self, cleaned, active_variants):
+        """
+        Cross-check the product-level SKU against variant sku_suffix values
+        (this submission's own variants, and every other product's variants
+        in the DB) and vice versa — Product.sku and ProductVariant.sku_suffix
+        must never silently share a value.
+        """
+        product_sku = (cleaned.get("sku") or "").strip()
+        suffix_forms: dict[str, list] = {}
+        for vform in active_variants:
+            suffix = vform.cleaned_data.get("sku_suffix")
+            if suffix:
+                suffix_forms.setdefault(suffix, []).append(vform)
+
+        #this submission's own common SKU vs its own variants' suffixes.
+        if product_sku and product_sku in suffix_forms:
+            self.add_error(
+                "sku", "This SKU is already used by one of the variants below."
+            )
+            for vform in suffix_forms[product_sku]:
+                vform.add_error(
+                    "sku_suffix",
+                    "This SKU is already used by the product's common SKU field above.",
+                )
+
+        if product_sku:
+            conflict = ProductVariant.objects.filter(sku_suffix=product_sku)
+            if self.instance.pk:
+                conflict = conflict.exclude(product_id=self.instance.pk)
+            if conflict.exists():
+                self.add_error(
+                    "sku", "This SKU is already used by another product's variant."
+                )
+
+        if suffix_forms:
+            existing_products = Product.objects.filter(sku__in=suffix_forms.keys())
+            if self.instance.pk:
+                existing_products = existing_products.exclude(pk=self.instance.pk)
+            taken = set(existing_products.values_list("sku", flat=True))
+            for suffix in taken:
+                for vform in suffix_forms[suffix]:
+                    vform.add_error(
+                        "sku_suffix", "This SKU is already used by another product."
+                    )
 
 
 class CategoryForm(SlugAutoMixin):

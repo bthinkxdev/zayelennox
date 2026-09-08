@@ -349,10 +349,20 @@
   document.addEventListener("submit", function (e) {
     const elt = e.target;
     if (elt && elt.tagName === "FORM" && ["buy-form", "buy-now-form", "sticky-buy-form", "sticky-buy-now-form"].includes(elt.id)) {
-      const qtyInput = elt.querySelector(".pdp-qty-input");
-      if (qtyInput) {
-        const qty = parseInt(qtyInput.value, 10);
-        const maxStock = parseInt("{{ resolved_stock|default:0 }}", 10);
+      const formQtyInput = elt.querySelector(".pdp-qty-input");
+      if (formQtyInput) {
+        const qty = parseInt(formQtyInput.value, 10);
+        const visibleQtyInput = document.getElementById("pdp-qty");
+        let maxStock = NaN;
+        if (visibleQtyInput) {
+          maxStock = parseInt(visibleQtyInput.getAttribute("max"), 10);
+        }
+        if (isNaN(maxStock)) {
+          maxStock = parseInt("{{ resolved_stock|default:0 }}", 10);
+        }
+        if (isNaN(maxStock)) {
+          maxStock = parseInt("{{ resolved_stock|default:0 }}", 10);
+        }
         if (maxStock > 0 && qty > maxStock) {
           e.preventDefault();
           e.stopImmediatePropagation();

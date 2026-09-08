@@ -153,9 +153,9 @@ class ShiprocketClient:
         order_items = []
         for item in items:
             variant = item.variant
-            sku = item.product.sku
+            sku = item.product.sku or ""
             if variant is not None and variant.sku_suffix:
-                sku = f"{sku}-{variant.sku_suffix}"
+                sku = f"{sku}-{variant.sku_suffix}" if sku else variant.sku_suffix
             order_items.append(
                 {
                     "name": item.product.name,

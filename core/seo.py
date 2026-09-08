@@ -109,7 +109,6 @@ def build_product_json_ld(
         "@context": "https://schema.org",
         "@type": "Product",
         "name": product.name,
-        "sku": product.sku,
         "url": request.build_absolute_uri(reverse("catalog:pdp", kwargs={"slug": product.slug})),
         "offers": {
             "@type": "Offer",
@@ -123,6 +122,9 @@ def build_product_json_ld(
     }
     if image_url:
         data["image"] = image_url
+
+    if product.sku:
+        data["sku"] = product.sku
 
     description = resolve_meta_description(obj=product, fallback=product.name)
     if description:

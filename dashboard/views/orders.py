@@ -101,7 +101,15 @@ def order_detail(request: HttpRequest, pk: int) -> HttpResponse:
     payments = order.payment_transactions.select_related("currency").all()
     pod = getattr(order, "proof_of_delivery", None)
 
-    allowed_choices = OrderStatus.choices
+    next_statuses = ALLOWED_STATUS_TRANSITIONS.get(order.order_status, set())
+    if next_statuses:
+        allowed_choices = [
+            (value, label)
+            for value, label in OrderStatus.choices
+            if value == order.order_status or value in next_statuses
+        ]
+    else:
+        allowed_choices = []
 
     context = {
         "nav_section": "orders",
@@ -133,7 +141,7 @@ def order_transition(request: HttpRequest, pk: int) -> HttpResponse:
 
     try:
         transition_order_status(
-            order=order, new_status=new_status, actor=request.user, note=note, force=True
+            order=order, new_status=new_status, actor=request.user, note=note
         )
         messages.success(
             request, f"Order moved to {dict(OrderStatus.choices).get(new_status, new_status)}."

@@ -113,9 +113,13 @@ class Product(TimeStampedModel):
     sku = models.CharField(
         max_length=64,
         unique=True,
+        null=True,
+        blank=True,
         db_index=True,
         verbose_name="SKU",
-        help_text="Stock keeping unit identifier.",
+        help_text="Stock keeping unit identifier. Required for a simple product; "
+        "optional when the product has variants, since each variant carries its "
+        "own SKU suffix instead.",
     )
     category = models.ForeignKey(
         Category,
@@ -405,7 +409,9 @@ class ProductVariant(TimeStampedModel):
         unique_together = [("product", "variant_type", "name")]
 
     def __str__(self) -> str:
-        return f"{self.product.sku}-{self.sku_suffix}"
+        if self.product_id and self.product.sku:
+            return f"{self.product.sku}-{self.sku_suffix}"
+        return self.sku_suffix
 
     @property
     def effective_price(self):

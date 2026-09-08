@@ -96,9 +96,15 @@ def confirm_payment_success(
             reset_cart(cart=cart)
 
         #send order placement confirmation email
-        from notifications.tasks import dispatch_order_confirmation_notification
+        from notifications.tasks import (
+            dispatch_order_confirmation_notification,
+            dispatch_vendor_order_notification,
+        )
         transaction.on_commit(
             lambda: dispatch_order_confirmation_notification.delay(order_id=order.pk)
+        )
+        transaction.on_commit(
+            lambda: dispatch_vendor_order_notification.delay(order_id=order.pk)
         )
 
     return payment_transaction

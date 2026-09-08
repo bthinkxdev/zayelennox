@@ -4,7 +4,7 @@
 {% block title %}{% trans "Checkout" %} | ZAYE LENNOX{% endblock %}
 
 {% block content %}
-<div class="container page-container checkout-page jm-page" hx-get="{% url 'checkout:checkout' %}{% if buy_now_mode %}?buy_now=1{% endif %}" hx-trigger="cartUpdated from:body" hx-select=".checkout-page" hx-swap="outerHTML">
+<div class="container page-container checkout-page jm-page">
   {% if not summary.lines %}
   <div class="text-center py-5 mt-5">
     <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5" class="mb-3 mx-auto"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
@@ -214,7 +214,7 @@
       <div id="checkout-result" class="mt-3"></div>
     </div>
 
-    <div class="col-lg-5">
+    <div class="col-lg-5" id="checkout-right-column" hx-get="{% url 'checkout:checkout' %}{% if buy_now_mode %}?buy_now=1{% endif %}" hx-trigger="cartUpdated from:body" hx-select="#checkout-right-column" hx-swap="outerHTML">
       <div class="checkout-step sticky-top" style="top: 100px;">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <h2 class="mb-0">{% trans "Order Summary" %}</h2>
@@ -222,6 +222,17 @@
           <a href="#" class="text-decoration-none small text-floward fw-semibold" data-bs-toggle="offcanvas" data-bs-target="#cartOffcanvas">{% trans "Edit Cart" %}</a>
           {% endif %}
         </div>
+
+        {% if messages %}
+        <div class="mb-3">
+          {% for message in messages %}
+          <div class="alert alert-{% if 'error' in message.tags or 'danger' in message.tags %}danger{% else %}success{% endif %} alert-dismissible fade show small py-2 mb-1" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="padding: 0.5rem;"></button>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
         <div id="checkout-order-summary-lines">
           {% include "checkout/partials/_order_summary_lines.html" %}
         </div>
@@ -229,17 +240,25 @@
         {% if summary.coupon_code %}
         <div class="d-flex align-items-center justify-content-between py-2 border-bottom">
           <span class="small fw-semibold text-floward">{{ summary.coupon_code }}</span>
-          <form method="post" action="{% url 'checkout:coupon-remove' %}">
+          <form method="post" action="{% url 'checkout:coupon-remove' %}"
+                hx-post="{% url 'checkout:coupon-remove' %}"
+                hx-target="#checkout-right-column"
+                hx-select="#checkout-right-column"
+                hx-swap="outerHTML">
             {% csrf_token %}
             {% if buy_now_mode %}<input type="hidden" name="buy_now" value="1">{% endif %}
             <button type="submit" class="btn btn-link text-danger p-0 ms-2" style="font-size: 0.8rem; text-decoration: none;">{% trans "Remove" %}</button>
           </form>
         </div>
         {% elif has_active_coupons %}
-        <form method="post" action="{% url 'checkout:coupon-apply' %}" class="d-flex gap-2 py-3 border-bottom">
+        <form method="post" action="{% url 'checkout:coupon-apply' %}" class="d-flex gap-2 py-3 border-bottom"
+              hx-post="{% url 'checkout:coupon-apply' %}"
+              hx-target="#checkout-right-column"
+              hx-select="#checkout-right-column"
+              hx-swap="outerHTML">
           {% csrf_token %}
           {% if buy_now_mode %}<input type="hidden" name="buy_now" value="1">{% endif %}
-          <input type="text" name="code" class="form-control form-control-sm" placeholder="{% trans 'Enter coupon code' %}">
+          <input type="text" name="code" class="form-control form-control-sm" placeholder="{% trans 'Enter coupon code' %}" autocomplete="off">
           <button type="submit" class="btn btn-dark btn-sm px-3">{% trans "Apply" %}</button>
         </form>
         {% endif %}
@@ -249,11 +268,11 @@
         </div>
         <div class="d-flex justify-content-between small pt-1">
           <span>{% trans "Shipping" %}</span>
-          <span id="summary-shipping" data-value="{{ summary.delivery_charge|stringformat:'f' }}">{{ display_currency.symbol }}{{ summary.delivery_charge }}</span>
+          <span id="summary-shipping" data-server-value="{{ summary.delivery_charge|stringformat:'f' }}" data-value="{{ summary.delivery_charge|stringformat:'f' }}">{{ display_currency.symbol }}{{ summary.delivery_charge }}</span>
         </div>
         <div class="d-flex justify-content-between fw-semibold mt-2 pt-2 border-top">
           <span>{% trans "Total" %}</span>
-          <span class="text-floward" id="summary-total" data-value="{{ summary.grand_total|stringformat:'f' }}">{{ display_currency.symbol }} {{ summary.grand_total }}</span>
+          <span class="text-floward" id="summary-total" data-server-value="{{ summary.grand_total|stringformat:'f' }}" data-value="{{ summary.grand_total|stringformat:'f' }}">{{ display_currency.symbol }} {{ summary.grand_total }}</span>
         </div>
         <div id="checkout-place-order-area">
           {% include "checkout/partials/_place_order_button.html" %}
@@ -306,6 +325,17 @@
       document.body.addEventListener('htmx:afterSwap', function(event) {
         if (event.detail && event.detail.requestConfig && event.detail.requestConfig.elt === checkoutForm) {
           hideOrderProcessingOverlay();
+        }
+        
+        var targetId = event.detail.target ? event.detail.target.id : '';
+        if (targetId === 'checkout-right-column') {
+          // Re-run the delivery check if we had one, to re-apply Shiprocket rates
+          var pincodeInputEl = document.getElementById('checkout-pincode');
+          if (pincodeInputEl && pincodeInputEl.value.length === 6 && typeof scheduleDeliveryCheck === 'function') {
+             // Reset the lastCheckedPincode so it bypasses the "already checked" guard
+             lastCheckedPincode = '';
+             scheduleDeliveryCheck();
+          }
         }
       });
       checkoutForm.addEventListener('htmx:responseError', hideOrderProcessingOverlay);
@@ -736,31 +766,43 @@
     var shipOtherWrap = document.getElementById('ship-other-couriers-wrap');
     var shipOtherList = document.getElementById('ship-other-couriers');
 
-    var summarySubtotalEl = document.getElementById('summary-subtotal');
-    var summaryShippingEl = document.getElementById('summary-shipping');
-    var summaryTotalEl = document.getElementById('summary-total');
     var currencySymbol = "{{ display_currency.symbol }}";
-    // Base = subtotal net of any coupon discount, derived from the server-rendered
-    // total minus the server-rendered delivery charge so coupons stay accounted for
-    // when the shipping charge is later replaced by a live Shiprocket quote.
-    var initialTotal = summaryTotalEl ? parseFloat(summaryTotalEl.getAttribute('data-value')) || 0 : 0;
-    var initialShipping = summaryShippingEl ? parseFloat(summaryShippingEl.getAttribute('data-value')) || 0 : 0;
-    var baseAfterDiscount = initialTotal - initialShipping;
 
     function formatMoney(amount) {
       return currencySymbol + amount.toFixed(2);
     }
 
     function updateOrderSummary(shippingCharge) {
+      var summaryShippingEl = document.getElementById('summary-shipping');
+      var summaryTotalEl = document.getElementById('summary-total');
+      if (!summaryShippingEl || !summaryTotalEl) return;
+      
+      var serverTotal = parseFloat(summaryTotalEl.getAttribute('data-server-value')) || parseFloat(summaryTotalEl.getAttribute('data-value')) || 0;
+      var serverShipping = parseFloat(summaryShippingEl.getAttribute('data-server-value')) || parseFloat(summaryShippingEl.getAttribute('data-value')) || 0;
+      var baseAfterDiscount = serverTotal - serverShipping;
+
       var total = baseAfterDiscount + shippingCharge;
-      if (summaryShippingEl) {
-        summaryShippingEl.setAttribute('data-value', shippingCharge.toFixed(2));
-        summaryShippingEl.textContent = formatMoney(shippingCharge);
-      }
-      if (summaryTotalEl) {
-        summaryTotalEl.setAttribute('data-value', total.toFixed(2));
-        summaryTotalEl.textContent = formatMoney(total);
-      }
+      
+      summaryShippingEl.setAttribute('data-value', shippingCharge.toFixed(2));
+      summaryShippingEl.textContent = formatMoney(shippingCharge);
+      
+      summaryTotalEl.setAttribute('data-value', total.toFixed(2));
+      summaryTotalEl.textContent = formatMoney(total);
+    }
+
+    function resetOrderSummaryToDefault() {
+      var summaryShippingEl = document.getElementById('summary-shipping');
+      var summaryTotalEl = document.getElementById('summary-total');
+      if (!summaryShippingEl || !summaryTotalEl) return;
+      
+      var serverTotal = parseFloat(summaryTotalEl.getAttribute('data-server-value')) || parseFloat(summaryTotalEl.getAttribute('data-value')) || 0;
+      var serverShipping = parseFloat(summaryShippingEl.getAttribute('data-server-value')) || parseFloat(summaryShippingEl.getAttribute('data-value')) || 0;
+      
+      summaryShippingEl.setAttribute('data-value', serverShipping.toFixed(2));
+      summaryShippingEl.textContent = formatMoney(serverShipping);
+      
+      summaryTotalEl.setAttribute('data-value', serverTotal.toFixed(2));
+      summaryTotalEl.textContent = formatMoney(serverTotal);
     }
 
     function resetShippingPanel() {
@@ -847,6 +889,7 @@
         resultBox.className = 'small mt-2';
         resultBox.textContent = '';
         resetShippingPanel();
+        resetOrderSummaryToDefault();
         return;
       }
 

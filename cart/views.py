@@ -215,7 +215,8 @@ def cart_page_remove_view(request: HttpRequest) -> HttpResponse:
 def cart_quantity_view(request: HttpRequest) -> HttpResponse:
     """Increment/decrement a cart line's quantity (+1/-1); deletes at zero."""
     form = CartQuantityForm(request.POST)
-    is_drawer = request.headers.get("HX-Target") == "cart-drawer-body"
+    # Safely check payload first, fallback to HTMX header
+    is_drawer = request.POST.get("is_drawer") == "1" or request.headers.get("HX-Target") == "cart-drawer-body"
 
     if not form.is_valid():
         if is_drawer:

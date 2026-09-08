@@ -7,14 +7,14 @@
          data-product-stock="{% if product.is_in_stock %}{% trans 'In Stock' %}{% else %}{% trans 'Out of Stock' %}{% endif %}"
          data-in-stock="{% if product.is_in_stock %}true{% else %}false{% endif %}"
          data-product-badge="{% if product.is_featured %}{% trans 'Featured' %}{% elif product.is_bestseller %}{% trans 'Bestseller' %}{% elif product.is_new_arrival %}{% trans 'New' %}{% endif %}"
-         {% with img=product.primary_images.0 %}
+         {% with img=product|card_image %}
          data-product-image="{% if img and img.image %}{{ img.image.url }}{% else %}{% static 'img/product-placeholder.svg' %}{% endif %}"
          {% endwith %}
          data-in-cart="{% if cart_product_ids and product.pk in cart_product_ids %}true{% else %}false{% endif %}">
   {# Media: only the image sits inside .ratio so Bootstrap does not stretch badge/actions into a full-bleed blocker. #}
   <div class="jm-product-card__media">
     <a href="{% url 'catalog:pdp' slug=product.slug %}" class="jm-product-card__img-link ratio ratio-1x1" tabindex="-1" aria-hidden="true">
-      {% with img=product.primary_images.0 %}
+      {% with img=product|card_image %}
       {% if img and img.image %}
       <img src="{{ img.image.url }}" alt="{{ img.alt_text|default:product.name }}" class="object-fit-cover" width="400"
         height="400" loading="lazy"

@@ -39,9 +39,22 @@ def create_checkout_session(
     ).first()
     if existing:
         return existing
+
+    last_completed = CheckoutSession.objects.filter(
+        cart=cart,
+        status=CheckoutSessionStatus.COMPLETED,
+    ).order_by("-updated_at").first()
+
+    address = None
+    if last_completed:
+        if customer_profile is None:
+            customer_profile = last_completed.customer_profile
+        address = last_completed.address
+
     return CheckoutSession.objects.create(
         cart=cart,
         customer_profile=customer_profile,
+        address=address,
         session_key=session_key,
     )
 

@@ -1,4 +1,4 @@
-{% load i18n static %}
+{% load i18n static storefront_tags %}
 {% if products or brands or categories or equipment_types %}
 <div class="search-suggestions-container" role="presentation">
   
@@ -12,7 +12,7 @@
            role="option"
            id="search-suggestion-prod-{{ forloop.counter }}"
            style="gap: 12px; font-size: 0.875rem;">
-          {% with img=product.primary_images.0 %}
+          {% with img=product|card_image %}
           {% if img and img.image %}
             <img src="{{ img.image.url }}" alt="{{ img.alt_text|default:product.name }}" class="rounded bg-light" style="width: 34px; height: 34px; object-fit: cover; flex-shrink: 0; border: 1px solid var(--floward-border-light);" onerror="this.onerror=null;this.src='{% static 'img/product-placeholder.svg' %}';">
           {% else %}
