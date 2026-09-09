@@ -369,7 +369,7 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
         return render(
             request,
             "checkout/partials/_stock_issue_oob.html",
-            {"summary": summary},
+            {"summary": summary, "buy_now_mode": buy_now_mode},
             status=200,
         )
 
@@ -399,7 +399,7 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
         return render(
             request,
             "checkout/partials/_stock_issue_oob.html",
-            {"summary": summary},
+            {"summary": summary, "buy_now_mode": buy_now_mode},
             status=200,
         )
 

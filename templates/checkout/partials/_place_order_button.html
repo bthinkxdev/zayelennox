@@ -2,9 +2,17 @@
 {% if summary.has_stock_issues %}
 <button type="button" class="btn btn-floward w-100 py-2 mt-3" disabled style="cursor: not-allowed;">{% trans "Place Order & Pay" %}</button>
 {% if summary.has_out_of_stock_items %}
+  {% if buy_now_mode %}
+<div class="text-danger small mt-2 text-center">{% trans "Some items are out of stock. Please click 'Edit Item' to remove them." %}</div>
+  {% else %}
 <div class="text-danger small mt-2 text-center">{% trans "Some items are out of stock. Please click 'Edit Cart' to remove them." %}</div>
+  {% endif %}
 {% else %}
+  {% if buy_now_mode %}
+<div class="text-danger small mt-2 text-center">{% trans "Some items exceed available quantity. Please click 'Edit Item' to reduce quantity." %}</div>
+  {% else %}
 <div class="text-danger small mt-2 text-center">{% trans "Some items exceed available quantity. Please click 'Cart' to reduce quantity." %}</div>
+  {% endif %}
 {% endif %}
 {% elif not payment_gateways %}
 <button type="button" class="btn btn-floward w-100 py-2 mt-3" disabled style="cursor: not-allowed;">{% trans "Place Order & Pay" %}</button>

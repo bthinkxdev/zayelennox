@@ -23,7 +23,7 @@
           </div>
           <div class="flex-grow-1 min-w-0">
             <div class="d-flex justify-content-between align-items-start gap-2">
-              <a href="{% url 'catalog:pdp' slug=line.product.slug %}" class="cart-line__name text-dark text-truncate">{{ line.product.name }}</a>
+              <a href="{% url 'catalog:pdp' slug=line.product.slug %}{% if line.variant %}?variant_id={{ line.variant.pk }}{% endif %}" class="cart-line__name text-dark text-truncate">{{ line.product.name }}</a>
               <span class="fw-semibold flex-shrink-0">{{ display_currency.symbol }} {{ line.line_subtotal }}</span>
             </div>
             {% if line.variant %}<div class="cart-line__meta">{{ line.variant.name }}</div>{% endif %}

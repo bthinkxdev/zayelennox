@@ -90,8 +90,7 @@
           hx-trigger="pageshow from:window, cartItemAdded from:body, cartUpdated from:body">
 
           <div id="pdp-add-to-cart-group" class="jm-pdp-buybox__row {% if is_in_cart %}d-none{% endif %}">
-            {% if price_data.is_in_stock == "true" %}
-            <div class="qty-stepper jm-pdp-qty" aria-label="{% trans 'Quantity' %}">
+            <div class="qty-stepper jm-pdp-qty{% if price_data.is_in_stock != 'true' %} d-none{% endif %}" aria-label="{% trans 'Quantity' %}">
               <button class="qty-stepper__btn" type="button"
                 onclick="let inp = document.getElementById('pdp-qty'); let msg = document.getElementById('pdp-qty-limit-msg'); if(inp.value > 1) { inp.value = parseInt(inp.value) - 1; document.querySelectorAll('.pdp-qty-input').forEach(i => i.value = inp.value); } if(msg) msg.classList.add('d-none');"
                 aria-label="{% trans 'Decrease quantity' %}">&minus;</button>
@@ -102,7 +101,6 @@
                 onclick="let inp = document.getElementById('pdp-qty'); let max = parseInt(inp.getAttribute('max'), 10) || 1; let msg = document.getElementById('pdp-qty-limit-msg'); if(parseInt(inp.value, 10) < max) { inp.value = parseInt(inp.value, 10) + 1; document.querySelectorAll('.pdp-qty-input').forEach(i => i.value = inp.value); } if(msg) msg.classList.toggle('d-none', parseInt(inp.value, 10) < max);"
                 aria-label="{% trans 'Increase quantity' %}">&plus;</button>
             </div>
-            {% endif %}
 
             <form id="buy-form" method="post" action="{% url 'cart:add' %}" class="jm-pdp-buybox__atc flex-grow-1"
               hx-post="{% url 'cart:add' %}" hx-target="#cart-drawer-body" hx-swap="innerHTML">

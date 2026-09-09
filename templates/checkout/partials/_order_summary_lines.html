@@ -29,12 +29,16 @@
       {% if not line.is_in_stock %}
       <div class="d-flex align-items-center gap-2 mt-1">
         <div class="text-danger fw-semibold" style="font-size: 0.75rem;">{% trans "Out of stock" %}</div>
+        {% if buy_now_mode %}
         <a href="{% url 'catalog:pdp' slug=line.product.slug %}{% if line.variant %}?variant_id={{ line.variant.pk }}{% endif %}" class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 0.7rem; line-height: 1.5; text-decoration: none;">{% trans "Edit Item" %}</a>
+        {% endif %}
       </div>
       {% elif line.quantity > line.available_stock %}
       <div class="d-flex align-items-center gap-2 mt-1">
         <div class="text-danger fw-semibold" style="font-size: 0.75rem;">{% trans "Only" %} {{ line.available_stock }} {% trans "items available in stock." %}</div>
+        {% if buy_now_mode %}
         <a href="{% url 'catalog:pdp' slug=line.product.slug %}{% if line.variant %}?variant_id={{ line.variant.pk }}{% endif %}" class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 0.7rem; line-height: 1.5; text-decoration: none;">{% trans "Edit Item" %}</a>
+        {% endif %}
       </div>
       {% endif %}
     </div>

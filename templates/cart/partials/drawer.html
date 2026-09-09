@@ -18,7 +18,7 @@
       {% endwith %}
     </div>
     <div class="cart-line__info">
-      <a href="{% url 'catalog:pdp' slug=line.product.slug %}" class="cart-line__name text-dark">
+      <a href="{% url 'catalog:pdp' slug=line.product.slug %}{% if line.variant %}?variant_id={{ line.variant.pk }}{% endif %}" class="cart-line__name text-dark">
         {{ line.product.name }}
       </a>
       {% if line.variant %}

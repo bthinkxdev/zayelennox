@@ -39,7 +39,7 @@
         <button id="rzp-button" class="btn btn-floward btn-lg w-100 py-3 mb-2">
           {% trans "Pay Now" %} ({{ order.currency.symbol }} {{ order.total_amount }})
         </button>
-        <a href="{% url 'checkout:checkout' %}" class="btn btn-link text-muted small">{% trans "Cancel and return to checkout" %}</a>
+        <a href="{{ cancel_url }}" class="btn btn-link text-muted small">{% trans "Cancel and return to checkout" %}</a>
       </div>
     </div>
   </div>
