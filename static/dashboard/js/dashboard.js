@@ -631,6 +631,38 @@
     });
   }
 
+  function initTableLabels() {
+    var tables = document.querySelectorAll(".table:not(.repeater)");
+    Array.prototype.forEach.call(tables, function (table) {
+      var headers = table.querySelectorAll("thead th");
+      var headerTexts = [];
+      Array.prototype.forEach.call(headers, function (th) {
+        headerTexts.push(th.textContent.trim());
+      });
+      var rows = table.querySelectorAll("tbody tr");
+      Array.prototype.forEach.call(rows, function (tr) {
+        var cells = tr.querySelectorAll("td");
+        if (cells.length === 1 && cells[0].hasAttribute("colspan")) {
+          tr.classList.add("empty-row-card");
+          return;
+        }
+        Array.prototype.forEach.call(cells, function (td, i) {
+          if (headerTexts[i] && !td.getAttribute("data-label")) {
+            td.setAttribute("data-label", headerTexts[i]);
+          }
+          if (!td.querySelector(".td-content")) {
+            var wrapper = document.createElement("div");
+            wrapper.className = "td-content";
+            while (td.firstChild) {
+              wrapper.appendChild(td.firstChild);
+            }
+            td.appendChild(wrapper);
+          }
+        });
+      });
+    });
+  }
+
   function initPage() {
     initSidebar();
     initFormValidation();
@@ -644,6 +676,7 @@
     initProductFormPersistFiles();
     initOrderStatusGuard();
     initSearchFormGuard();
+    initTableLabels();
   }
 
   // ---- List page search forms: don't let "Search" submit on empty/whitespace ----

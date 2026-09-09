@@ -85,28 +85,28 @@
                 {% for iform in images %}
                 <tr>
                   <td class="d-none">{{ iform.id }}</td>
-                  <td>
+                  <td data-label="Preview">
                     {% if iform.instance.pk and iform.instance.image %}<img src="{{ iform.instance.image.url }}"
                       class="thumb" data-img-preview alt="">
                     {% else %}<img src="" class="thumb d-none" data-img-preview alt="">{% endif %}
                   </td>
-                  <td>
+                  <td data-label="Image file">
                     {{ iform.image }}
                     {% if iform.image.errors %}<div class="text-danger small mt-1">{{ iform.image.errors|join:", " }}</div>{% endif %}
                   </td>
-                  <td>
+                  <td data-label="Alt text">
                     {{ iform.alt_text }}
                     {% if iform.alt_text.errors %}<div class="text-danger small mt-1">{{ iform.alt_text.errors|join:", " }}</div>{% endif %}
                   </td>
-                  <td>
+                  <td data-label="Order">
                     {{ iform.display_order }}
                     {% if iform.display_order.errors %}<div class="text-danger small mt-1">{{ iform.display_order.errors|join:", " }}</div>{% endif %}
                   </td>
-                  <td class="text-center">
+                  <td class="text-center" data-label="Primary">
                     {{ iform.is_primary }}
                     {% if iform.is_primary.errors %}<div class="text-danger small mt-1">{{ iform.is_primary.errors|join:", " }}</div>{% endif %}
                   </td>
-                  <td class="text-center">
+                  <td class="text-center" data-label="Remove">
                     {% if iform.instance.pk %}
                     <label class="form-check d-inline-flex m-0" title="Delete on save">{{ iform.DELETE }}</label>
                     {% else %}
@@ -122,12 +122,12 @@
           <template data-formset-empty>
             <tr>
               <td class="d-none">{{ image_empty_form.id }}</td>
-              <td><img src="" class="thumb d-none" data-img-preview alt=""></td>
-              <td>{{ image_empty_form.image }}</td>
-              <td>{{ image_empty_form.alt_text }}</td>
-              <td>{{ image_empty_form.display_order }}</td>
-              <td class="text-center">{{ image_empty_form.is_primary }}</td>
-              <td class="text-center"><button type="button" class="btn btn-icon btn-sm btn-light text-danger"
+              <td data-label="Preview"><img src="" class="thumb d-none" data-img-preview alt=""></td>
+              <td data-label="Image file">{{ image_empty_form.image }}</td>
+              <td data-label="Alt text">{{ image_empty_form.alt_text }}</td>
+              <td data-label="Order">{{ image_empty_form.display_order }}</td>
+              <td class="text-center" data-label="Primary">{{ image_empty_form.is_primary }}</td>
+              <td class="text-center" data-label="Remove"><button type="button" class="btn btn-icon btn-sm btn-light text-danger"
                   data-row-remove><i class="ti ti-trash"></i></button></td>
             </tr>
           </template>
@@ -175,12 +175,12 @@
                     {{ vform.id }}
                     {% if vform.instance.pk %}{{ vform.DELETE }}{% endif %}
                   </td>
-                  <td data-summary="variant_type">{{ vform.instance.variant_type }}</td>
-                  <td data-summary="name">{{ vform.instance.name }}</td>
-                  <td data-summary="price">{% if vform.instance.pk %}{{ product.base_price|add:vform.instance.price_delta|default_if_none:"" }}{% endif %}</td>
-                  <td data-summary="stock_quantity">{{ vform.instance.stock_quantity|default_if_none:"" }}</td>
-                  <td data-summary="image_count">{% if vform.instance.pk %}{{ vform.instance.images.count }} image{{ vform.instance.images.count|pluralize }}{% else %}0 images{% endif %}</td>
-                  <td class="text-end">
+                  <td data-summary="variant_type" data-label="Type">{{ vform.instance.variant_type }}</td>
+                  <td data-summary="name" data-label="Name">{{ vform.instance.name }}</td>
+                  <td data-summary="price" data-label="Price">{% if vform.instance.pk %}{{ product.base_price|add:vform.instance.price_delta|default_if_none:"" }}{% endif %}</td>
+                  <td data-summary="stock_quantity" data-label="Stock">{{ vform.instance.stock_quantity|default_if_none:"" }}</td>
+                  <td data-summary="image_count" data-label="Images">{% if vform.instance.pk %}{{ vform.instance.images.count }} image{{ vform.instance.images.count|pluralize }}{% else %}0 images{% endif %}</td>
+                  <td class="text-end" data-label="Actions">
                     <button type="button" class="btn btn-sm btn-outline-secondary" data-open-variant-modal><i class="ti ti-pencil me-1"></i>Edit</button>
                     <button type="button" class="btn btn-icon btn-sm btn-light text-danger" data-row-remove title="Remove"><i class="ti ti-trash"></i></button>
                   </td>
@@ -282,12 +282,12 @@
                 {{ variant_empty_form.id }}
                 {{ variant_empty_form.DELETE }}
               </td>
-              <td data-summary="variant_type"></td>
-              <td data-summary="name"></td>
-              <td data-summary="price"></td>
-              <td data-summary="stock_quantity"></td>
-              <td data-summary="image_count">0 images</td>
-              <td class="text-end">
+              <td data-summary="variant_type" data-label="Type"></td>
+              <td data-summary="name" data-label="Name"></td>
+              <td data-summary="price" data-label="Price"></td>
+              <td data-summary="stock_quantity" data-label="Stock"></td>
+              <td data-summary="image_count" data-label="Images">0 images</td>
+              <td class="text-end" data-label="Actions">
                 <button type="button" class="btn btn-sm btn-outline-secondary" data-open-variant-modal><i class="ti ti-pencil me-1"></i>Edit</button>
                 <button type="button" class="btn btn-icon btn-sm btn-light text-danger" data-row-remove title="Remove"><i class="ti ti-trash"></i></button>
               </td>
@@ -492,13 +492,13 @@
                     {{ dform.id }}
                     {% if dform.instance.pk %}{{ dform.DELETE }}{% endif %}
                   </td>
-                  <td>
+                  <td data-label="Document Title">
                     {{ dform.title }}
                     {% if dform.title.errors %}
                     <div class="text-danger small mt-1">{{ dform.title.errors|join:", " }}</div>
                     {% endif %}
                   </td>
-                  <td>
+                  <td data-label="PDF/Document File">
                     {% if dform.instance.pk and dform.instance.document_file %}
                     <div class="d-flex align-items-center mb-1 py-1" data-existing-file-container>
                       <span class="small fw-semibold text-dark text-truncate" style="max-width: 250px;" data-file-label>
@@ -521,13 +521,13 @@
                     <div class="text-danger small mt-1">{{ dform.document_file.errors|join:", " }}</div>
                     {% endif %}
                   </td>
-                  <td>
+                  <td data-label="Display Order">
                     {{ dform.display_order }}
                     {% if dform.display_order.errors %}
                     <div class="text-danger small mt-1">{{ dform.display_order.errors|join:", " }}</div>
                     {% endif %}
                   </td>
-                  <td class="text-center" data-view-container>
+                  <td class="text-center" data-view-container data-label="View">
                     {% if dform.instance.pk and dform.instance.document_file %}
                     <a href="{{ dform.instance.document_file.url }}" target="_blank"
                       class="btn btn-icon btn-sm btn-light text-info" data-view-btn title="View Document"><i
@@ -536,7 +536,7 @@
                     <span class="text-muted small" data-view-placeholder>-</span>
                     {% endif %}
                   </td>
-                  <td class="text-center">
+                  <td class="text-center" data-label="Remove">
                     <button type="button" class="btn btn-icon btn-sm btn-light text-danger" data-row-remove
                       title="Remove Document">
                       <i class="ti ti-trash"></i>
@@ -553,16 +553,16 @@
                 {{ document_empty_form.id }}
                 {{ document_empty_form.DELETE }}
               </td>
-              <td>{{ document_empty_form.title }}</td>
-              <td>
+              <td data-label="Document Title">{{ document_empty_form.title }}</td>
+              <td data-label="PDF/Document File">
                 {{ document_empty_form.document_file }}
                 <span class="text-muted d-block mt-1" style="font-size: 0.75rem;">Upload a PDF or Image.</span>
               </td>
-              <td>{{ document_empty_form.display_order }}</td>
-              <td class="text-center" data-view-container>
+              <td data-label="Display Order">{{ document_empty_form.display_order }}</td>
+              <td class="text-center" data-view-container data-label="View">
                 <span class="text-muted small" data-view-placeholder>-</span>
               </td>
-              <td class="text-center">
+              <td class="text-center" data-label="Remove">
                 <button type="button" class="btn btn-icon btn-sm btn-light text-danger" data-row-remove>
                   <i class="ti ti-trash"></i>
                 </button>
