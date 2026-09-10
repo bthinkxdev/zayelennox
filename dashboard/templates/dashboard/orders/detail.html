@@ -139,6 +139,31 @@
       </div>
     </div>
 
+    {% if shipment %}
+    <div class="card mb-3">
+      <div class="card-header bg-transparent px-4 py-3"><h3 class="h5 mb-0">Shipment</h3></div>
+      <div class="card-body p-4 small">
+        <div><span class="text-secondary">Status:</span> {{ shipment.get_current_status_display }}</div>
+        {% if shipment.awb_code %}
+        <div><span class="text-secondary">AWB:</span> {{ shipment.awb_code }}
+          <a href="https://shiprocket.co/tracking/{{ shipment.awb_code }}" target="_blank" rel="noopener" class="ms-1">Track</a>
+        </div>
+        {% endif %}
+        {% if shipment.courier_name %}<div><span class="text-secondary">Courier:</span> {{ shipment.courier_name }}</div>{% endif %}
+        {% if shipment.label_url %}<div><a href="{{ shipment.label_url }}" target="_blank" rel="noopener">Download label</a></div>{% endif %}
+        {% if shipment.error_log %}<div class="text-danger mt-1"><strong>Error:</strong> {{ shipment.error_log }}</div>{% endif %}
+        <div class="mt-2">
+          <a href="https://app.shiprocket.in/seller/orders/all" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm">
+            Open Shiprocket orders panel
+          </a>
+        </div>
+        <div class="text-secondary mt-1" style="font-size: 0.75rem;">
+          In Shiprocket, search by order number <strong>{{ order.order_number }}</strong>{% if shipment.awb_code %} or AWB <strong>{{ shipment.awb_code }}</strong>{% endif %} to find this shipment directly.
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     {% if pod %}
     <div class="card">
       <div class="card-header bg-transparent px-4 py-3"><h3 class="h5 mb-0">Proof of Delivery</h3></div>

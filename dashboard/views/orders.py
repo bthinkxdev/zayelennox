@@ -100,6 +100,7 @@ def order_detail(request: HttpRequest, pk: int) -> HttpResponse:
     history = order.status_history.select_related("changed_by").all()
     payments = order.payment_transactions.select_related("currency").all()
     pod = getattr(order, "proof_of_delivery", None)
+    shipment = getattr(order, "shipment", None)
 
     next_statuses = ALLOWED_STATUS_TRANSITIONS.get(order.order_status, set())
     if next_statuses:
@@ -119,6 +120,7 @@ def order_detail(request: HttpRequest, pk: int) -> HttpResponse:
         "history": history,
         "payments": payments,
         "pod": pod,
+        "shipment": shipment,
         "allowed_choices": allowed_choices,
     }
     return render(request, "dashboard/orders/detail.html", context)

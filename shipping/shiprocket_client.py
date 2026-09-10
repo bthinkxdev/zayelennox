@@ -85,13 +85,41 @@ class ShiprocketClient:
             return token
         except requests.RequestException as exc:
             logger.error("Shiprocket auth failed: %s", exc, exc_info=True)
-            raise ShiprocketAPIError(f"Shiprocket auth failed: {exc}") from exc
+            response = getattr(exc, "response", None)
+            if response is not None:
+                raise ShiprocketAPIError(
+                    f"Shiprocket authentication failed: {self._extract_error_message(response)}"
+                ) from exc
+            raise ShiprocketAPIError("Could not reach Shiprocket to authenticate. Please try again shortly.") from exc
 
     def _headers(self) -> dict:
         return {
             "Authorization": f"Bearer {self.authenticate()}",
             "Content-Type": "application/json",
         }
+
+    def _extract_error_message(self, response) -> str:
+
+        try:
+            body = response.json()
+        except ValueError:
+            return f"Shiprocket returned an error (HTTP {response.status_code})."
+
+        if isinstance(body, dict):
+            message = body.get("message")
+            errors = body.get("errors")
+            if isinstance(errors, dict) and errors:
+                parts = []
+                for field, msgs in errors.items():
+                    if isinstance(msgs, (list, tuple)):
+                        msgs = ", ".join(str(m) for m in msgs)
+                    parts.append(f"{field}: {msgs}")
+                detail = "; ".join(parts)
+                return f"{message}: {detail}" if message else detail
+            if message:
+                return str(message)
+
+        return f"Shiprocket returned an error (HTTP {response.status_code})."
 
     def _request(self, method: str, path: str, *, json=None, params=None, timeout=None):
         url = f"{self.base_url}{path}"
@@ -118,6 +146,17 @@ class ShiprocketClient:
                         response.text[:500],
                     )
                     last_exc = ShiprocketAPIError(f"Shiprocket server error {response.status_code}")
+                elif 400 <= response.status_code < 500:
+                    
+                    message = self._extract_error_message(response)
+                    logger.warning(
+                        "Shiprocket %s %s client error %s: %s",
+                        method,
+                        path,
+                        response.status_code,
+                        response.text[:500],
+                    )
+                    raise ShiprocketAPIError(message)
                 else:
                     response.raise_for_status()
                     return response.json()
@@ -137,7 +176,12 @@ class ShiprocketClient:
             if attempt < self.max_retries:
                 time.sleep(min(2 ** attempt, 5))
 
-        raise ShiprocketAPIError(f"Shiprocket request failed for {path}: {last_exc}")
+        logger.error(
+            "Shiprocket %s %s failed after %s attempts: %s", method, path, self.max_retries, last_exc, exc_info=True
+        )
+        raise ShiprocketAPIError(
+            f"Could not reach Shiprocket for this step after {self.max_retries} attempts. Please try again shortly."
+        )
 
     # ---------- Public API methods ----------
 
