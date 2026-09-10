@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from django.db import models
-from django.utils import timezone
 
 from core.models import TimeStampedModel
 
@@ -62,18 +61,6 @@ class Coupon(TimeStampedModel):
     def __str__(self) -> str:
         return self.code
 
-    @property
-    def is_currently_active(self) -> bool:
-        """is_active flag AND within the valid_from/valid_until window right now."""
-        if not self.is_active:
-            return False
-        now = timezone.now()
-        if self.valid_from and now < self.valid_from:
-            return False
-        if self.valid_until and now > self.valid_until:
-            return False
-        return True
-
 
 class CouponRedemption(TimeStampedModel):
     """Tracks coupon usage per customer."""
@@ -115,14 +102,6 @@ class FlashSale(TimeStampedModel):
 
     def __str__(self) -> str:
         return self.name
-
-    @property
-    def is_currently_active(self) -> bool:
-        """is_active flag AND within the starts_at/ends_at window right now."""
-        if not self.is_active:
-            return False
-        now = timezone.now()
-        return self.starts_at <= now <= self.ends_at
 
 
 class AbandonedCartRecovery(TimeStampedModel):
