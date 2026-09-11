@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "PayU Payment" %} | ZAYE LENNOX{% endblock %}
+
+{% block content %}
+<div class="container page-container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6 text-center">
+      <div class="card shadow-sm p-4 border-0 rounded-3">
+        <div class="mb-3">
+          <i class="ti ti-credit-card text-success fs-1"></i>
+        </div>
+        <h3 class="fw-bold mb-2">{% trans "Complete Your Payment" %}</h3>
+        <p class="text-muted mb-4">{% trans "Order Reference:" %} <strong>{{ order.order_number }}</strong></p>
+
+        <div class="bg-light p-3 rounded mb-4 text-start">
+          <div class="d-flex justify-content-between mb-2">
+            <span>{% trans "Payment Method:" %}</span>
+            <span class="fw-semibold">PayU</span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span>{% trans "Total Amount:" %}</span>
+            <span class="fw-bold fs-5 text-success">{{ order.currency.symbol }} {{ order.total_amount }}</span>
+          </div>
+        </div>
+
+        <p class="text-muted small mb-4">{% trans "Click Pay Now to continue to PayU's secure payment page." %}</p>
+
+        {# form to PayU's hosted checkout page — submitted only on the customer's click, see script below #}
+        <form id="payu-form" action="{{ payu_action_url }}" method="post">
+          <input type="hidden" name="key" value="{{ payu_key }}">
+          <input type="hidden" name="txnid" value="{{ payu_txnid }}">
+          <input type="hidden" name="amount" value="{{ payu_amount }}">
+          <input type="hidden" name="productinfo" value="{{ payu_productinfo }}">
+          <input type="hidden" name="firstname" value="{{ payu_firstname }}">
+          <input type="hidden" name="email" value="{{ payu_email }}">
+          <input type="hidden" name="phone" value="{{ payu_phone }}">
+          <input type="hidden" name="surl" value="{{ surl }}">
+          <input type="hidden" name="furl" value="{{ furl }}">
+          <input type="hidden" name="hash" value="{{ payu_hash }}">
+        </form>
+
+        <button id="payu-button" class="btn btn-floward btn-lg w-100 py-3 mb-2">
+          {% trans "Pay Now" %} ({{ order.currency.symbol }} {{ order.total_amount }})
+        </button>
+        <a href="{{ cancel_url }}" class="btn btn-link text-muted small">{% trans "Cancel and return to checkout" %}</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var form = document.getElementById("payu-form");
+    var button = document.getElementById("payu-button");
+    var submitted = false;
+
+    // Submit only when the customer actually clicks Pay Now — no auto-submit
+    // on page load. An auto-submit here means clicking the browser's Back
+    // button from PayU lands back on this page just long enough to
+    // immediately resubmit and bounce straight back to PayU, with no way to
+    // actually cancel and return to checkout.
+    button.addEventListener("click", function (e) {
+      e.preventDefault();
+      if (submitted) return;
+      submitted = true;
+      button.disabled = true;
+      form.submit();
+    });
+
+    // If the browser restores this page from bfcache (e.g. after Back from
+    // PayU), make sure the button/flag are reset rather than staying stuck
+    // from a previous submit.
+    window.addEventListener("pageshow", function (event) {
+      if (event.persisted) {
+        submitted = false;
+        button.disabled = false;
+      }
+    });
+  });
+</script>
+{% endblock %}

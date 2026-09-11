@@ -78,6 +78,15 @@ def gateway_display_name(gateway_key):
 
 
 @register.filter
+def payment_failure_reason(payment_transaction):
+
+    if payment_transaction is None:
+        return ""
+    metadata = getattr(payment_transaction, "metadata", None) or {}
+    return metadata.get("failure_reason", "")
+
+
+@register.filter
 def primary_image(product):
     """Return the URL of a product's primary (or first) image, else empty string."""
     try:

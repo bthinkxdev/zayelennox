@@ -168,13 +168,22 @@ def checkout_view(request: HttpRequest) -> HttpResponse:
         if last_tx:
             selected_gateway_key = last_tx.gateway_key
 
-    from payments.adapters.concrete import _get_razorpay_credentials
+    from core.models import SiteSettings
+    from payments.adapters.concrete import _get_razorpay_credentials, _get_payu_credentials
     razorpay_key, razorpay_secret = _get_razorpay_credentials()
-    
+    payu_key, payu_salt = _get_payu_credentials()
+
+    site_settings = SiteSettings.objects.first()
+    active_gateway_family = getattr(site_settings, "active_payment_gateway", "razorpay") or "razorpay"
+
     available_gateways = {}
     for key, adapter in PAYMENT_GATEWAYS.items():
-        if key.startswith("razorpay") and (not razorpay_key or not razorpay_secret):
-            continue
+        if key.startswith("razorpay"):
+            if active_gateway_family != "razorpay" or not razorpay_key or not razorpay_secret:
+                continue
+        elif key == "payu":
+            if active_gateway_family != "payu" or not payu_key or not payu_salt:
+                continue
         available_gateways[key] = adapter
 
     from marketing.selectors import has_any_active_coupons
@@ -403,9 +412,20 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
             status=200,
         )
 
-    payment_data = {}
-
     gateway_key = form.cleaned_data["gateway_key"]
+
+    payment_data = {}
+    if gateway_key == "payu":
+        customer_name = ""
+        customer_email = ""
+        if order.customer_profile:
+            customer_name = f"{order.customer_profile.user.first_name} {order.customer_profile.user.last_name}".strip() or order.customer_profile.user.username
+            customer_email = order.customer_profile.user.email
+        elif order.delivery_address_snapshot:
+            customer_name = order.delivery_address_snapshot.get("recipient_name", "")
+            customer_email = order.delivery_address_snapshot.get("email", "")
+        payment_data = {"customer_name": customer_name, "customer_email": customer_email}
+
     process_payment(
         order=order,
         gateway_key=gateway_key,
@@ -414,6 +434,14 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
 
     if gateway_key.startswith("razorpay"):
         pay_url = reverse("checkout:razorpay-pay", kwargs={"order_id": order.pk})
+        if request.headers.get("HX-Request"):
+            response = HttpResponse()
+            response["HX-Redirect"] = pay_url
+            return response
+        return redirect(pay_url)
+
+    if gateway_key == "payu":
+        pay_url = reverse("checkout:payu-pay", kwargs={"order_id": order.pk})
         if request.headers.get("HX-Request"):
             response = HttpResponse()
             response["HX-Redirect"] = pay_url
@@ -692,6 +720,195 @@ def razorpay_callback_view(request: HttpRequest) -> HttpResponse:
             confirm_payment_failed(payment_transaction=payment_tx)
         order_was_buy_now = bool(order.cart_id and getattr(order.cart, "is_buy_now", False))
         return redirect(_checkout_url(buy_now_mode=order_was_buy_now))
+
+
+@require_GET
+@never_cache
+def payu_pay_view(request: HttpRequest, order_id: int) -> HttpResponse:
+    """
+    Render the PayU hosted-checkout redirect page (auto-submitting form).
+
+    """
+    from orders.models import Order
+    from payments.models import PaymentTransaction
+    from payments.adapters.concrete import PayUAdapter, _get_payu_credentials
+    from django.shortcuts import get_object_or_404
+
+    order = get_object_or_404(Order, pk=order_id)
+    if order.payment_transactions.filter(status="success").exists():
+        return redirect(f"{reverse('cms:homepage')}?open_cart=1")
+
+    payment_tx = PaymentTransaction.objects.filter(order=order, gateway_key="payu").last()
+    if payment_tx is None or not payment_tx.external_intent_id:
+        return redirect("checkout:checkout")
+
+    customer_name = ""
+    customer_email = ""
+    customer_phone = ""
+    if order.customer_profile:
+        customer_name = f"{order.customer_profile.user.first_name} {order.customer_profile.user.last_name}".strip() or order.customer_profile.user.username
+        customer_email = order.customer_profile.user.email
+        customer_phone = order.customer_profile.phone
+    elif order.delivery_address_snapshot:
+        customer_name = order.delivery_address_snapshot.get("recipient_name", "")
+        customer_email = order.delivery_address_snapshot.get("email", "")
+        customer_phone = order.delivery_address_snapshot.get("phone", "")
+
+    merchant_key, merchant_salt = _get_payu_credentials()
+    txnid = payment_tx.external_intent_id
+    amount_str = f"{payment_tx.amount:.2f}"
+    productinfo = f"Order {order.order_number}".strip() or "Order Payment"
+    firstname = (customer_name or "Customer").strip()[:60] or "Customer"
+    email = (customer_email or "guest@example.com").strip()
+
+    request_hash = ""
+    display_key = merchant_key
+    if merchant_key and merchant_salt:
+        request_hash = PayUAdapter.build_request_hash(
+            merchant_key=merchant_key,
+            merchant_salt=merchant_salt,
+            txnid=txnid,
+            amount=amount_str,
+            productinfo=productinfo,
+            firstname=firstname,
+            email=email,
+        )
+    else:
+        display_key = display_key or "payu_test_mock"
+
+    #store order_id in session so the callback can retrieve it if PayU omits it
+    request.session["payu_order_pk"] = order.pk
+
+    callback_url = request.build_absolute_uri(reverse("checkout:payu-callback"))
+    order_was_buy_now = bool(order.cart_id and getattr(order.cart, "is_buy_now", False))
+    cancel_url = request.build_absolute_uri(_checkout_url(buy_now_mode=order_was_buy_now))
+
+    return render(
+        request,
+        "checkout/payu_pay.html",
+        {
+            "order": order,
+            "payu_action_url": PayUAdapter.base_url(),
+            "payu_key": display_key,
+            "payu_txnid": txnid,
+            "payu_amount": amount_str,
+            "payu_productinfo": productinfo,
+            "payu_firstname": firstname,
+            "payu_email": email,
+            "payu_phone": customer_phone,
+            "payu_hash": request_hash,
+            "surl": callback_url,
+            "furl": callback_url,
+            "cancel_url": cancel_url,
+        },
+    )
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def payu_callback_view(request: HttpRequest) -> HttpResponse:
+    """
+    Handle PayU's browser POST redirect after payment (used as both the
+    success URL ``surl`` and failure URL ``furl`` — PayU's ``status`` field
+    tells them apart), mirroring razorpay_callback_view.
+
+    """
+    import logging
+
+    from payments.models import PaymentTransaction
+    from payments.adapters.concrete import PayUAdapter, _get_payu_credentials
+    from payments.services import confirm_payment_success, confirm_payment_failed
+    from django.contrib import messages
+    from django.shortcuts import get_object_or_404
+    from orders.models import Order
+
+    logger = logging.getLogger(__name__)
+
+    status = request.POST.get("status", "")
+    txnid = request.POST.get("txnid", "")
+    amount = request.POST.get("amount", "")
+    productinfo = request.POST.get("productinfo", "")
+    firstname = request.POST.get("firstname", "")
+    email = request.POST.get("email", "")
+    mihpayid = request.POST.get("mihpayid", "")
+    received_hash = request.POST.get("hash", "")
+
+    payment_tx = PaymentTransaction.objects.filter(
+        external_intent_id=txnid,
+        gateway_key="payu",
+    ).last()
+
+    order_id = request.session.get("payu_order_pk") or (payment_tx.order_id if payment_tx else None)
+    request.session.pop("payu_order_pk", None)
+
+    if not order_id or payment_tx is None:
+        logger.warning(
+            "PayU callback for unknown transaction: txnid=%s status=%s post_keys=%s",
+            txnid, status, sorted(request.POST.keys()),
+        )
+        messages.error(request, "We couldn't find that payment attempt. Please try again.")
+        return redirect("checkout:checkout")
+
+    order = get_object_or_404(Order, pk=order_id)
+
+    merchant_key, merchant_salt = _get_payu_credentials()
+    adapter = PayUAdapter()
+    is_valid = adapter.verify_response_hash(
+        merchant_salt=merchant_salt,
+        merchant_key=merchant_key,
+        status=status,
+        txnid=txnid,
+        amount=amount,
+        productinfo=productinfo,
+        firstname=firstname,
+        email=email,
+        received_hash=received_hash,
+    )
+
+    payment_succeeded = is_valid and status.lower() == "success"
+
+    reason = ""
+    if not payment_succeeded:
+        if not is_valid:
+            reason = (
+                "Payment verification failed (response hash mismatch). This "
+                "almost always means the PayU Merchant Salt in Settings "
+                "doesn't match your PayU dashboard — double-check it and "
+                "make sure Test Mode matches the credentials you're using."
+            )
+        else:
+            reason = (
+                request.POST.get("error_Message")
+                or request.POST.get("field9")
+                or request.POST.get("unmappedstatus")
+                or (f'PayU reported status "{status}".' if status else "PayU did not report a status.")
+            )
+
+    raw_response = {
+        k: v for k, v in request.POST.items()
+        if k not in ("csrfmiddlewaretoken", "hash")
+    }
+    metadata_update = {"payu_callback": raw_response, "hash_valid": is_valid}
+    if reason:
+        metadata_update["failure_reason"] = reason
+    payment_tx.metadata = {**(payment_tx.metadata or {}), **metadata_update}
+    payment_tx.save(update_fields=["metadata", "updated_at"])
+
+    order_was_buy_now = bool(order.cart_id and getattr(order.cart, "is_buy_now", False))
+
+    if payment_succeeded:
+        #confirm_payment_success is idempotent — safe even if a PayU webhook
+        #already confirmed this same payment.
+        confirm_payment_success(payment_transaction=payment_tx, external_transaction_id=mihpayid)
+        return redirect("checkout:confirmation", order_id=order.pk)
+
+    logger.warning(
+        "PayU payment not successful: order=%s txnid=%s status=%s hash_valid=%s reason=%s",
+        order.pk, txnid, status, is_valid, reason,
+    )
+    confirm_payment_failed(payment_transaction=payment_tx)
+    messages.error(request, f"Payment failed: {reason}" if reason else "Payment failed. Please try again.")
+    return redirect(_checkout_url(buy_now_mode=order_was_buy_now))
 
 
 @require_POST

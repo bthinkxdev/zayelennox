@@ -274,6 +274,65 @@ def handle_payment_webhook(
 
 
 
+@transaction.atomic
+def handle_payu_webhook_event(
+    *,
+    txnid: str,
+    status: str,
+    mihpayid: str,
+    raw_response: dict[str, Any] | None = None,
+) -> PaymentTransaction | None:
+    """
+    Converge a signature-verified, server-to-server PayU webhook delivery onto
+    confirm_payment_success/failed — the same convergence point the PayU
+    browser callback (checkout.views.payu_callback_view) uses, so a webhook
+    arriving before, after, or instead of the browser redirect is always safe
+    (confirm_payment_success/failed are both idempotent — whichever path
+    reaches a transaction first wins, and the other becomes a no-op).
+
+    Caller (payments.views.payu_webhook_view) must verify the PayU reverse
+    hash before calling this — by the time we get here the hash is already
+    known-good, so this only has to record PayU's own decline reason (when
+    present, e.g. ``error_Message``/``unmappedstatus``) and converge status,
+    the same way the browser callback does, so the dashboard's failure_reason
+    (dashboard.templatetags.dashboard_extras.payment_failure_reason) shows a
+    consistent explanation regardless of which path delivered the outcome.
+    """
+    payment_tx = PaymentTransaction.objects.filter(
+        external_intent_id=txnid,
+        gateway_key="payu",
+    ).first()
+    if payment_tx is None:
+        logger.warning("Unknown PayU transaction for webhook: txnid=%s status=%s", txnid, status)
+        return None
+
+    raw = raw_response or {}
+    succeeded = status.lower() == "success"
+    reason = ""
+    if not succeeded:
+        reason = (
+            raw.get("error_Message")
+            or raw.get("field9")
+            or raw.get("unmappedstatus")
+            or (f'PayU reported status "{status}".' if status else "PayU did not report a status.")
+        )
+
+    metadata_update: dict[str, Any] = {"payu_webhook": raw}
+    if reason:
+        metadata_update["failure_reason"] = reason
+    payment_tx.metadata = {**(payment_tx.metadata or {}), **metadata_update}
+    payment_tx.save(update_fields=["metadata", "updated_at"])
+
+    if succeeded:
+        return confirm_payment_success(payment_transaction=payment_tx, external_transaction_id=mihpayid)
+
+    logger.warning(
+        "PayU webhook: payment not successful. payment_tx=%s txnid=%s status=%s reason=%s",
+        payment_tx.pk, txnid, status, reason,
+    )
+    return confirm_payment_failed(payment_transaction=payment_tx)
+
+
 def verify_razorpay_webhook_signature(*, payload: bytes, signature: str) -> bool:
     """
     Verify a real Razorpay webhook's ``X-Razorpay-Signature`` header.

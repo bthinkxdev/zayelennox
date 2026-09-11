@@ -243,6 +243,33 @@ class SiteSettings(TimeStampedModel):
         verbose_name="Razorpay Key Secret",
         help_text="Razorpay Key Secret / Test Key Secret for payment signature verification.",
     )
+    active_payment_gateway = models.CharField(
+        max_length=20,
+        choices=[("razorpay", "Razorpay"), ("payu", "PayU")],
+        default="razorpay",
+        verbose_name="Active Payment Gateway",
+        help_text="Payment gateway customers pay through at checkout. Only this "
+        "gateway's credentials are used — switching here does not affect the "
+        "existing checkout or shipping flow.",
+    )
+    payu_merchant_key = models.CharField(
+        max_length=120,
+        blank=True,
+        verbose_name="PayU Merchant Key",
+        help_text="PayU Merchant Key for payment processing.",
+    )
+    payu_merchant_salt = models.CharField(
+        max_length=120,
+        blank=True,
+        verbose_name="PayU Merchant Salt",
+        help_text="PayU Merchant Salt for payment hash verification.",
+    )
+    payu_test_mode = models.BooleanField(
+        default=True,
+        verbose_name="PayU Test Mode",
+        help_text="Use PayU's test/sandbox endpoint. Turn off only once you have "
+        "live PayU credentials configured above.",
+    )
     shiprocket_email = models.EmailField(
         blank=True,
         verbose_name="Shiprocket Email",

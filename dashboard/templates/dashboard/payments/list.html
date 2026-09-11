@@ -42,7 +42,12 @@
             <td><a href="{% url 'dashboard:order-detail' pay.order_id %}">{{ pay.order.order_number }}</a></td>
             <td>{{ pay.gateway_key|gateway_display_name }}</td>
             <td>{{ pay.amount|floatformat:2 }} {{ pay.currency.code }}</td>
-            <td><span class="badge bg-secondary-subtle text-secondary">{{ pay.get_status_display }}</span></td>
+            <td>
+              <span class="badge bg-secondary-subtle text-secondary">{{ pay.get_status_display }}</span>
+              {% with reason=pay|payment_failure_reason %}
+              {% if reason %}<div class="small text-danger mt-1" style="max-width: 260px; white-space: normal;">{{ reason }}</div>{% endif %}
+              {% endwith %}
+            </td>
             <td class="small text-muted">{{ pay.external_transaction_id|default:"—" }}</td>
             <td>{{ pay.created_at|date:"M d, Y H:i" }}</td>
           </tr>

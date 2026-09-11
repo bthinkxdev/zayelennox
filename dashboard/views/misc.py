@@ -44,6 +44,7 @@ def settings_view(request: HttpRequest) -> HttpResponse:
             "page_title": "Settings",
             "form": form,
             "razorpay_webhook_url": request.build_absolute_uri(reverse("payments:razorpay-webhook")),
+            "payu_webhook_url": request.build_absolute_uri(reverse("payments:payu-webhook")),
             "shiprocket_webhook_url": request.build_absolute_uri(reverse("shipping:shiprocket-webhook")),
         },
     )

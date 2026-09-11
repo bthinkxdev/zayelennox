@@ -12,17 +12,30 @@
           {% csrf_token %}
           <div class="row">
             {% for field in form %}
-            {% if field.name == 'razorpay_key_id' %}
+            {% if field.name == 'active_payment_gateway' %}
             <div class="col-12 mt-3 mb-2">
               <h5 class="border-bottom pb-2 fw-semibold text-dark">Payment Integration</h5>
+              <div class="form-text mb-2">Choose which gateway customers pay through at checkout. Only the selected gateway's fields below are used — switching this never touches the checkout or shipping flow itself.</div>
             </div>
-            <div class="col-12 mb-3">
+            {% endif %}
+            {% if field.name == 'razorpay_key_id' %}
+            <div class="col-12 mb-3" data-gateway-group="razorpay">
               <label class="form-label">Razorpay Webhook URL</label>
               <div class="input-group">
                 <input type="text" class="form-control webhook-url-field" value="{{ razorpay_webhook_url }}" readonly>
                 <button type="button" class="btn btn-outline-secondary webhook-copy-btn">Copy</button>
               </div>
               <div class="form-text">Paste this into your Razorpay dashboard's webhook settings.</div>
+            </div>
+            {% endif %}
+            {% if field.name == 'payu_merchant_key' %}
+            <div class="col-12 mb-3" data-gateway-group="payu">
+              <label class="form-label">PayU Webhook URL</label>
+              <div class="input-group">
+                <input type="text" class="form-control webhook-url-field" value="{{ payu_webhook_url }}" readonly>
+                <button type="button" class="btn btn-outline-secondary webhook-copy-btn">Copy</button>
+              </div>
+              <div class="form-text">Paste this into your PayU dashboard's webhook / server callback settings.</div>
             </div>
             {% endif %}
             {% if field.name == 'shiprocket_email' %}
@@ -38,7 +51,8 @@
               <div class="form-text">Paste this into your Shiprocket dashboard's webhook settings, along with the webhook token below.</div>
             </div>
             {% endif %}
-            <div class="{% if field.field.widget.input_type == 'checkbox' %}col-12{% else %}col-md-6{% endif %} mb-3">
+            <div class="{% if field.field.widget.input_type == 'checkbox' %}col-12{% else %}col-md-6{% endif %} mb-3"
+              {% if field.name == 'razorpay_key_id' or field.name == 'razorpay_key_secret' %}data-gateway-group="razorpay"{% elif field.name == 'payu_merchant_key' or field.name == 'payu_merchant_salt' %}data-gateway-group="payu"{% endif %}>
               {% if field.name == 'logo' %}
                 <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                 
@@ -123,5 +137,21 @@ document.querySelectorAll(".webhook-copy-btn").forEach(function (btn) {
     });
   });
 });
+
+
+(function () {
+  var gatewaySelect = document.getElementById("id_active_payment_gateway");
+  if (!gatewaySelect) return;
+
+  function applyGatewayVisibility() {
+    var selected = gatewaySelect.value;
+    document.querySelectorAll("[data-gateway-group]").forEach(function (el) {
+      el.style.display = (el.getAttribute("data-gateway-group") === selected) ? "" : "none";
+    });
+  }
+
+  gatewaySelect.addEventListener("change", applyGatewayVisibility);
+  applyGatewayVisibility();
+})();
 </script>
 {% endblock %}

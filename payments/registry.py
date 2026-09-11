@@ -8,6 +8,7 @@ from payments.adapters.concrete import (
     ApplePayAdapter,
     CardGatewayAdapter,
     GooglePayAdapter,
+    PayUAdapter,
     RazorpayAdapter,
     RazorpayUPIAdapter,
     RazorpayCardAdapter,
@@ -23,6 +24,7 @@ PAYMENT_GATEWAYS: dict[str, PaymentGatewayAdapter] = {
     RazorpayCardAdapter.key: RazorpayCardAdapter(),
     RazorpayNetbankingAdapter.key: RazorpayNetbankingAdapter(),
     RazorpayWalletAdapter.key: RazorpayWalletAdapter(),
+    PayUAdapter.key: PayUAdapter(),
 }
 
 
