@@ -266,6 +266,28 @@
           <span>{% trans "Subtotal" %}</span>
           <span id="summary-subtotal" data-value="{{ summary.subtotal|stringformat:'f' }}">{{ display_currency.symbol }}{{ summary.subtotal }}</span>
         </div>
+        {% if gst_breakdown %}
+        <div class="text-muted" style="font-size: 0.7rem;">{% trans "Prices are inclusive of GST" %}</div>
+        <div class="d-flex justify-content-between small pt-1 text-muted">
+          <span>{% trans "Taxable Value" %}</span>
+          <span>{{ display_currency.symbol }}{{ gst_breakdown.total_taxable_value }}</span>
+        </div>
+        {% if gst_breakdown.is_interstate %}
+        <div class="d-flex justify-content-between small pt-1 text-muted">
+          <span>{% trans "IGST" %}</span>
+          <span>{{ display_currency.symbol }}{{ gst_breakdown.split.igst }}</span>
+        </div>
+        {% else %}
+        <div class="d-flex justify-content-between small pt-1 text-muted">
+          <span>{% trans "CGST" %}</span>
+          <span>{{ display_currency.symbol }}{{ gst_breakdown.split.cgst }}</span>
+        </div>
+        <div class="d-flex justify-content-between small pt-1 text-muted">
+          <span>{% trans "SGST" %}</span>
+          <span>{{ display_currency.symbol }}{{ gst_breakdown.split.sgst }}</span>
+        </div>
+        {% endif %}
+        {% endif %}
         <div class="d-flex justify-content-between small pt-1">
           <span>{% trans "Shipping" %}</span>
           <span id="summary-shipping" data-server-value="{{ summary.delivery_charge|stringformat:'f' }}" data-value="{{ summary.delivery_charge|stringformat:'f' }}">{{ display_currency.symbol }}{{ summary.delivery_charge }}</span>

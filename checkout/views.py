@@ -186,6 +186,10 @@ def checkout_view(request: HttpRequest) -> HttpResponse:
                 continue
         available_gateways[key] = adapter
 
+    from checkout.selectors import get_cart_gst_breakdown
+    buyer_state = session.address.state_name if session.address_id else ""
+    gst_breakdown = get_cart_gst_breakdown(summary=summary, buyer_state=buyer_state)
+
     from marketing.selectors import has_any_active_coupons
     return render(
         request,
@@ -193,6 +197,7 @@ def checkout_view(request: HttpRequest) -> HttpResponse:
         {
             "cart": cart,
             "summary": summary,
+            "gst_breakdown": gst_breakdown,
             "checkout_session": session,
             "addresses": addresses,
             "payment_gateways": available_gateways,

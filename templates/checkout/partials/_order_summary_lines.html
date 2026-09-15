@@ -25,6 +25,9 @@
       <div class="text-muted" style="font-size: 0.75rem;">{{ line.variant.name }}</div>
       {% endif %}
       <div class="text-muted" style="font-size: 0.75rem;">{% trans "Qty:" %} {{ line.quantity }} &times; {{ display_currency.symbol }} {{ line.unit_price_at_add }}</div>
+      {% if line.effective_hsn_code %}
+      <div class="text-muted" style="font-size: 0.7rem;">{% trans "HSN" %} {{ line.effective_hsn_code }} &middot; {% trans "Incl. GST" %} {{ line.effective_gst_rate_percent }}%</div>
+      {% endif %}
 
       {% if not line.is_in_stock %}
       <div class="d-flex align-items-center gap-2 mt-1">

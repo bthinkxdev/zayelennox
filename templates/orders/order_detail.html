@@ -80,6 +80,9 @@
                 <div class="col-12 col-sm-4 text-sm-end mt-2 mt-sm-0">
                   <span class="text-muted small d-block d-sm-none">{% trans "Price" %}</span>
                   <span class="fw-bold">{% money_label item.unit_price order.currency %}</span>
+                  {% if item.hsn_code_snapshot %}
+                  <span class="text-muted d-block" style="font-size: 0.7rem;">{% trans "HSN" %} {{ item.hsn_code_snapshot }}</span>
+                  {% endif %}
                 </div>
               </div>
             </li>
@@ -174,6 +177,27 @@
             <span class="text-muted">{% trans "Subtotal" %}</span>
             <span>{% money_label order.subtotal order.currency %}</span>
           </div>
+          {% if order.has_gst_details %}
+          <div class="d-flex justify-content-between mb-2 text-muted" style="font-size: 0.8rem;">
+            <span>{% trans "Taxable Value" %}</span>
+            <span>{% money_label order.total_taxable_value order.currency %}</span>
+          </div>
+          {% if order.is_interstate %}
+          <div class="d-flex justify-content-between mb-2 text-muted" style="font-size: 0.8rem;">
+            <span>{% trans "IGST" %}</span>
+            <span>{% money_label order.tax_breakdown.igst order.currency %}</span>
+          </div>
+          {% else %}
+          <div class="d-flex justify-content-between mb-2 text-muted" style="font-size: 0.8rem;">
+            <span>{% trans "CGST" %}</span>
+            <span>{% money_label order.tax_breakdown.cgst order.currency %}</span>
+          </div>
+          <div class="d-flex justify-content-between mb-2 text-muted" style="font-size: 0.8rem;">
+            <span>{% trans "SGST" %}</span>
+            <span>{% money_label order.tax_breakdown.sgst order.currency %}</span>
+          </div>
+          {% endif %}
+          {% endif %}
           {% if order.coupon_discount > 0 %}
           <div class="d-flex justify-content-between mb-2 text-success">
             <span class="text-muted">{% trans "Discount" %}</span>

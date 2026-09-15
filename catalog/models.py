@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator, MaxValueValidator, MinValueValidator
@@ -158,6 +160,19 @@ class Product(TimeStampedModel):
         blank=True,
         verbose_name="Purchase Price",
         help_text="Optional",
+    )
+    hsn_code = models.CharField(
+        max_length=8,
+        blank=True,
+        verbose_name="HSN/SAC Code",
+        help_text="4-8 digit HSN (goods) or SAC (services) code shown on GST invoices.",
+    )
+    gst_rate_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("18.00"),
+        verbose_name="GST Rate (%)",
+        help_text="GST % already included in this product's prices. Common slabs: 0/5/12/18/28.",
     )
     is_rental = models.BooleanField(default=False, db_index=True, verbose_name="Is Rental Eligible")
     rental_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Rental Price")
@@ -354,6 +369,21 @@ class ProductVariant(TimeStampedModel):
         help_text="Leave blank to fall back to the product's purchase price (offset by "
         "this variant's price difference).",
     )
+    hsn_code = models.CharField(
+        max_length=8,
+        null=True,
+        blank=True,
+        verbose_name="HSN/SAC override",
+        help_text="Leave blank to inherit the product's HSN/SAC code.",
+    )
+    gst_rate_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="GST Rate override (%)",
+        help_text="Leave blank to inherit the product's GST rate.",
+    )
     sku_suffix = models.CharField(
         max_length=32,
         verbose_name="SKU suffix",
@@ -439,6 +469,18 @@ class ProductVariant(TimeStampedModel):
         if self.product.purchase_price is not None:
             return self.product.purchase_price + self.price_delta
         return None
+
+    @property
+    def effective_hsn_code(self):
+        """This variant's HSN/SAC code, falling back to the product's."""
+        return self.hsn_code if self.hsn_code else self.product.hsn_code
+
+    @property
+    def effective_gst_rate_percent(self):
+        """This variant's GST rate, falling back to the product's."""
+        if self.gst_rate_percent is not None:
+            return self.gst_rate_percent
+        return self.product.gst_rate_percent
 
     def get_shipping_dims(self) -> dict:
         """

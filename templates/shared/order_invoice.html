@@ -181,15 +181,23 @@
                             contact@{{ request.get_host }}<br>
                         {% endif %}
                         {% if site_settings.whatsapp_number %}
-                            {{ site_settings.whatsapp_number }}
+                            {{ site_settings.whatsapp_number }}<br>
+                        {% endif %}
+                        {% if order.has_gst_details %}
+                            {% if site_settings.gstin %}GSTIN: {{ site_settings.gstin }}<br>{% endif %}
+                            {% if site_settings.pan_number %}PAN: {{ site_settings.pan_number }}<br>{% endif %}
+                            {% if site_settings.registered_state %}State: {{ site_settings.registered_state }}{% endif %}
                         {% endif %}
                     </div>
                 </div>
             </div>
             <div class="invoice-meta">
-                <div class="invoice-title">INVOICE</div>
+                <div class="invoice-title">{% if order.has_gst_details %}TAX INVOICE{% else %}INVOICE{% endif %}</div>
                 <div class="invoice-number">#{{ order.order_number }}</div>
                 <div class="invoice-date">Date: {{ order.created_at|date:"M d, Y" }}</div>
+                {% if order.has_gst_details %}
+                <div class="invoice-date">Place of Supply: {{ order.delivery_address_snapshot.state|default:"—" }}</div>
+                {% endif %}
             </div>
         </div>
 
@@ -262,8 +270,13 @@
             <thead>
                 <tr>
                     <th>Item Description</th>
+                    {% if order.has_gst_details %}<th>HSN/SAC</th>{% endif %}
                     <th>Price/Qty</th>
                     <th>Qty</th>
+                    {% if order.has_gst_details %}
+                    <th>Taxable Value</th>
+                    <th>Tax</th>
+                    {% endif %}
                     <th>Total</th>
                 </tr>
             </thead>
@@ -276,8 +289,13 @@
                             <span class="item-variant">{{ item.variant.name }}</span>
                         {% endif %}
                     </td>
+                    {% if order.has_gst_details %}<td>{{ item.hsn_code_snapshot|default:"—" }}</td>{% endif %}
                     <td>{% money_label item.unit_price order.currency %}</td>
                     <td>{{ item.quantity }}</td>
+                    {% if order.has_gst_details %}
+                    <td>{% money_label item.taxable_value order.currency %}</td>
+                    <td>{% money_label item.tax_amount order.currency %} ({{ item.gst_rate_percent_snapshot }}%)</td>
+                    {% endif %}
                     <td>{{ order.currency.symbol }} {% widthratio item.unit_price 1 item.quantity %}</td>
                 </tr>
                 {% endfor %}
@@ -290,6 +308,27 @@
                     <td>Subtotal</td>
                     <td>{% money_label order.subtotal order.currency %}</td>
                 </tr>
+                {% if order.has_gst_details %}
+                <tr>
+                    <td>Total Taxable Value</td>
+                    <td>{% money_label order.total_taxable_value order.currency %}</td>
+                </tr>
+                {% if order.is_interstate %}
+                <tr>
+                    <td>IGST</td>
+                    <td>{% money_label order.tax_breakdown.igst order.currency %}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td>CGST</td>
+                    <td>{% money_label order.tax_breakdown.cgst order.currency %}</td>
+                </tr>
+                <tr>
+                    <td>SGST</td>
+                    <td>{% money_label order.tax_breakdown.sgst order.currency %}</td>
+                </tr>
+                {% endif %}
+                {% endif %}
                 {% if order.delivery_charge > 0 %}
                 <tr>
                     <td>Delivery Charge</td>

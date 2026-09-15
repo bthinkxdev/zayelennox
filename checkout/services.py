@@ -13,6 +13,7 @@ from cart.models import Cart, CartItem
 from cart.selectors import get_cart_summary
 from checkout.exceptions import CheckoutSessionError
 from checkout.models import CheckoutSession, CheckoutSessionStatus
+from checkout.selectors import get_cart_gst_breakdown
 
 from marketing.models import Coupon
 from marketing.services import record_coupon_redemption
@@ -165,6 +166,8 @@ def place_order(
             "country": "India",
         }
 
+    gst_breakdown = get_cart_gst_breakdown(summary=summary, buyer_state=address_snapshot.get("state", ""))
+
     try:
         order = Order.objects.create(
             customer_profile=customer_profile,
@@ -177,6 +180,9 @@ def place_order(
             coupon_discount=summary.coupon_discount,
             delivery_charge=delivery_charge,
             total_amount=grand_total,
+            is_interstate=gst_breakdown.is_interstate,
+            total_taxable_value=gst_breakdown.total_taxable_value,
+            total_tax_amount=gst_breakdown.total_tax_amount,
             currency=session.cart.currency,
             delivery_address_snapshot=address_snapshot,
             invoice_details=session.invoice_details,
@@ -184,13 +190,17 @@ def place_order(
     except IntegrityError:
         return Order.objects.get(idempotency_key=idempotency_key)
 
-    for line in summary.lines:
+    for line, gst_line in zip(summary.lines, gst_breakdown.lines):
         OrderItem.objects.create(
             order=order,
             product=line.product,
             variant=line.variant,
             quantity=line.quantity,
             unit_price=line.unit_price_at_add,
+            hsn_code_snapshot=gst_line.hsn_code,
+            gst_rate_percent_snapshot=gst_line.gst_rate_percent,
+            taxable_value=gst_line.taxable_value,
+            tax_amount=gst_line.tax_amount,
         )
 
     if session.cart.coupon_code:

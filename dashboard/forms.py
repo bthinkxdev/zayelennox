@@ -95,6 +95,8 @@ class ProductForm(SlugAutoMixin):
             "base_price",
             "mrp",
             "purchase_price",
+            "hsn_code",
+            "gst_rate_percent",
 
             "color",
             "stock_quantity",
@@ -122,7 +124,8 @@ class ProductForm(SlugAutoMixin):
        
         self._variants_formset = variants_formset
         self.fields["slug"].required = False
-        
+        self.fields["hsn_code"].required = True
+
         for name in ("sku", "base_price", "mrp", "purchase_price", *_DIMENSION_FIELDS):
             self.fields[name].required = False
         
@@ -343,6 +346,8 @@ class ProductVariantForm(forms.ModelForm):
             "stock_quantity",
             "mrp",
             "purchase_price",
+            "hsn_code",
+            "gst_rate_percent",
             "weight_kg",
             "length_cm",
             "width_cm",
@@ -356,6 +361,8 @@ class ProductVariantForm(forms.ModelForm):
             }),
             "mrp": forms.NumberInput(attrs={"placeholder": "e.g. 599.00", "step": "0.01"}),
             "purchase_price": forms.NumberInput(attrs={"placeholder": "Optional", "step": "0.01"}),
+            "hsn_code": forms.TextInput(attrs={"placeholder": "Leave blank to use product's HSN"}),
+            "gst_rate_percent": forms.NumberInput(attrs={"placeholder": "Leave blank to use product's rate", "step": "0.01"}),
             "weight_kg": forms.NumberInput(attrs={"placeholder": "Product default", "step": "0.001"}),
             "length_cm": forms.NumberInput(attrs={"placeholder": "Product default", "step": "0.01"}),
             "width_cm": forms.NumberInput(attrs={"placeholder": "Product default", "step": "0.01"}),
@@ -370,7 +377,7 @@ class ProductVariantForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for name in ("weight_kg", "length_cm", "width_cm", "height_cm", "mrp", "purchase_price"):
+        for name in ("weight_kg", "length_cm", "width_cm", "height_cm", "mrp", "purchase_price", "hsn_code", "gst_rate_percent"):
             self.fields[name].required = False
         
         if self.instance.pk and self.instance.product_id:
@@ -789,6 +796,9 @@ class SiteSettingsForm(forms.ModelForm):
         "twitter_url",
         "whatsapp_number",
         "vendor_email",
+        "gstin",
+        "pan_number",
+        "registered_state",
         "tax_rate_percent",
         "default_shipping_charge",
         "active_payment_gateway",
@@ -817,6 +827,9 @@ class SiteSettingsForm(forms.ModelForm):
             "twitter_url",
             "whatsapp_number",
             "vendor_email",
+            "gstin",
+            "pan_number",
+            "registered_state",
             "tax_rate_percent",
             "default_shipping_charge",
             "active_payment_gateway",

@@ -102,6 +102,20 @@ class CartSummaryLine:
         return self.available_stock > 0
 
     @property
+    def effective_hsn_code(self) -> str:
+        """HSN/SAC code for this line: the variant's own if set, else the product's."""
+        if self.variant is not None:
+            return self.variant.effective_hsn_code
+        return self.product.hsn_code
+
+    @property
+    def effective_gst_rate_percent(self):
+        """GST % for this line: the variant's own if set, else the product's."""
+        if self.variant is not None:
+            return self.variant.effective_gst_rate_percent
+        return self.product.gst_rate_percent
+
+    @property
     def display_image(self):
         """
         The thumbnail this line should show: the selected variant's own

@@ -19,25 +19,36 @@
       </div>
       <div class="table-responsive">
         <table class="table mb-0 align-middle">
-          <thead class="table-light"><tr><th>Product</th><th>Variant</th><th>Qty</th><th>Unit price</th><th>Line total</th></tr></thead>
+          <thead class="table-light"><tr><th>Product</th><th>Variant</th><th>HSN</th><th>Qty</th><th>Unit price</th><th>Tax</th><th>Line total</th></tr></thead>
           <tbody>
             {% for item in items %}
             <tr>
               <td>{{ item.product.name }}</td>
               <td>{{ item.variant.name|default:"—" }}</td>
+              <td>{{ item.hsn_code_snapshot|default:"—" }}</td>
               <td>{{ item.quantity }}</td>
               <td>{{ item.unit_price|floatformat:2 }}</td>
+              <td>{% if item.hsn_code_snapshot %}{{ item.tax_amount|floatformat:2 }} ({{ item.gst_rate_percent_snapshot }}%){% else %}—{% endif %}</td>
               <td>{{ item.quantity|floatformat:0 }} × {{ item.unit_price|floatformat:2 }}</td>
             </tr>
             {% empty %}
-            <tr><td colspan="5" class="text-center text-secondary py-4">No items.</td></tr>
+            <tr><td colspan="7" class="text-center text-secondary py-4">No items.</td></tr>
             {% endfor %}
           </tbody>
           <tfoot>
-            <tr><td colspan="4" class="text-end">Subtotal</td><td>{{ order.subtotal|floatformat:2 }}</td></tr>
-            <tr><td colspan="4" class="text-end">Coupon discount</td><td>-{{ order.coupon_discount|floatformat:2 }}</td></tr>
-            <tr><td colspan="4" class="text-end">Delivery</td><td>{{ order.delivery_charge|floatformat:2 }}</td></tr>
-            <tr class="fw-bold"><td colspan="4" class="text-end">Total</td><td>{{ order.total_amount|floatformat:2 }} {% if order.currency %}{{ order.currency.code }}{% endif %}</td></tr>
+            <tr><td colspan="6" class="text-end">Subtotal</td><td>{{ order.subtotal|floatformat:2 }}</td></tr>
+            {% if order.has_gst_details %}
+            <tr><td colspan="6" class="text-end text-secondary">Taxable Value</td><td>{{ order.total_taxable_value|floatformat:2 }}</td></tr>
+            {% if order.is_interstate %}
+            <tr><td colspan="6" class="text-end text-secondary">IGST</td><td>{{ order.tax_breakdown.igst|floatformat:2 }}</td></tr>
+            {% else %}
+            <tr><td colspan="6" class="text-end text-secondary">CGST</td><td>{{ order.tax_breakdown.cgst|floatformat:2 }}</td></tr>
+            <tr><td colspan="6" class="text-end text-secondary">SGST</td><td>{{ order.tax_breakdown.sgst|floatformat:2 }}</td></tr>
+            {% endif %}
+            {% endif %}
+            <tr><td colspan="6" class="text-end">Coupon discount</td><td>-{{ order.coupon_discount|floatformat:2 }}</td></tr>
+            <tr><td colspan="6" class="text-end">Delivery</td><td>{{ order.delivery_charge|floatformat:2 }}</td></tr>
+            <tr class="fw-bold"><td colspan="6" class="text-end">Total</td><td>{{ order.total_amount|floatformat:2 }} {% if order.currency %}{{ order.currency.code }}{% endif %}</td></tr>
           </tfoot>
         </table>
       </div>

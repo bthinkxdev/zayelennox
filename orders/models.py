@@ -5,6 +5,7 @@ from __future__ import annotations
 from django.conf import settings
 from django.db import models
 
+from catalog.tax import split_by_supply_type
 from core.models import TimeStampedModel
 
 
@@ -84,6 +85,13 @@ class Order(TimeStampedModel):
         verbose_name="Total amount",
         help_text="Order total in the customer's checkout currency.",
     )
+    is_interstate = models.BooleanField(
+        default=False,
+        verbose_name="Interstate supply",
+        help_text="Snapshotted at placement from seller vs delivery state. Not re-derived later.",
+    )
+    total_taxable_value = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     currency = models.ForeignKey(
         "core.Currency",
         on_delete=models.PROTECT,
@@ -140,6 +148,23 @@ class Order(TimeStampedModel):
             return "Unknown"
         return tx.get_status_display()
 
+    @property
+    def has_gst_details(self) -> bool:
+        """
+        Whether this order has GST data to show at all.
+
+        Orders placed before GST billing was added have no HSN snapshot on
+        any line, so every GST-display template gates on this rather than
+        on tax_amount == 0 (which is also true for a legitimately 0%-rated
+        new order) — historical orders keep rendering exactly as before.
+        """
+        return any(item.hsn_code_snapshot for item in self.items.all())
+
+    @property
+    def tax_breakdown(self) -> dict:
+        """CGST/SGST/IGST split of this order's total_tax_amount."""
+        return split_by_supply_type(tax_amount=self.total_tax_amount, is_interstate=self.is_interstate)
+
 
 class OrderItem(TimeStampedModel):
     """Immutable purchased line on an order."""
@@ -170,6 +195,17 @@ class OrderItem(TimeStampedModel):
         decimal_places=2,
         verbose_name="Unit price",
     )
+    hsn_code_snapshot = models.CharField(max_length=8, blank=True, verbose_name="HSN/SAC Code")
+    gst_rate_percent_snapshot = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0, verbose_name="GST Rate (%)"
+    )
+    taxable_value = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        help_text="unit_price x quantity with GST reverse-calculated out.",
+    )
+    tax_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     class Meta:
         verbose_name = "Order item"
@@ -191,6 +227,11 @@ class OrderItem(TimeStampedModel):
         if self.variant_id and self.variant is not None:
             return self.variant.get_shipping_dims()
         return self.product.get_shipping_dims()
+
+    @property
+    def tax_breakdown(self) -> dict:
+        """CGST/SGST/IGST split of this line's tax_amount."""
+        return split_by_supply_type(tax_amount=self.tax_amount, is_interstate=self.order.is_interstate)
 
 
 OrderLineItem = OrderItem

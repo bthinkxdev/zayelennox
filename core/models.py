@@ -209,6 +209,24 @@ class SiteSettings(TimeStampedModel):
         verbose_name="Vendor Email",
         help_text="Email address to receive quote requests and contact inquiries.",
     )
+    gstin = models.CharField(
+        max_length=15,
+        blank=True,
+        verbose_name="GSTIN",
+        help_text="Your GST registration number, shown on customer invoices.",
+    )
+    pan_number = models.CharField(
+        max_length=10,
+        blank=True,
+        verbose_name="PAN",
+    )
+    registered_state = models.CharField(
+        max_length=120,
+        blank=True,
+        verbose_name="Registered State",
+        help_text="Your GST-registered state. Compared to each order's delivery state "
+        "to decide CGST+SGST (same state) vs IGST (different state).",
+    )
     default_currency = models.ForeignKey(
         Currency,
         on_delete=models.PROTECT,
@@ -217,6 +235,9 @@ class SiteSettings(TimeStampedModel):
         related_name="+",
     )
     default_language = models.CharField(max_length=5, default="en")
+    # Dead field: dashboard-editable but never read anywhere for actual price
+    # math. Deliberately not repurposed for GST — see Product.gst_rate_percent
+    # and SiteSettings.registered_state instead.
     tax_rate_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     default_shipping_charge = models.DecimalField(max_digits=10, decimal_places=2, default=50)
     card_gateway_public_key_env = models.CharField(

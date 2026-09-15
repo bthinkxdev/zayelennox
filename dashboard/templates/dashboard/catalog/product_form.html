@@ -30,7 +30,14 @@
             <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.mrp simple_product_required=True %}</div>
             <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.purchase_price %}</div>
             <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.color %}</div>
+            <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.hsn_code %}</div>
+            <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.gst_rate_percent %}</div>
           </div>
+          {% if form_mode == "edit" and not form.instance.hsn_code %}
+          <div class="alert alert-warning mt-3 mb-0 py-2 px-3 small">
+            <i class="ti ti-alert-triangle me-1"></i>Missing HSN code — this product's invoices will show no HSN/tax breakdown until you set one.
+          </div>
+          {% endif %}
         </div>
       </div>
 
@@ -215,6 +222,16 @@
                       {{ vform.purchase_price }}
                       {% if vform.purchase_price.errors %}<div class="text-danger variant-field-error small mt-1">{{ vform.purchase_price.errors|join:", " }}</div>{% endif %}
                     </div>
+                    <div data-field="hsn_code">
+                      <label class="form-label">HSN/SAC override</label>
+                      {{ vform.hsn_code }}
+                      {% if vform.hsn_code.errors %}<div class="text-danger variant-field-error small mt-1">{{ vform.hsn_code.errors|join:", " }}</div>{% endif %}
+                    </div>
+                    <div data-field="gst_rate_percent">
+                      <label class="form-label">GST rate override (%)</label>
+                      {{ vform.gst_rate_percent }}
+                      {% if vform.gst_rate_percent.errors %}<div class="text-danger variant-field-error small mt-1">{{ vform.gst_rate_percent.errors|join:", " }}</div>{% endif %}
+                    </div>
                     <div data-field="sku_suffix">
                       <label class="form-label">SKU suffix <span class="text-danger">*</span></label>
                       {{ vform.sku_suffix }}
@@ -321,6 +338,14 @@
                   <label class="form-label">Purchase price</label>
                   {{ variant_empty_form.purchase_price }}
                 </div>
+                <div data-field="hsn_code">
+                  <label class="form-label">HSN/SAC override</label>
+                  {{ variant_empty_form.hsn_code }}
+                </div>
+                <div data-field="gst_rate_percent">
+                  <label class="form-label">GST rate override (%)</label>
+                  {{ variant_empty_form.gst_rate_percent }}
+                </div>
                 <div data-field="sku_suffix">
                   <label class="form-label">SKU suffix <span class="text-danger">*</span></label>
                   {{ variant_empty_form.sku_suffix }}
@@ -376,6 +401,8 @@
                 <div class="col-md-4" data-slot="price"></div>
                 <div class="col-md-4" data-slot="mrp"></div>
                 <div class="col-md-4" data-slot="purchase_price"></div>
+                <div class="col-md-4" data-slot="hsn_code"></div>
+                <div class="col-md-4" data-slot="gst_rate_percent"></div>
                 <div class="col-md-6" data-slot="sku_suffix"></div>
                 <div class="col-md-6" data-slot="stock_quantity"></div>
                 <div class="col-md-3" data-slot="weight_kg"></div>
