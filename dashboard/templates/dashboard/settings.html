@@ -52,7 +52,7 @@
             </div>
             {% endif %}
             <div class="{% if field.field.widget.input_type == 'checkbox' %}col-12{% else %}col-md-6{% endif %} mb-3"
-              {% if field.name == 'razorpay_key_id' or field.name == 'razorpay_key_secret' %}data-gateway-group="razorpay"{% elif field.name == 'payu_merchant_key' or field.name == 'payu_merchant_salt' %}data-gateway-group="payu"{% endif %}>
+              {% if field.name == 'razorpay_key_id' or field.name == 'razorpay_key_secret' %}data-gateway-group="razorpay"{% elif field.name == 'payu_merchant_key' or field.name == 'payu_merchant_salt' or field.name == 'payu_test_mode' %}data-gateway-group="payu"{% endif %}>
               {% if field.name == 'logo' %}
                 <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                 
