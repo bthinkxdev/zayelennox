@@ -912,6 +912,18 @@ def payu_callback_view(request: HttpRequest) -> HttpResponse:
 
 
 @require_POST
+def payu_attempt_view(request: HttpRequest, order_id: int) -> HttpResponse:
+
+    from orders.models import Order
+    from django.shortcuts import get_object_or_404
+    from payments.services import mark_payment_attempted
+
+    get_object_or_404(Order, pk=order_id)
+    mark_payment_attempted(order_id=order_id)
+    return HttpResponse(status=204)
+
+
+@require_POST
 def checkout_coupon_apply_view(request: HttpRequest) -> HttpResponse:
     """Validate and apply a coupon code from checkout."""
     from cart.forms import CartCouponForm

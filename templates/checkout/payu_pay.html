@@ -66,6 +66,15 @@
       if (submitted) return;
       submitted = true;
       button.disabled = true;
+
+      try {
+        fetch("{% url 'checkout:payu-attempt' order.pk %}", {
+          method: "POST",
+          headers: { "X-CSRFToken": "{{ csrf_token }}" },
+          keepalive: true,
+        }).catch(function () {});
+      } catch (err) {}
+
       form.submit();
     });
 

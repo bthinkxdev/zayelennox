@@ -19,5 +19,6 @@ urlpatterns = [
     path("pay/razorpay/<int:order_id>/attempt/", views.razorpay_attempt_view, name="razorpay-attempt"),
     path("pay/razorpay/callback/", views.razorpay_callback_view, name="razorpay-callback"),
     path("pay/payu/<int:order_id>/", views.payu_pay_view, name="payu-pay"),
+    path("pay/payu/<int:order_id>/attempt/", views.payu_attempt_view, name="payu-attempt"),
     path("pay/payu/callback/", views.payu_callback_view, name="payu-callback"),
 ]
