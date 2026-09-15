@@ -257,14 +257,26 @@
             }
           }
 
-          //image preview logic
+          //image/video preview logic — a video file can't be shown as an
+          //<img src>, so it just gets a play-icon placeholder + filename
+          //tooltip instead of a real thumbnail (matched by name suffix so
+          //this only affects the ProductImage "video" field).
           var row = inp.closest("tr");
           var prev = row ? row.querySelector("[data-img-preview]") : null;
+          var isVideoInput = /-video$/.test(inp.name || "");
           if (prev) {
             if (prev.src && prev.src.startsWith("blob:")) {
               URL.revokeObjectURL(prev.src);
             }
-            prev.src = fileUrl;
+            if (isVideoInput) {
+              prev.removeAttribute("src");
+              prev.title = inp.files[0].name;
+              prev.classList.add("thumb-video-placeholder");
+            } else {
+              prev.src = fileUrl;
+              prev.classList.remove("thumb-video-placeholder");
+              prev.removeAttribute("title");
+            }
             prev.classList.remove("d-none");
           }
 
@@ -470,6 +482,11 @@
       input.files = dt.files;
     }
 
+    function isPendingVideoFile(file) {
+      if (file.type && file.type.indexOf("video/") === 0) return true;
+      return /\.(mp4|webm|ogg|mov)$/i.test(file.name || "");
+    }
+
     function renderPendingPreview(input) {
       var previewHost = previewHostFor(input);
       if (!previewHost) return;
@@ -477,14 +494,18 @@
       var fieldName = input.dataset.primaryFieldName || "";
       previewHost.innerHTML = "";
       pending.forEach(function (file, index) {
-        var url = URL.createObjectURL(file);
         var item = document.createElement("div");
         item.className = "variant-image-grid__item";
         item.setAttribute("data-pending-image", "1");
         item.setAttribute("data-pending-index", String(index));
         var checked = input._primaryPendingFile === file;
+        //a video file can't be shown as an <img src> - render a play-icon
+        //placeholder (with the filename as a tooltip) instead.
+        var mediaMarkup = isPendingVideoFile(file)
+          ? '<span class="variant-image-grid__video-placeholder" title="' + file.name + '"><i class="ti ti-player-play-filled"></i></span>'
+          : '<img src="' + URL.createObjectURL(file) + '" alt="">';
         item.innerHTML =
-          '<img src="' + url + '" alt="">' +
+          mediaMarkup +
           '<button type="button" class="variant-image-grid__remove-pending" title="Remove"><i class="ti ti-x"></i></button>' +
           '<label class="variant-image-grid__primary-toggle" title="Set as primary image">' +
           '<input type="radio" name="' + fieldName + '" value="new:' + index + '"' + (checked ? " checked" : "") + '>' +

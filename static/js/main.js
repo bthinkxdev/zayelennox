@@ -295,19 +295,120 @@
     }
   });
 
-  function reinitPageScripts() {
-    document.querySelectorAll('.thumb-btn').forEach(function (btn) {
-      if (btn.dataset.boundThumb) return;
-      btn.dataset.boundThumb = '1';
-      btn.addEventListener('click', function () {
-        var main = document.getElementById('main-pdp-image');
-        if (main) main.src = this.getAttribute('data-full');
-        document.querySelectorAll('.thumb-btn').forEach(function (b) {
-          b.classList.remove('active', 'is-active');
+  // PDP gallery: a flex track of full-width slides (image or video) that
+  // slides via pointer/touch drag, snapping to the nearest slide on
+  // release. Bound once per gallery root (drag listeners survive an AJAX
+  // rebuild of the track's contents on variant change - only the thumbnail
+  // click bindings and the active index need refreshing after that), so
+  // this is safe to call repeatedly via reinitPageScripts().
+  function initPdpGallery(root) {
+    var stage = root.querySelector('[data-gallery-stage]');
+    var track = root.querySelector('[data-gallery-track]');
+    if (!stage || !track) return;
+
+    if (!root._pdpGalleryState) {
+      var state = { index: 0, dragging: false, startX: 0, startY: 0, delta: 0, pointerId: null, axis: null };
+
+      var setTransition = function (on) {
+        track.style.transition = on ? 'transform 0.3s ease' : 'none';
+      };
+
+      var pauseInactiveVideos = function () {
+        Array.prototype.forEach.call(track.querySelectorAll('video'), function (v, i) {
+          if (i !== state.index && !v.paused) v.pause();
         });
-        this.classList.add('active', 'is-active');
+      };
+
+      var syncActiveClasses = function () {
+        root.querySelectorAll('.thumb-btn').forEach(function (btn, i) {
+          btn.classList.toggle('active', i === state.index);
+          btn.classList.toggle('is-active', i === state.index);
+        });
+        Array.prototype.forEach.call(track.children, function (slide, i) {
+          slide.classList.toggle('is-active', i === state.index);
+        });
+      };
+
+      var goTo = function (newIndex, opts) {
+        var count = track.children.length;
+        if (!count) return;
+        state.index = Math.max(0, Math.min(newIndex, count - 1));
+        setTransition(!(opts && opts.instant));
+        track.style.transform = 'translateX(' + (-state.index * 100) + '%)';
+        pauseInactiveVideos();
+        syncActiveClasses();
+      };
+
+      stage.addEventListener('pointerdown', function (e) {
+        if (track.children.length < 2) return;
+        state.dragging = true;
+        state.axis = null;
+        state.startX = e.clientX;
+        state.startY = e.clientY;
+        state.delta = 0;
+        state.pointerId = e.pointerId;
+        setTransition(false);
+        try { stage.setPointerCapture(state.pointerId); } catch (err) { /* noop */ }
+      });
+
+      stage.addEventListener('pointermove', function (e) {
+        if (!state.dragging || e.pointerId !== state.pointerId) return;
+        var dx = e.clientX - state.startX;
+        var dy = e.clientY - state.startY;
+        if (state.axis === null) {
+          if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+          state.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+        }
+        if (state.axis !== 'x') return; // vertical drag - let the page scroll instead
+        e.preventDefault();
+        state.delta = dx;
+        var width = stage.clientWidth || 1;
+        var percent = (state.delta / width) * 100;
+        track.style.transform = 'translateX(' + (-state.index * 100 + percent) + '%)';
+      });
+
+      var endDrag = function (e) {
+        if (!state.dragging) return;
+        state.dragging = false;
+        try { stage.releasePointerCapture(state.pointerId); } catch (err) { /* noop */ }
+        if (state.axis === 'x') {
+          var width = stage.clientWidth || 1;
+          var threshold = width * 0.18;
+          if (state.delta <= -threshold) {
+            goTo(state.index + 1);
+          } else if (state.delta >= threshold) {
+            goTo(state.index - 1);
+          } else {
+            goTo(state.index); // snap back
+          }
+        }
+        state.axis = null;
+        state.delta = 0;
+      };
+      stage.addEventListener('pointerup', endDrag);
+      stage.addEventListener('pointercancel', endDrag);
+      stage.addEventListener('pointerleave', function (e) {
+        if (state.dragging && e.pointerId === state.pointerId) endDrag(e);
+      });
+
+      state.goTo = goTo;
+      root._pdpGalleryState = state;
+    }
+
+    root.querySelectorAll('.thumb-btn').forEach(function (btn) {
+      if (btn.dataset.boundGalleryThumb) return;
+      btn.dataset.boundGalleryThumb = '1';
+      btn.addEventListener('click', function () {
+        root._pdpGalleryState.goTo(parseInt(this.getAttribute('data-index') || '0', 10));
       });
     });
+
+    root._pdpGalleryState.goTo(0, { instant: true });
+  }
+  window.initPdpGallery = initPdpGallery;
+
+  function reinitPageScripts() {
+    document.querySelectorAll('[data-jm-pdp-gallery]').forEach(initPdpGallery);
   }
   window.reinitPageScripts = reinitPageScripts;
 

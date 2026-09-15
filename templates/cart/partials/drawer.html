@@ -10,7 +10,7 @@
     <li class="cart-line">
     <div class="cart-line__img-wrap">
       {% with line.display_image as primary_image %}
-      {% if primary_image %}
+      {% if primary_image.image %}
       <img src="{{ primary_image.image.url }}" alt="{{ primary_image.alt_text|default:line.product.name }}" class="cart-line__img" loading="lazy">
       {% else %}
       <img src="{% static 'img/product-placeholder.svg' %}" alt="{{ line.product.name }}" class="cart-line__img cart-line__img--placeholder">

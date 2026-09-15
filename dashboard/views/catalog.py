@@ -247,6 +247,13 @@ def _save_variants(product, variants, request):
         _save_variant_images(product=product, variant=instance, prefix=vform.prefix, request=request)
 
 
+_VIDEO_EXTENSIONS = ("mp4", "webm", "ogg", "mov")
+
+
+def _is_video_file(filename: str) -> bool:
+    return "." in filename and filename.rsplit(".", 1)[-1].lower() in _VIDEO_EXTENSIONS
+
+
 def _save_variant_images(*, product, variant, prefix, request):
     """
     Apply one variant row's image changes.
@@ -264,12 +271,15 @@ def _save_variant_images(*, product, variant, prefix, request):
     if new_files:
         next_order = ProductImage.objects.filter(variant=variant).count()
         for offset, uploaded_file in enumerate(new_files):
+            media_kwargs = (
+                {"video": uploaded_file} if _is_video_file(uploaded_file.name) else {"image": uploaded_file}
+            )
             created.append(
                 ProductImage.objects.create(
                     product=product,
                     variant=variant,
-                    image=uploaded_file,
                     display_order=next_order + offset,
+                    **media_kwargs,
                 )
             )
 
@@ -301,8 +311,9 @@ def _normalize_variant_primary_image(variant):
     primary_images = [img for img in images_qs if img.is_primary]
 
     if not primary_images:
-        images_qs[0].is_primary = True
-        images_qs[0].save(update_fields=["is_primary"])
+        default = next((img for img in images_qs if img.image), images_qs[0])
+        default.is_primary = True
+        default.save(update_fields=["is_primary"])
     elif len(primary_images) > 1:
         for img in primary_images[1:]:
             img.is_primary = False
@@ -333,8 +344,9 @@ def _normalize_primary_image(product):
     primary_images = [img for img in images_qs if img.is_primary]
 
     if not primary_images:
-        images_qs[0].is_primary = True
-        images_qs[0].save(update_fields=["is_primary"])
+        default = next((img for img in images_qs if img.image), images_qs[0])
+        default.is_primary = True
+        default.save(update_fields=["is_primary"])
     elif len(primary_images) > 1:
         for img in primary_images[1:]:
             img.is_primary = False

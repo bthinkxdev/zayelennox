@@ -1,27 +1,45 @@
 {% load i18n %}
 <div class="jm-pdp-gallery" data-jm-pdp-gallery>
-  <div class="jm-pdp-gallery__stage ratio ratio-1x1 zoom-container">
-    {% with primary=price_data.images.0 %}
-    {% if primary %}
-    <img id="main-pdp-image"
-         class="jm-pdp-gallery__image zoom-image object-fit-contain"
-         src="{{ primary.url }}"
-         alt="{{ primary.alt|default:product.name }}"
-         width="800"
-         height="800"
-         fetchpriority="high">
-    {% endif %}
-    {% endwith %}
+  <div class="jm-pdp-gallery__stage ratio ratio-1x1 zoom-container" data-gallery-stage>
+    <div class="jm-pdp-gallery__track" data-gallery-track>
+      {% for item in price_data.media %}
+      <div class="jm-pdp-gallery__slide{% if forloop.first %} is-active{% endif %}" data-gallery-slide>
+        {% if item.type == "video" %}
+        <video class="jm-pdp-gallery__image object-fit-contain"
+               data-gallery-video
+               src="{{ item.url }}"
+               {% if item.poster %}poster="{{ item.poster }}"{% endif %}
+               muted playsinline controls preload="metadata"></video>
+        {% else %}
+        <img class="jm-pdp-gallery__image zoom-image object-fit-contain"
+             src="{{ item.url }}"
+             alt="{{ item.alt|default:product.name }}"
+             {% if forloop.first %}width="800" height="800" fetchpriority="high"{% else %}loading="lazy"{% endif %}>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
   </div>
-  {% if price_data.images %}
+  {% if price_data.media %}
   <div class="jm-pdp-gallery__thumbs" role="list">
-    {% for image in price_data.images %}
+    {% for item in price_data.media %}
     <button type="button"
             class="jm-pdp-gallery__thumb thumb-btn{% if forloop.first %} is-active active{% endif %}"
-            data-full="{{ image.url }}"
-            aria-label="{% trans 'View image' %} {{ forloop.counter }}"
+            data-index="{{ forloop.counter0 }}"
+            aria-label="{% trans 'View item' %} {{ forloop.counter }}"
             role="listitem">
-      <img src="{{ image.url }}" alt="" width="72" height="72" class="object-fit-cover" loading="lazy">
+      {% if item.type == "video" and not item.poster %}
+      <span class="jm-pdp-gallery__thumb-placeholder" aria-hidden="true">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+      </span>
+      {% else %}
+      <img src="{{ item.poster|default:item.url }}" alt="" width="72" height="72" class="object-fit-cover" loading="lazy">
+      {% endif %}
+      {% if item.type == "video" %}
+      <span class="jm-pdp-gallery__thumb-badge" aria-hidden="true">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+      </span>
+      {% endif %}
     </button>
     {% endfor %}
   </div>

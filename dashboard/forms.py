@@ -407,9 +407,12 @@ ProductVariantFormSet = forms.inlineformset_factory(
 class ProductImageForm(forms.ModelForm):
     class Meta:
         model = ProductImage
-        fields = ["image", "alt_text", "display_order", "is_primary"]
+        fields = ["image", "video", "alt_text", "display_order", "is_primary"]
+        widgets = {
+            "image": forms.ClearableFileInput(attrs={"accept": "image/*"}),
+            "video": forms.ClearableFileInput(attrs={"accept": "video/mp4,video/webm,video/ogg,.mov"}),
+        }
         error_messages = {
-            "image": {"required": "Image file is required."},
             "alt_text": {"required": "Alt text is required."},
             "display_order": {"required": "Display order is required."},
         }

@@ -640,8 +640,13 @@ def get_variant_price(
         "is_in_stock": str(resolved_stock > 0).lower(),
         "is_low_stock": str(is_low_stock).lower(),
         "low_stock_threshold": str(product.low_stock_threshold),
-        "images": [
-            {"url": img.image.url, "alt": img.alt_text or product.name}
+        "media": [
+            {
+                "type": img.media_type,
+                "url": img.media_src,
+                "poster": img.image.url if img.video and img.image else "",
+                "alt": img.alt_text or product.name,
+            }
             for img in gallery_images
         ],
     }

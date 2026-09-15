@@ -74,7 +74,7 @@
                 <tr>
                   <th class="d-none"></th>
                   <th style="width:80px">Preview</th>
-                  <th>Image file</th>
+                  <th>Image or video file</th>
                   <th>Alt text</th>
                   <th>Order</th>
                   <th class="text-center">Primary</th>
@@ -86,13 +86,18 @@
                 <tr>
                   <td class="d-none">{{ iform.id }}</td>
                   <td data-label="Preview">
-                    {% if iform.instance.pk and iform.instance.image %}<img src="{{ iform.instance.image.url }}"
+                    {% if iform.instance.pk and iform.instance.video %}
+                    <span class="thumb thumb-video-placeholder" data-img-preview data-preview-kind="video"><i class="ti ti-player-play-filled"></i></span>
+                    {% elif iform.instance.pk and iform.instance.image %}<img src="{{ iform.instance.image.url }}"
                       class="thumb" data-img-preview alt="">
                     {% else %}<img src="" class="thumb d-none" data-img-preview alt="">{% endif %}
                   </td>
-                  <td data-label="Image file">
+                  <td data-label="Image or video file">
                     {{ iform.image }}
+                    {{ iform.video }}
                     {% if iform.image.errors %}<div class="text-danger small mt-1">{{ iform.image.errors|join:", " }}</div>{% endif %}
+                    {% if iform.video.errors %}<div class="text-danger small mt-1">{{ iform.video.errors|join:", " }}</div>{% endif %}
+                    {% if iform.non_field_errors %}<div class="text-danger small mt-1">{{ iform.non_field_errors|join:", " }}</div>{% endif %}
                   </td>
                   <td data-label="Alt text">
                     {{ iform.alt_text }}
@@ -123,7 +128,7 @@
             <tr>
               <td class="d-none">{{ image_empty_form.id }}</td>
               <td data-label="Preview"><img src="" class="thumb d-none" data-img-preview alt=""></td>
-              <td data-label="Image file">{{ image_empty_form.image }}</td>
+              <td data-label="Image or video file">{{ image_empty_form.image }}{{ image_empty_form.video }}</td>
               <td data-label="Alt text">{{ image_empty_form.alt_text }}</td>
               <td data-label="Order">{{ image_empty_form.display_order }}</td>
               <td class="text-center" data-label="Primary">{{ image_empty_form.is_primary }}</td>
@@ -246,7 +251,11 @@
                         {% if vform.instance.pk %}
                         {% for img in vform.instance.images.all %}
                         <div class="variant-image-grid__item{% if img.is_primary %} is-primary{% endif %}" data-existing-image>
+                          {% if img.video %}
+                          <span class="variant-image-grid__video-placeholder"><i class="ti ti-player-play-filled"></i></span>
+                          {% else %}
                           <img src="{{ img.image.url }}" alt="">
+                          {% endif %}
                           <label class="variant-image-grid__remove-toggle" title="Check to remove on save">
                             <input type="checkbox" name="{{ vform.prefix }}-delete_image_ids" value="{{ img.pk }}">
                             <span class="variant-image-grid__remove"><i class="ti ti-trash"></i></span>
@@ -266,7 +275,7 @@
                     </div>
                     <div data-field="new_images">
                       <label class="form-label">Add images <span class="text-muted fw-normal">— pick again to add more.</span></label>
-                      <input type="file" name="{{ vform.prefix }}-new_images" accept="image/*" multiple class="form-control" data-variant-file-input data-primary-field-name="{{ vform.prefix }}-primary_choice">
+                      <input type="file" name="{{ vform.prefix }}-new_images" accept="image/*,video/mp4,video/webm,video/ogg,.mov" multiple class="form-control" data-variant-file-input data-primary-field-name="{{ vform.prefix }}-primary_choice">
                       <div class="variant-image-grid" data-new-image-preview></div>
                     </div>
                   </td>
@@ -344,7 +353,7 @@
                 </div>
                 <div data-field="new_images">
                   <label class="form-label">Add images <span class="text-muted fw-normal">— pick again to add more.</span></label>
-                  <input type="file" name="variants-__prefix__-new_images" accept="image/*" multiple class="form-control" data-variant-file-input data-primary-field-name="variants-__prefix__-primary_choice">
+                  <input type="file" name="variants-__prefix__-new_images" accept="image/*,video/mp4,video/webm,video/ogg,.mov" multiple class="form-control" data-variant-file-input data-primary-field-name="variants-__prefix__-primary_choice">
                   <div class="variant-image-grid" data-new-image-preview></div>
                 </div>
               </td>

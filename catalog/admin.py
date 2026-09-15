@@ -45,7 +45,7 @@ class BrandAdmin(admin.ModelAdmin):
 class ProductImageInline(admin.TabularInline):
     model = ProductImage
     fk_name = "product"
-    fields = ("image", "variant", "alt_text", "display_order", "is_primary")
+    fields = ("image", "video", "variant", "alt_text", "display_order", "is_primary")
     extra = 1
 
 

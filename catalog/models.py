@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from django.conf import settings
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator, MaxValueValidator, MinValueValidator
 from django.db import models
 
 from core.models import TimeStampedModel
@@ -480,7 +481,16 @@ class ProductImage(TimeStampedModel):
     )
     image = models.ImageField(
         upload_to="products/images/",
+        blank=True,
         verbose_name="Image",
+        help_text="Photo slide. Also used as the video's thumbnail when a video is uploaded below.",
+    )
+    video = models.FileField(
+        upload_to="products/images/videos/",
+        blank=True,
+        verbose_name="Video",
+        validators=[FileExtensionValidator(["mp4", "webm", "ogg", "mov"])],
+        help_text="Video slide (mp4/webm). Takes priority over the photo in the gallery.",
     )
     alt_text = models.CharField(
         max_length=255,
@@ -514,10 +524,27 @@ class ProductImage(TimeStampedModel):
         ]
 
     def save(self, *args, **kwargs):
-      
+
         if self.variant_id and not self.product_id:
             self.product_id = self.variant.product_id
         super().save(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+        if not self.image and not self.video:
+            raise ValidationError("Upload an image or a video.")
+
+    @property
+    def media_type(self) -> str:
+        return "video" if self.video else "image"
+
+    @property
+    def media_src(self) -> str:
+        if self.video:
+            return self.video.url
+        if self.image:
+            return self.image.url
+        return ""
 
     def __str__(self) -> str:
         if self.variant_id:
