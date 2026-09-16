@@ -792,7 +792,7 @@ class Combo(TimeStampedModel):
         db_index=True,
         verbose_name="Slug",
     )
-    description = models.TextField(blank=True, verbose_name="Description")
+    description = models.TextField(max_length=5000, blank=True, verbose_name="Description")
     image = models.ImageField(
         upload_to="combos/",
         blank=True,

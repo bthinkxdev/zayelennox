@@ -424,6 +424,22 @@ class ComboForm(SlugAutoMixin):
         self.fields["slug"].required = False
 
 
+class ComboVariantSelect(forms.Select):
+
+    def __init__(self, *args, variant_product_map=None, **kwargs):
+        self.variant_product_map = variant_product_map or {}
+        super().__init__(*args, **kwargs)
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
+        if value not in (None, ""):
+            raw_value = value.value if hasattr(value, "value") else value
+            product_id = self.variant_product_map.get(str(raw_value))
+            if product_id is not None:
+                option["attrs"]["data-product-id"] = product_id
+        return option
+
+
 class ComboItemForm(forms.ModelForm):
     class Meta:
         model = ComboItem
@@ -441,9 +457,14 @@ class ComboItemForm(forms.ModelForm):
         if self.instance.pk and self.instance.product_id:
             product_filter |= Q(pk=self.instance.product_id)
         self.fields["product"].queryset = Product.objects.filter(product_filter).order_by("name")
-        self.fields["variant"].queryset = ProductVariant.objects.select_related("product").order_by(
+        variant_queryset = ProductVariant.objects.select_related("product").order_by(
             "product__name", "name"
         )
+        self.fields["variant"].widget = ComboVariantSelect(
+            attrs=self.fields["variant"].widget.attrs,
+            variant_product_map={str(v.pk): v.product_id for v in variant_queryset},
+        )
+        self.fields["variant"].queryset = variant_queryset
         self.fields["variant"].required = False
 
     def clean_quantity(self):

@@ -684,17 +684,68 @@
     });
   }
 
+
+  function initComboVariantFilter() {
+    var wrap = document.querySelector('[data-formset="comboitems"]');
+    if (!wrap) return;
+
+    function filterRow(row) {
+      if (!row) return;
+      var productSelect = row.querySelector("select[name$='-product']");
+      var variantSelect = row.querySelector("select[name$='-variant']");
+      if (!productSelect || !variantSelect) return;
+
+      var productId = productSelect.value;
+      var currentValue = variantSelect.value;
+      var currentStillValid = false;
+
+      Array.prototype.forEach.call(variantSelect.options, function (opt) {
+        if (!opt.value) return; 
+        var belongs = !!productId && opt.getAttribute("data-product-id") === productId;
+        opt.hidden = !belongs;
+        opt.disabled = !belongs;
+        if (belongs && opt.value === currentValue) currentStillValid = true;
+      });
+
+      if (currentValue && !currentStillValid) {
+        variantSelect.value = "";
+      }
+    }
+
+    function filterAllRows() {
+      var rows = wrap.querySelectorAll("[data-formset-body] > tr");
+      Array.prototype.forEach.call(rows, filterRow);
+    }
+
+    wrap.addEventListener("change", function (e) {
+      if (e.target.matches && e.target.matches("select[name$='-product']")) {
+        filterRow(e.target.closest("tr"));
+      }
+    });
+
+    var addBtn = wrap.querySelector("[data-formset-add]");
+    if (addBtn) {
+      addBtn.addEventListener("click", function () {
+        setTimeout(filterAllRows, 0);
+      });
+    }
+
+    filterAllRows();
+  }
+
   function initPage() {
     initSidebar();
     initFormValidation();
     initCharts();
     initFormsets();
+    initComboVariantFilter();
     initVariantStockToggle();
     initVariantModal();
     initVariantImagesToggle();
     initSimpleProductRequiredMarkers();
     initVariantEmptyState();
     initProductFormPersistFiles();
+    initComboFormPersistFiles();
     initOrderStatusGuard();
     initSearchFormGuard();
     initTableLabels();
@@ -776,84 +827,95 @@
   }
 
 
-  function initProductFormPersistFiles() {
-    var form = document.getElementById("product-form");
+  function bindFilePersistForm(formId, reinit) {
+    var form = document.getElementById(formId);
     if (!form || form.dataset.ajaxBound === "1") return;
     form.dataset.ajaxBound = "1";
-    form.addEventListener("submit", handleProductFormSubmit);
+
+    form.addEventListener("submit", function handleSubmit(e) {
+      e.preventDefault();
+      var formEl = e.currentTarget;
+      var submitBtn = formEl.querySelector('button[type="submit"]');
+
+      var pickedFiles = [];
+      Array.prototype.forEach.call(formEl.querySelectorAll('input[type="file"]'), function (input) {
+        if (input.files && input.files[0]) {
+          pickedFiles.push({ name: input.name, file: input.files[0] });
+        }
+      });
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="ti ti-loader-2 me-1"></i>Saving...';
+      }
+
+      fetch(formEl.action, {
+        method: "POST",
+        body: new FormData(formEl),
+        credentials: "same-origin",
+      })
+        .then(function (response) {
+          return response.text().then(function (html) {
+            return { html: html, url: response.url };
+          });
+        })
+        .then(function (result) {
+          var doc = new DOMParser().parseFromString(result.html, "text/html");
+          var newForm = doc.getElementById(formId);
+
+          if (newForm) {
+
+            var imported = document.importNode(newForm, true);
+            formEl.parentNode.replaceChild(imported, formEl);
+
+            pickedFiles.forEach(function (entry) {
+              var input = imported.querySelector('input[type="file"][name="' + entry.name + '"]');
+              if (!input) return;
+              var dt = new DataTransfer();
+              dt.items.add(entry.file);
+              input.files = dt.files;
+              input.dispatchEvent(new Event("change", { bubbles: true }));
+            });
+
+            reinit();
+            bindFilePersistForm(formId, reinit);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          } else if (doc.getElementById("sidebar")) {
+
+            document.title = doc.title;
+            document.body.innerHTML = doc.body.innerHTML;
+            window.history.pushState({}, doc.title, result.url);
+            initPage();
+            window.scrollTo(0, 0);
+          } else {
+
+            window.location.href = result.url;
+          }
+        })
+        .catch(function () {
+
+          formEl.removeEventListener("submit", handleSubmit);
+          formEl.submit();
+        });
+    });
   }
 
-  function handleProductFormSubmit(e) {
-    e.preventDefault();
-    var formEl = e.currentTarget;
-    var submitBtn = formEl.querySelector('button[type="submit"]');
-
-
-    var pickedFiles = [];
-    Array.prototype.forEach.call(formEl.querySelectorAll('input[type="file"]'), function (input) {
-      if (input.files && input.files[0]) {
-        pickedFiles.push({ name: input.name, file: input.files[0] });
-      }
+  function initProductFormPersistFiles() {
+    bindFilePersistForm("product-form", function () {
+      initFormsets();
+      initVariantStockToggle();
+      initVariantModal();
+      initVariantImagesToggle();
+      initSimpleProductRequiredMarkers();
+      initVariantEmptyState();
     });
+  }
 
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<i class="ti ti-loader-2 me-1"></i>Saving...';
-    }
-
-    fetch(formEl.action, {
-      method: "POST",
-      body: new FormData(formEl),
-      credentials: "same-origin",
-    })
-      .then(function (response) {
-        return response.text().then(function (html) {
-          return { html: html, url: response.url };
-        });
-      })
-      .then(function (result) {
-        var doc = new DOMParser().parseFromString(result.html, "text/html");
-        var newForm = doc.getElementById("product-form");
-
-        if (newForm) {
-        
-          var imported = document.importNode(newForm, true);
-          formEl.parentNode.replaceChild(imported, formEl);
-
-          pickedFiles.forEach(function (entry) {
-            var input = imported.querySelector('input[type="file"][name="' + entry.name + '"]');
-            if (!input) return;
-            var dt = new DataTransfer();
-            dt.items.add(entry.file);
-            input.files = dt.files;
-            input.dispatchEvent(new Event("change", { bubbles: true }));
-          });
-
-          initFormsets();
-          initVariantStockToggle();
-          initVariantModal();
-          initVariantImagesToggle();
-          initSimpleProductRequiredMarkers();
-          initVariantEmptyState();
-          initProductFormPersistFiles();
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        } else if (doc.getElementById("sidebar")) {
-         
-          document.title = doc.title;
-          document.body.innerHTML = doc.body.innerHTML;
-          window.history.pushState({}, doc.title, result.url);
-          initPage();
-          window.scrollTo(0, 0);
-        } else {
-         
-          window.location.href = result.url;
-        }
-      })
-      .catch(function () {
-        
-        formEl.removeEventListener("submit", handleProductFormSubmit);
-        formEl.submit();
-      });
+  function initComboFormPersistFiles() {
+    bindFilePersistForm("combo-form", function () {
+      initFormsets();
+      initComboVariantFilter();
+    });
   }
 
   document.addEventListener("DOMContentLoaded", initPage);
