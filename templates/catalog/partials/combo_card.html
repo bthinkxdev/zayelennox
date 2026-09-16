@@ -1,0 +1,37 @@
+{% load i18n static storefront_tags %}
+<article class="jm-product-card card h-100">
+  <div class="jm-product-card__media">
+    <a href="{% url 'catalog:combo-detail' slug=combo.slug %}" class="jm-product-card__img-link ratio ratio-1x1" tabindex="-1" aria-hidden="true">
+      {% if combo.image %}
+      <img src="{{ combo.image.url }}" alt="{{ combo.name }}" class="object-fit-cover" width="400" height="400" loading="lazy">
+      {% else %}
+      <img src="{% static 'img/product-placeholder.svg' %}" alt="{{ combo.name }}" class="object-fit-cover product-card-img--placeholder" width="400" height="400" loading="lazy">
+      {% endif %}
+    </a>
+    <div class="jm-product-card__badges">
+      <span class="product-badge product-badge--combo">{% trans "Combo" %}</span>
+    </div>
+  </div>
+
+  <div class="card-body jm-product-card__body d-flex flex-column">
+    <h3 class="card-title">{{ combo.name }}</h3>
+    <p class="small text-muted mb-2">
+      {% blocktrans count counter=combo.items.all|length %}{{ counter }} product{% plural %}{{ counter }} products{% endblocktrans %}
+    </p>
+
+    <div class="jm-product-card__pricing">
+      <p class="product-price mb-0">{% money_label combo.combo_price display_currency %}</p>
+      {% if combo.savings > 0 %}
+      <p class="jm-product-card__was mb-0">
+        <span class="text-decoration-line-through">{% money_label combo.normal_price display_currency %}</span>
+      </p>
+      {% endif %}
+    </div>
+
+    <a class="stretched-link jm-product-card__stretch" href="{% url 'catalog:combo-detail' slug=combo.slug %}" aria-label="{% blocktrans with name=combo.name %}View {{ name }}{% endblocktrans %}"></a>
+
+    <a href="{% url 'catalog:combo-detail' slug=combo.slug %}" class="jm-product-card__atc mt-auto">
+      <span>{% trans "View Combo" %}</span>
+    </a>
+  </div>
+</article>

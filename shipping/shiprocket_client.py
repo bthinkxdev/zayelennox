@@ -229,6 +229,8 @@ class ShiprocketClient:
             "order_items": order_items,
             "payment_method": payment_method,
             "sub_total": str(order.subtotal),
+            "shipping_charges": str(order.delivery_charge),
+            "total_discount": str(order.coupon_discount),
             "length": float(parcel["length"]),
             "breadth": float(parcel["breadth"]),
             "height": float(parcel["height"]),

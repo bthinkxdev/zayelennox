@@ -17,7 +17,9 @@ from catalog.forms import ReviewSubmissionForm
 from catalog.services import submit_review
 
 from catalog.selectors import (
+    get_active_combos,
     get_category_by_slug,
+    get_combo_by_slug,
     get_plp_filter_options,
     get_plp_products,
     get_product_detail,
@@ -375,6 +377,25 @@ def rental_list_view(request: HttpRequest) -> HttpResponse:
         .only(*PLP_CARD_FIELDS)
     )
     return render(request, "catalog/rentals.html", {"products": list(products)})
+
+
+@require_GET
+@never_cache
+def combo_list_view(request: HttpRequest) -> HttpResponse:
+    """Storefront listing of active product combos."""
+    combos = get_active_combos()
+    return render(request, "catalog/combo_list.html", {"combos": combos})
+
+
+@require_GET
+@never_cache
+def combo_detail_view(request: HttpRequest, slug: str) -> HttpResponse:
+    """Combo detail page — bundled products, combined price, add-to-cart."""
+    combo = get_combo_by_slug(slug=slug)
+    if combo is None:
+        raise Http404("Combo not found")
+    return render(request, "catalog/combo_detail.html", {"combo": combo})
+
 
 @require_POST
 @login_required

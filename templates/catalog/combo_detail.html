@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load i18n static storefront_tags %}
+
+{% block title %}{{ combo.name }} | ZAYE LENNOX{% endblock %}
+
+{% block content %}
+<div class="container page-container py-4">
+  <div class="row g-4">
+    <div class="col-md-6">
+      <div class="ratio ratio-1x1 rounded-3 overflow-hidden bg-light">
+        {% if combo.image %}
+        <img src="{{ combo.image.url }}" alt="{{ combo.name }}" class="object-fit-cover">
+        {% else %}
+        <img src="{% static 'img/product-placeholder.svg' %}" alt="{{ combo.name }}" class="object-fit-cover">
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <span class="product-badge product-badge--combo mb-2 d-inline-block">{% trans "Combo" %}</span>
+      <h1 class="h3 fw-bold">{{ combo.name }}</h1>
+      {% if combo.description %}<p class="text-muted">{{ combo.description }}</p>{% endif %}
+
+      <div class="d-flex align-items-baseline gap-2 my-3">
+        <span class="fs-3 fw-bold">{% money_label combo.combo_price display_currency %}</span>
+        {% if combo.savings > 0 %}
+        <span class="text-muted text-decoration-line-through">{% money_label combo.normal_price display_currency %}</span>
+        <span class="badge bg-success-subtle text-success">{% blocktrans with amount=combo.savings|floatformat:0 %}Save {{ amount }}{% endblocktrans %}</span>
+        {% endif %}
+      </div>
+
+      <div class="card border-0 bg-light mb-4">
+        <div class="card-body">
+          <h2 class="h6 mb-3">{% trans "This combo includes" %}</h2>
+          <ul class="list-unstyled mb-0">
+            {% for item in combo.items.all %}
+            <li class="d-flex justify-content-between align-items-center py-2{% if not forloop.last %} border-bottom{% endif %}">
+              <span>
+                <a href="{% url 'catalog:pdp' slug=item.product.slug %}" class="text-dark text-decoration-none">
+                  {{ item.product.name }}{% if item.variant %} — {{ item.variant.name }}{% endif %}
+                </a>
+              </span>
+              <span class="text-muted small">{% trans "Qty" %} {{ item.quantity }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+
+      {% if combo.is_available %}
+      <form method="post" action="{% url 'cart:combo-add' %}" hx-post="{% url 'cart:combo-add' %}" hx-target="#cart-drawer-body" hx-swap="innerHTML">
+        {% csrf_token %}
+        <input type="hidden" name="combo_id" value="{{ combo.pk }}">
+        <input type="hidden" name="quantity" value="1">
+        <button type="submit" class="btn btn-floward btn-lg w-100">
+          {% trans "Add Combo to Cart" %}
+        </button>
+      </form>
+      {% else %}
+      <button type="button" class="btn btn-secondary btn-lg w-100" disabled>{% trans "Currently Unavailable" %}</button>
+      <p class="text-muted small mt-2">{% trans "One or more products in this combo are out of stock." %}</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

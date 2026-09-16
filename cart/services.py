@@ -8,10 +8,15 @@ from typing import Any, Optional
 from django.db import transaction
 from django.http import HttpRequest
 
-from cart.exceptions import CartItemNotFoundError, InsufficientStockError, VariantRequiredError
+from cart.exceptions import (
+    CartItemNotFoundError,
+    ComboLineNotAdjustableError,
+    InsufficientStockError,
+    VariantRequiredError,
+)
 from cart.models import Cart, CartItem
 from cart.selectors import get_buy_now_cart_for_request, get_cart_for_request, get_cart_summary
-from catalog.models import Product, ProductVariant
+from catalog.models import Combo, Product, ProductVariant
 from catalog.selectors import get_variant_price
 from core.selectors import get_default_currency
 from delivery.models import City
@@ -158,9 +163,21 @@ def add_to_cart(
     variant: Optional[ProductVariant] = None,
     quantity: int = 1,
     overwrite: bool = False,
+    combo: Optional[Combo] = None,
+    unit_price_override: Optional[Decimal] = None,
 ) -> CartItem:
     """
     Add or increment a cart line, or overwrite exactly.
+
+    Args:
+        combo: When set, this line is a component of a product combo — it's
+            kept on a separate cart row from any standalone line of the same
+            product/variant (see the unique constraint on CartItem), and its
+            price comes from ``unit_price_override`` rather than the live
+            catalog price.
+        unit_price_override: Explicit unit price to snapshot instead of
+            resolving one from the catalog. Used exclusively by
+            ``add_combo_to_cart`` for its prorated per-component price.
 
     Raises:
         VariantRequiredError: The product has variants but none was resolved
@@ -179,8 +196,18 @@ def add_to_cart(
         else None
     )
 
-    item = CartItem.objects.filter(cart=cart, product=product, variant=variant).first()
-    
+    # Lock the cart row itself: without it, two concurrent add-to-cart
+    # requests for the same (cart, product, variant, combo) can both miss
+    # the lookup below (no matching row yet) and each INSERT their own —
+    # the unique constraint can't catch that itself since combo (and
+    # variant, for a product with no variants) is NULL, and most databases
+    # don't treat two NULLs as equal for uniqueness. Locking the cart
+    # serializes concurrent adds to it so the second request always sees
+    # the first's row before deciding whether to create or merge.
+    Cart.objects.select_for_update().get(pk=cart.pk)
+
+    item = CartItem.objects.filter(cart=cart, product=product, variant=variant, combo=combo).first()
+
     if item:
         new_quantity = quantity if overwrite else item.quantity + quantity
     else:
@@ -190,22 +217,114 @@ def add_to_cart(
     if new_quantity > max_stock:
         raise InsufficientStockError(f"Only {max_stock} items available in stock.")
 
-    if item:
+    if unit_price_override is not None:
+        unit_price = unit_price_override
+    else:
         unit_price = _resolve_unit_price(product=product, variant=variant, user=user, quantity=new_quantity)
+
+    if item:
         item.quantity = new_quantity
         item.unit_price_at_add = unit_price
         item.save(update_fields=["quantity", "unit_price_at_add", "updated_at"])
     else:
-        unit_price = _resolve_unit_price(product=product, variant=variant, user=user, quantity=quantity)
         item = CartItem.objects.create(
             cart=cart,
             product=product,
             variant=variant,
             quantity=quantity,
             unit_price_at_add=unit_price,
+            combo=combo,
+            combo_name_snapshot=combo.name if combo else "",
         )
 
     return item
+
+
+@transaction.atomic
+def add_combo_to_cart(*, cart: Cart, combo: Combo, quantity: int = 1) -> list[CartItem]:
+    """
+    Add every component of a combo to the cart as its own line, at a
+    prorated share of the combo's fixed price.
+
+    The discount between ``combo.combo_price`` and the sum of the
+    components' normal prices is split across components proportionally to
+    their own normal price, so each product's HSN/GST taxable value stays
+    correct — a combo itself is never a taxable line. All-or-nothing: if any
+    component can't be added (out of stock, missing variant), the whole
+    call raises and nothing is added.
+
+    Raises:
+        VariantRequiredError: A component product needs a variant selection.
+        InsufficientStockError: A component doesn't have enough stock, or
+            ``quantity`` isn't a positive number.
+    """
+    if quantity < 1:
+        raise InsufficientStockError("Quantity must be at least 1.")
+
+    combo_items = list(combo.items.select_related("product", "variant"))
+    if not combo_items:
+        raise InsufficientStockError("This combo has no products configured.")
+
+    user = (
+        cart.customer_profile.user
+        if (cart.customer_profile and cart.customer_profile.user_id)
+        else None
+    )
+
+    normal_line_totals: list[Decimal] = []
+    for combo_item in combo_items:
+        line_quantity = combo_item.quantity * quantity
+        normal_unit_price = _resolve_unit_price(
+            product=combo_item.product,
+            variant=combo_item.variant,
+            user=user,
+            quantity=line_quantity,
+        )
+        normal_line_totals.append(normal_unit_price * line_quantity)
+
+    total_normal = sum(normal_line_totals)
+    combo_total = combo.combo_price * quantity
+
+    if total_normal <= 0:
+        prorated_line_totals = [Decimal("0.00") for _ in combo_items]
+    else:
+        prorated_line_totals = [
+            (line_total / total_normal * combo_total).quantize(Decimal("0.01"))
+            for line_total in normal_line_totals
+        ]
+        # Correct rounding drift on the last line so the lines sum to
+        # exactly combo_total (paise-level remainder from quantize above).
+        remainder = combo_total - sum(prorated_line_totals)
+        prorated_line_totals[-1] += remainder
+
+    added_items: list[CartItem] = []
+    for combo_item, line_total in zip(combo_items, prorated_line_totals):
+        line_quantity = combo_item.quantity * quantity
+        # CartItem stores one unit_price for the whole line, so a combo
+        # component with quantity > 1 can lose or gain a paisa or two here
+        # if line_total doesn't divide evenly — bounded to a few paise per
+        # such line and self-consistent from this point on (every downstream
+        # total is summed from these stored unit prices, never recomputed
+        # against combo_price), the same tolerance any per-unit-priced cart
+        # line has when splitting a discount across a quantity.
+        unit_price = (line_total / line_quantity).quantize(Decimal("0.01"))
+        added_items.append(
+            add_to_cart(
+                cart=cart,
+                product=combo_item.product,
+                variant=combo_item.variant,
+                quantity=line_quantity,
+                combo=combo,
+                unit_price_override=unit_price,
+            )
+        )
+    return added_items
+
+
+@transaction.atomic
+def remove_combo_from_cart(*, cart: Cart, combo_id: int) -> None:
+    """Remove every cart line that was added as part of the given combo."""
+    CartItem.objects.filter(cart=cart, combo_id=combo_id).delete()
 
 
 @transaction.atomic
@@ -238,10 +357,17 @@ def adjust_cart_item_quantity(
 
     Raises:
         CartItemNotFoundError: When no matching line exists on this cart.
+        ComboLineNotAdjustableError: The line is a combo component — its
+            quantity is fixed at add-time (see add_combo_to_cart); remove
+            and re-add the combo instead of adjusting one line.
     """
     item = CartItem.objects.select_for_update().filter(cart=cart, pk=cart_item_id).first()
     if item is None:
         raise CartItemNotFoundError("Cart item not found.")
+    if item.combo_id:
+        raise ComboLineNotAdjustableError(
+            "This item is part of a combo — remove the whole combo to change it."
+        )
 
     new_quantity = item.quantity + delta
     if new_quantity < 1:

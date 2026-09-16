@@ -447,11 +447,13 @@ def edit_profile_view(request: HttpRequest) -> HttpResponse:
         
     profile = context.profile
     address = context.default_address
-    
+    billing_address = context.default_billing_address
+
     initial = {
         "name": request.user.get_full_name(),
         "email": request.user.email or request.user.username,
         "phone": profile.phone,
+        "billing_same_as_delivery": billing_address is None,
     }
     if address:
         initial.update({
@@ -460,6 +462,16 @@ def edit_profile_view(request: HttpRequest) -> HttpResponse:
             "city_name": address.city_name,
             "state_name": address.state_name,
             "pincode": address.pincode,
+        })
+    if billing_address:
+        initial.update({
+            "billing_company_name": billing_address.company_name,
+            "billing_gstin": billing_address.gstin,
+            "billing_line1": billing_address.line1,
+            "billing_line2": billing_address.line2,
+            "billing_city_name": billing_address.city_name,
+            "billing_state_name": billing_address.state_name,
+            "billing_pincode": billing_address.pincode,
         })
 
     if request.method == "POST":
@@ -502,6 +514,35 @@ def edit_profile_view(request: HttpRequest) -> HttpResponse:
                         label="Default Address"
                     )
                     set_default_address(customer_profile=profile, address_id=new_addr.pk)
+
+            from accounts.services import clear_billing_address, set_billing_address
+            if form.cleaned_data.get("billing_same_as_delivery"):
+                if billing_address:
+                    clear_billing_address(customer_profile=profile)
+            else:
+                billing_line1 = form.cleaned_data["billing_line1"]
+                if billing_line1:
+                    billing_fields = {
+                        "company_name": form.cleaned_data.get("billing_company_name", ""),
+                        "gstin": form.cleaned_data.get("billing_gstin", ""),
+                        "line1": billing_line1,
+                        "line2": form.cleaned_data.get("billing_line2", ""),
+                        "city_name": form.cleaned_data.get("billing_city_name", ""),
+                        "state_name": form.cleaned_data.get("billing_state_name", ""),
+                        "pincode": form.cleaned_data.get("billing_pincode", ""),
+                    }
+                    if billing_address:
+                        for field_name, value in billing_fields.items():
+                            setattr(billing_address, field_name, value)
+                        billing_address.save(update_fields=[*billing_fields.keys(), "updated_at"])
+                    else:
+                        from accounts.models import Address
+                        new_billing_addr = Address.objects.create(
+                            customer_profile=profile,
+                            label="Billing Address",
+                            **billing_fields,
+                        )
+                        set_billing_address(customer_profile=profile, address_id=new_billing_addr.pk)
 
             from django.contrib import messages
             messages.success(request, "Profile updated successfully.")

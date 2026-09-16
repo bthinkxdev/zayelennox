@@ -775,6 +775,140 @@ class ProductSpecification(TimeStampedModel):
         return f"{self.product.name} - {self.name}: {self.value}"
 
 
+class Combo(TimeStampedModel):
+    """
+    Curated bundle of existing products sold together at one fixed price.
+
+    The discount between ``combo_price`` and the sum of the components'
+    normal prices is prorated per component at add-to-cart time (see
+    ``cart.services.add_combo_to_cart``) so each product's own HSN/GST
+    taxable value stays correct — a combo is not itself a taxable line.
+    """
+
+    name = models.CharField(max_length=200, verbose_name="Name")
+    slug = models.SlugField(
+        max_length=220,
+        unique=True,
+        db_index=True,
+        verbose_name="Slug",
+    )
+    description = models.TextField(blank=True, verbose_name="Description")
+    image = models.ImageField(
+        upload_to="combos/",
+        blank=True,
+        null=True,
+        verbose_name="Image",
+    )
+    combo_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+        verbose_name="Combo price",
+        help_text="Fixed total price charged for one unit of this combo, across all its "
+        "component products.",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        db_index=True,
+        verbose_name="Is active",
+        help_text="When False, hidden from the storefront and cannot be added to cart.",
+    )
+    display_order = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Display order",
+        help_text="Lower values appear first in combo listings.",
+    )
+
+    class Meta:
+        verbose_name = "Combo"
+        verbose_name_plural = "Combos"
+        ordering = ["display_order", "name"]
+        indexes = [
+            models.Index(fields=["is_active"], name="cat_combo_is_active_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return self.name
+
+    @property
+    def normal_price(self):
+        """
+        Sum of each component's current live effective price × its quantity.
+
+        Uses ``self.items.all()`` with no further queryset methods chained,
+        so a caller that prefetched ``items`` (see
+        ``catalog.selectors._combo_items_prefetch``) hits that cache instead
+        of issuing a fresh query — any additional `.select_related()`/etc.
+        here would return a new, un-prefetched queryset instead.
+        """
+        total = Decimal("0.00")
+        for item in self.items.all():
+            unit_price = item.variant.effective_price if item.variant_id else item.product.base_price
+            total += unit_price * item.quantity
+        return total
+
+    @property
+    def savings(self):
+        """Discount vs. buying every component at its normal price."""
+        return max(self.normal_price - self.combo_price, Decimal("0.00"))
+
+    @property
+    def is_available(self) -> bool:
+        """True only when the combo is active and every component is currently sellable."""
+        if not self.is_active:
+            return False
+        items = list(self.items.all())
+        if not items:
+            return False
+        for item in items:
+            if not item.product.is_active:
+                return False
+            stock = item.variant.stock_quantity if item.variant_id else item.product.stock_quantity
+            if stock < item.quantity:
+                return False
+        return True
+
+
+class ComboItem(TimeStampedModel):
+    """One product/variant + quantity component of a Combo."""
+
+    combo = models.ForeignKey(
+        Combo,
+        on_delete=models.CASCADE,
+        related_name="items",
+        verbose_name="Combo",
+    )
+    product = models.ForeignKey(
+        Product,
+        on_delete=models.PROTECT,
+        related_name="combo_items",
+        verbose_name="Product",
+    )
+    variant = models.ForeignKey(
+        ProductVariant,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="combo_items",
+        verbose_name="Variant",
+        help_text="Leave blank when the product has no variants, or to bundle its base form.",
+    )
+    quantity = models.PositiveIntegerField(default=1, verbose_name="Quantity")
+
+    class Meta:
+        verbose_name = "Combo item"
+        verbose_name_plural = "Combo items"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["combo", "product", "variant"],
+                name="combo_item_unique_product_variant",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.combo_id}: {self.product_id} x{self.quantity}"
+
+
 class ProductDocument(TimeStampedModel):
     """Downloadable document/manual for a product."""
 

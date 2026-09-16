@@ -32,6 +32,9 @@
                   {% if item.variant %}
                   <small class="text-muted">{{ item.variant.name }}</small>
                   {% endif %}
+                  {% if item.combo_name_snapshot %}
+                  <small class="text-floward d-block">{% trans "Part of combo:" %} {{ item.combo_name_snapshot }}</small>
+                  {% endif %}
                   {% if order.order_status == 'delivered' %}
                   <div class="mt-2">
                     <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#reviewModal{{ item.product.id }}">

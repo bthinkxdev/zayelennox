@@ -10,10 +10,16 @@ from django.utils.translation import gettext as _
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_POST
 
-from cart.exceptions import CartItemNotFoundError, InsufficientStockError, VariantRequiredError
+from cart.exceptions import (
+    CartItemNotFoundError,
+    ComboLineNotAdjustableError,
+    InsufficientStockError,
+    VariantRequiredError,
+)
 from cart.forms import CartCouponForm, CartQuantityForm
 from cart.selectors import get_cart_count, get_cart_for_request, get_cart_summary, get_wishlist_count
 from cart.services import (
+    add_combo_to_cart,
     add_to_cart,
     adjust_cart_item_quantity,
     apply_coupon,
@@ -21,6 +27,7 @@ from cart.services import (
     get_or_create_cart,
     remove_coupon,
     remove_cart_item,
+    remove_combo_from_cart,
     set_buy_now_item,
     toggle_wishlist,
 )
@@ -183,6 +190,47 @@ def cart_add_view(request: HttpRequest) -> HttpResponse:
 
 
 @require_POST
+def cart_add_combo_view(request: HttpRequest) -> HttpResponse:
+    """Add every product in a combo to the persistent cart in one call."""
+    from django.shortcuts import get_object_or_404
+
+    from catalog.models import Combo
+
+    combo_id = int(request.POST.get("combo_id", 0))
+    quantity = int(request.POST.get("quantity", 1))
+    combo = get_object_or_404(Combo, pk=combo_id, is_active=True)
+
+    cart = get_or_create_cart(request=request)
+    try:
+        add_combo_to_cart(cart=cart, combo=combo, quantity=quantity)
+    except (InsufficientStockError, VariantRequiredError) as exc:
+        from django.contrib import messages
+        messages.error(request, str(exc))
+        if request.headers.get("HX-Request"):
+            return _cart_drawer_response(request, error=str(exc))
+        return redirect(request.META.get("HTTP_REFERER", "/"))
+
+    return _cart_drawer_response(
+        request,
+        hx_triggers={"cartItemAdded": {"combo_id": combo.pk}},
+    )
+
+
+@require_POST
+def cart_remove_combo_view(request: HttpRequest) -> HttpResponse:
+    """Remove every cart line belonging to a combo; works from drawer or page."""
+    is_drawer = request.POST.get("is_drawer") == "1" or request.headers.get("HX-Target") == "cart-drawer-body"
+    cart = get_cart_for_request(request=request)
+    if cart:
+        remove_combo_from_cart(cart=cart, combo_id=int(request.POST.get("combo_id", 0)))
+
+    triggers = {"cartUpdated": None}
+    if is_drawer:
+        return _cart_drawer_response(request, hx_triggers=triggers)
+    return _cart_page_response(request, hx_triggers=triggers)
+
+
+@require_POST
 def cart_remove_view(request: HttpRequest) -> HttpResponse:
     """Remove a cart line and return drawer partial."""
     cart = get_cart_for_request(request=request)
@@ -237,6 +285,10 @@ def cart_quantity_view(request: HttpRequest) -> HttpResponse:
         if is_drawer:
             return _cart_drawer_response(request, hx_triggers={"cartUpdated": None})
         return _cart_page_response(request, error=_("That item is no longer in your cart."))
+    except ComboLineNotAdjustableError as exc:
+        if is_drawer:
+            return _cart_drawer_response(request, error=str(exc))
+        return _cart_page_response(request, error=str(exc))
     except InsufficientStockError as exc:
         item_id = form.cleaned_data["cart_item_id"] if form.is_valid() else None
         if is_drawer:

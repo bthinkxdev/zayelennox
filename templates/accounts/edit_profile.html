@@ -85,6 +85,71 @@
               {% endif %}
             </div>
 
+            <hr class="mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h2 class="h6 mb-0 text-muted text-uppercase" style="letter-spacing: 0.5px;">{% trans "Billing Address" %}</h2>
+            </div>
+
+            <div class="form-check mb-3">
+              {{ form.billing_same_as_delivery }}
+              <label class="form-check-label small" for="{{ form.billing_same_as_delivery.id_for_label }}">
+                {% trans "Same as delivery address" %}
+              </label>
+            </div>
+
+            <div id="billing-address-fields" class="d-none">
+              <div class="mb-3">
+                <label for="{{ form.billing_company_name.id_for_label }}" class="form-label small fw-semibold">{% trans "Company Name (Optional)" %}</label>
+                {{ form.billing_company_name }}
+              </div>
+
+              <div class="mb-3">
+                <label for="{{ form.billing_gstin.id_for_label }}" class="form-label small fw-semibold">{% trans "GSTIN (Optional)" %}</label>
+                {{ form.billing_gstin }}
+                {% if form.billing_gstin.errors %}
+                <div class="text-danger small mt-1">{{ form.billing_gstin.errors.0 }}</div>
+                {% endif %}
+              </div>
+
+              <div class="mb-3">
+                <label for="{{ form.billing_line1.id_for_label }}" class="form-label small fw-semibold">{% trans "Address Line 1" %}</label>
+                {{ form.billing_line1 }}
+                {% if form.billing_line1.errors %}
+                <div class="text-danger small mt-1">{{ form.billing_line1.errors.0 }}</div>
+                {% endif %}
+              </div>
+
+              <div class="mb-3">
+                <label for="{{ form.billing_line2.id_for_label }}" class="form-label small fw-semibold">{% trans "Address Line 2 (Optional)" %}</label>
+                {{ form.billing_line2 }}
+              </div>
+
+              <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                  <label for="{{ form.billing_city_name.id_for_label }}" class="form-label small fw-semibold">{% trans "City / Town" %}</label>
+                  {{ form.billing_city_name }}
+                  {% if form.billing_city_name.errors %}
+                  <div class="text-danger small mt-1">{{ form.billing_city_name.errors.0 }}</div>
+                  {% endif %}
+                </div>
+                <div class="col-md-6">
+                  <label for="{{ form.billing_state_name.id_for_label }}" class="form-label small fw-semibold">{% trans "State" %}</label>
+                  {{ form.billing_state_name }}
+                  {% if form.billing_state_name.errors %}
+                  <div class="text-danger small mt-1">{{ form.billing_state_name.errors.0 }}</div>
+                  {% endif %}
+                </div>
+              </div>
+
+              <div class="mb-4">
+                <label for="{{ form.billing_pincode.id_for_label }}" class="form-label small fw-semibold">{% trans "Pincode" %}</label>
+                {{ form.billing_pincode }}
+                {% if form.billing_pincode.errors %}
+                <div class="text-danger small mt-1">{{ form.billing_pincode.errors.0 }}</div>
+                {% endif %}
+              </div>
+            </div>
+
             <div class="d-grid mt-4">
               <button type="submit" class="btn btn-floward py-2 fw-medium">{% trans "Save Changes" %}</button>
             </div>
@@ -98,7 +163,7 @@
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     // Letters/symbols never make it into these fields - same behavior as checkout.
-    ['{{ form.phone.id_for_label }}', '{{ form.pincode.id_for_label }}'].forEach(function (fieldId) {
+    ['{{ form.phone.id_for_label }}', '{{ form.pincode.id_for_label }}', '{{ form.billing_pincode.id_for_label }}'].forEach(function (fieldId) {
       var el = document.getElementById(fieldId);
       if (!el) return;
       ['input', 'keyup', 'change'].forEach(function (evtName) {
@@ -111,6 +176,17 @@
         if (e.key && !/\d/.test(e.key)) e.preventDefault();
       });
     });
+
+    var billingCheckbox = document.getElementById('{{ form.billing_same_as_delivery.id_for_label }}');
+    var billingFields = document.getElementById('billing-address-fields');
+    function toggleBillingFields() {
+      if (!billingCheckbox || !billingFields) return;
+      billingFields.classList.toggle('d-none', billingCheckbox.checked);
+    }
+    if (billingCheckbox) {
+      billingCheckbox.addEventListener('change', toggleBillingFields);
+      toggleBillingFields();
+    }
   });
 </script>
 {% endblock %}

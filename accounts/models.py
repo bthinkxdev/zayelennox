@@ -68,6 +68,15 @@ class CustomerProfile(TimeStampedModel):
         verbose_name="Default address",
         help_text="Customer's primary delivery address.",
     )
+    default_billing_address = models.ForeignKey(
+        "accounts.Address",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Default billing address",
+        help_text="Customer's primary billing address, used for GST invoicing at checkout.",
+    )
     notify_via_email = models.BooleanField(
         default=True,
         verbose_name="Email notifications",
@@ -168,6 +177,24 @@ class Address(TimeStampedModel):
         verbose_name="Is default",
         help_text="When True, this is the customer's primary delivery address.",
     )
+    is_billing = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name="Is billing address",
+        help_text="When True, this is the customer's primary billing address for GST invoicing.",
+    )
+    company_name = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name="Company name",
+        help_text="Registered business name to print on the GST invoice's Bill To section.",
+    )
+    gstin = models.CharField(
+        max_length=15,
+        blank=True,
+        verbose_name="GSTIN",
+        help_text="Customer's 15-character GST identification number, shown on the invoice when set.",
+    )
 
     class Meta:
         verbose_name = "Address"
@@ -177,12 +204,21 @@ class Address(TimeStampedModel):
                 fields=["customer_profile", "is_default"],
                 name="accounts_address_default_idx",
             ),
+            models.Index(
+                fields=["customer_profile", "is_billing"],
+                name="accounts_address_billing_idx",
+            ),
         ]
         constraints = [
             models.UniqueConstraint(
                 fields=["customer_profile"],
                 condition=models.Q(is_default=True),
                 name="accounts_one_default_address_per_customer",
+            ),
+            models.UniqueConstraint(
+                fields=["customer_profile"],
+                condition=models.Q(is_billing=True),
+                name="accounts_one_billing_address_per_customer",
             ),
         ]
 

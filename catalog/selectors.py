@@ -10,6 +10,7 @@ from django.core.paginator import Paginator
 from django.db.models import Avg, Case, Count, F, IntegerField, Min, Prefetch, Q, QuerySet, When
 
 from catalog.models import (
+    Combo,
     ModerationStatus,
     Product,
     ProductDocument,
@@ -778,4 +779,40 @@ def get_related_products(*, product: Product, user: Optional[Any] = None, limit:
             p.display_price = p.base_price - discount
 
     return products
+
+
+def _combo_items_prefetch() -> Prefetch:
+    """Shared prefetch for combo component rows, hydrated with product/variant."""
+    from catalog.models import ComboItem
+
+    return Prefetch(
+        "items",
+        queryset=ComboItem.objects.select_related("product", "product__category", "variant"),
+    )
+
+
+def get_active_combos() -> list[Combo]:
+    """
+    Return active combos for storefront listing, ordered for display.
+
+    Query guarantee: 1 SELECT on combo + 1 prefetch SELECT on combo items.
+    """
+    return list(
+        Combo.objects.filter(is_active=True)
+        .prefetch_related(_combo_items_prefetch())
+        .order_by("display_order", "name")
+    )
+
+
+def get_combo_by_slug(*, slug: str) -> Optional[Combo]:
+    """
+    Return one active combo with its components hydrated, or None.
+
+    Query guarantee: 1 SELECT on combo + 1 prefetch SELECT on combo items.
+    """
+    return (
+        Combo.objects.filter(slug=slug, is_active=True)
+        .prefetch_related(_combo_items_prefetch())
+        .first()
+    )
 

@@ -28,6 +28,9 @@
       {% if line.effective_hsn_code %}
       <div class="text-muted" style="font-size: 0.7rem;">{% trans "HSN" %} {{ line.effective_hsn_code }} &middot; {% trans "Incl. GST" %} {{ line.effective_gst_rate_percent }}%</div>
       {% endif %}
+      {% if line.combo_name_snapshot %}
+      <div class="text-floward" style="font-size: 0.7rem;">{% trans "Part of combo:" %} {{ line.combo_name_snapshot }}</div>
+      {% endif %}
 
       {% if not line.is_in_stock %}
       <div class="d-flex align-items-center gap-2 mt-1">

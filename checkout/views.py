@@ -101,6 +101,109 @@ def _validate_delivery_fields(
     return errors
 
 
+def _validate_billing_fields(
+    *,
+    address_line1: str,
+    city_name: str,
+    state_name: str,
+    pincode: str,
+    gstin: str = "",
+) -> dict[str, list[str]]:
+    """Shared billing-detail validation for checkout's inline 'new billing address' fields."""
+    errors: dict[str, list[str]] = {}
+
+    address_line1 = (address_line1 or "").strip()
+    if not address_line1:
+        errors["billing_line1"] = ["Address Line 1 is required."]
+    elif not HAS_LETTER_RE.search(address_line1):
+        errors["billing_line1"] = ["Address Line 1 must contain letters."]
+
+    city_name = (city_name or "").strip()
+    if not city_name:
+        errors["billing_city_name"] = ["City is required."]
+    elif not HAS_LETTER_RE.search(city_name):
+        errors["billing_city_name"] = ["City must contain letters."]
+
+    state_name = (state_name or "").strip()
+    if not state_name:
+        errors["billing_state_name"] = ["State is required."]
+    elif not HAS_LETTER_RE.search(state_name):
+        errors["billing_state_name"] = ["State must contain letters."]
+
+    pincode = (pincode or "").strip()
+    if not pincode:
+        errors["billing_pincode"] = ["Pincode is required."]
+    elif not PINCODE_RE.match(pincode):
+        errors["billing_pincode"] = ["Enter a valid 6-digit pincode."]
+
+    gstin = (gstin or "").strip().upper()
+    if gstin and not re.match(r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$', gstin):
+        errors["billing_gstin"] = ["Enter a valid 15-character GSTIN."]
+
+    return errors
+
+
+def _resolve_billing_details(*, request: HttpRequest, profile) -> tuple[dict | None, dict[str, list[str]]]:
+    """
+    Resolve the billing snapshot to store on the checkout session's
+    ``invoice_details``, from a saved billing address, inline fields, or
+    "same as delivery" (returns ``({}, {})`` — the invoice falls back to the
+    delivery address snapshot at order placement).
+    """
+    if request.POST.get("billing_same_as_delivery", "1") == "1":
+        return {}, {}
+
+    billing_address_id = request.POST.get("billing_address_id", "").strip()
+    if billing_address_id.isdigit() and profile:
+        billing_addr = get_address_by_id(address_id=int(billing_address_id), customer_profile=profile)
+        if billing_addr:
+            return {
+                "billing": {
+                    "name": profile.user.get_full_name() if profile.user_id else "",
+                    "company_name": billing_addr.company_name,
+                    "gstin": billing_addr.gstin,
+                    "line1": billing_addr.line1,
+                    "line2": billing_addr.line2,
+                    "city": billing_addr.display_city,
+                    "state": billing_addr.state_name,
+                    "pincode": billing_addr.pincode,
+                    "country": "India",
+                }
+            }, {}
+
+    billing_company_name = request.POST.get("billing_company_name", "").strip()
+    billing_gstin = request.POST.get("billing_gstin", "").strip().upper()
+    billing_line1 = request.POST.get("billing_line1", "").strip()
+    billing_line2 = request.POST.get("billing_line2", "").strip()
+    billing_city_name = request.POST.get("billing_city_name", "").strip()
+    billing_state_name = request.POST.get("billing_state_name", "").strip()
+    billing_pincode = request.POST.get("billing_pincode", "").strip()
+
+    errors = _validate_billing_fields(
+        address_line1=billing_line1,
+        city_name=billing_city_name,
+        state_name=billing_state_name,
+        pincode=billing_pincode,
+        gstin=billing_gstin,
+    )
+    if errors:
+        return None, errors
+
+    return {
+        "billing": {
+            "name": profile.user.get_full_name() if (profile and profile.user_id) else "",
+            "company_name": billing_company_name,
+            "gstin": billing_gstin,
+            "line1": billing_line1,
+            "line2": billing_line2,
+            "city": billing_city_name,
+            "state": billing_state_name,
+            "pincode": billing_pincode,
+            "country": "India",
+        }
+    }, {}
+
+
 def _is_buy_now_request(request: HttpRequest) -> bool:
     """True when the current checkout request is for the isolated Buy Now cart."""
     if request.method == "GET":
@@ -157,10 +260,12 @@ def checkout_view(request: HttpRequest) -> HttpResponse:
 
 
     addresses = []
+    billing_addresses = []
     if profile:
         # Show every saved address as a choice, not just the default/first one
         # (get_saved_addresses already orders default-first, then newest).
         addresses = get_saved_addresses(customer_profile=profile)["results"]
+        billing_addresses = [a for a in addresses if a.is_billing]
 
     selected_gateway_key = None
     if session.order:
@@ -200,6 +305,7 @@ def checkout_view(request: HttpRequest) -> HttpResponse:
             "gst_breakdown": gst_breakdown,
             "checkout_session": session,
             "addresses": addresses,
+            "billing_addresses": billing_addresses,
             "payment_gateways": available_gateways,
             "selected_gateway_key": selected_gateway_key,
             "has_active_coupons": has_any_active_coupons(),
@@ -376,6 +482,16 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
                 set_default_address(customer_profile=profile, address_id=address.pk)
 
             update_checkout_session(checkout_session=session, address=address)
+
+    invoice_details, billing_errors = _resolve_billing_details(request=request, profile=profile)
+    if billing_errors:
+        return render(
+            request,
+            "checkout/partials/errors.html",
+            {"errors": billing_errors},
+            status=200,
+        )
+    update_checkout_session(checkout_session=session, invoice_details=invoice_details)
 
     from cart.selectors import get_cart_summary
     summary = get_cart_summary(cart=cart)

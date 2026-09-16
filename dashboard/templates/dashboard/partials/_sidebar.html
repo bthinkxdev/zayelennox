@@ -32,6 +32,11 @@
       </a>
     </li>
     <li>
+      <a class="nav-link {% if nav_section == 'combos' %}active{% endif %}" href="{% url 'dashboard:combo-list' %}">
+        <i class="ti ti-packages"></i><span class="nav-text">Combos</span>
+      </a>
+    </li>
+    <li>
       <a class="nav-link {% if nav_section == 'categories' %}active{% endif %}"
         href="{% url 'dashboard:category-list' %}">
         <i class="ti ti-category"></i><span class="nav-text">Categories</span>

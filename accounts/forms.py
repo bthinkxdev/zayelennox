@@ -13,6 +13,7 @@ from accounts.models import Address
 INDIA_PHONE_RE = re.compile(r'^[6-9]\d{9}$')
 PINCODE_RE = re.compile(r'^[1-9][0-9]{5}$')
 ONLY_DIGITS_RE = re.compile(r'^\d+$')
+GSTIN_RE = re.compile(r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$')
 # Requires at least one letter — rejects strings that are only digits and
 # strings that are only special characters/punctuation (e.g. "123", "###").
 HAS_LETTER_RE = re.compile(r'[A-Za-z]')
@@ -156,7 +157,7 @@ class ResetPasswordEmailForm(forms.Form):
 
 
 class AddressForm(forms.ModelForm):
-    """Create or update a customer delivery address."""
+    """Create or update a customer delivery or billing address."""
 
     pincode = forms.RegexField(
         regex=r"^[1-9][0-9]{5}$",
@@ -166,13 +167,25 @@ class AddressForm(forms.ModelForm):
 
     class Meta:
         model = Address
-        fields = ("label", "line1", "line2", "city", "pincode", "is_default")
+        fields = (
+            "label", "line1", "line2", "city", "pincode", "is_default",
+            "is_billing", "company_name", "gstin",
+        )
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         from delivery.models import City
 
         self.fields["city"].queryset = City.objects.filter(is_active=True)
+        self.fields["is_billing"].required = False
+        self.fields["company_name"].required = False
+        self.fields["gstin"].required = False
+
+    def clean_gstin(self):
+        gstin = (self.cleaned_data.get("gstin") or "").strip().upper()
+        if gstin and not GSTIN_RE.match(gstin):
+            raise forms.ValidationError("Enter a valid 15-character GSTIN.")
+        return gstin
 
 
 class SubscriptionCreateForm(forms.Form):
@@ -247,6 +260,41 @@ class CustomerProfileEditForm(forms.Form):
         widget=forms.TextInput(attrs={"class": "form-control", "inputmode": "numeric", "maxlength": "6"}),
     )
 
+    billing_same_as_delivery = forms.BooleanField(
+        label="Same as delivery address",
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+    )
+    billing_company_name = forms.CharField(
+        max_length=150, label="Company name", required=False,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    billing_gstin = forms.CharField(
+        max_length=15, label="GSTIN", required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "style": "text-transform: uppercase;"}),
+    )
+    billing_line1 = forms.CharField(
+        max_length=255, label="Address Line 1", required=False,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    billing_line2 = forms.CharField(
+        max_length=255, label="Address Line 2", required=False,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    billing_city_name = forms.CharField(
+        max_length=120, label="City / Town", required=False,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    billing_state_name = forms.CharField(
+        max_length=120, label="State", required=False,
+        widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    billing_pincode = forms.CharField(
+        max_length=10, label="Pincode", required=False,
+        widget=forms.TextInput(attrs={"class": "form-control", "inputmode": "numeric", "maxlength": "6"}),
+    )
+
     def clean_name(self):
         name = (self.cleaned_data.get("name") or "").strip()
         if name and not HAS_LETTER_RE.search(name):
@@ -287,6 +335,18 @@ class CustomerProfileEditForm(forms.Form):
             raise forms.ValidationError("Enter a valid 6-digit pincode.")
         return pincode
 
+    def clean_billing_gstin(self):
+        gstin = (self.cleaned_data.get("billing_gstin") or "").strip().upper()
+        if gstin and not GSTIN_RE.match(gstin):
+            raise forms.ValidationError("Enter a valid 15-character GSTIN.")
+        return gstin
+
+    def clean_billing_pincode(self):
+        pincode = (self.cleaned_data.get("billing_pincode") or "").strip()
+        if pincode and not PINCODE_RE.match(pincode):
+            raise forms.ValidationError("Enter a valid 6-digit pincode.")
+        return pincode
+
     def clean(self):
         cleaned = super().clean()
         # If the customer is entering/editing a default address, require the
@@ -298,4 +358,15 @@ class CustomerProfileEditForm(forms.Form):
                 self.add_error("state_name", "State is required.")
             if not cleaned.get("pincode"):
                 self.add_error("pincode", "Pincode is required.")
+
+        if not cleaned.get("billing_same_as_delivery") and cleaned.get("billing_line1"):
+            if not cleaned.get("billing_city_name"):
+                self.add_error("billing_city_name", "City is required.")
+            if not cleaned.get("billing_state_name"):
+                self.add_error("billing_state_name", "State is required.")
+            if not cleaned.get("billing_pincode"):
+                self.add_error("billing_pincode", "Pincode is required.")
+        elif not cleaned.get("billing_same_as_delivery") and not cleaned.get("billing_line1"):
+            self.add_error("billing_line1", "Address Line 1 is required.")
+
         return cleaned

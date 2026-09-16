@@ -126,18 +126,35 @@ class CartItem(TimeStampedModel):
         verbose_name="Unit price at add",
         help_text="Snapshotted price when the item entered the cart.",
     )
+    combo = models.ForeignKey(
+        "catalog.Combo",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="Source combo",
+        help_text="Set when this line was added as part of a product combo — its price is "
+        "the combo's prorated share rather than the product's live catalog price.",
+    )
+    combo_name_snapshot = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name="Combo name snapshot",
+        help_text="Combo name at the time this line was added — survives the combo being edited or deleted.",
+    )
 
     class Meta:
         verbose_name = "Cart item"
         verbose_name_plural = "Cart items"
         constraints = [
             models.UniqueConstraint(
-                fields=["cart", "product", "variant"],
-                name="cart_item_unique_product_variant",
+                fields=["cart", "product", "variant", "combo"],
+                name="cart_item_unique_product_variant_combo",
             ),
         ]
         indexes = [
             models.Index(fields=["cart"], name="cart_item_cart_idx"),
+            models.Index(fields=["combo"], name="cart_item_combo_idx"),
         ]
 
     def __str__(self) -> str:

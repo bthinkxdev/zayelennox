@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
 
-from catalog.models import Brand, Category, Product, Review
+from catalog.models import Brand, Category, Combo, Product, Review
 from core.models import Currency
 from dashboard import forms
 from dashboard.access import dashboard_required
@@ -111,6 +111,85 @@ class ProductDeleteView(DashboardDeleteView):
     nav_section = "products"
     url_basename = "product"
     singular_name = "Product"
+
+
+class ComboListView(DashboardListView):
+    model = Combo
+    nav_section = "combos"
+    url_basename = "combo"
+    singular_name = "Combo"
+    plural_name = "Combos"
+    search_fields = ["name", "slug"]
+    columns = [
+        {"label": "Name", "name": "name"},
+        {"label": "Combo Price", "name": "combo_price", "type": "money"},
+        {"label": "Products", "name": "item_count"},
+        {"label": "Active", "name": "is_active", "type": "bool"},
+        {"label": "Order", "name": "display_order"},
+    ]
+
+    def get_queryset(self):
+        # annotate() with an aggregate adds a GROUP BY, which silently drops
+        # the model's Meta.ordering (a Django quirk) - reapply it explicitly.
+        return (
+            super()
+            .get_queryset()
+            .annotate(item_count=Count("items", distinct=True))
+            .order_by("display_order", "name")
+        )
+
+
+class ComboDeleteView(DashboardDeleteView):
+    model = Combo
+    nav_section = "combos"
+    url_basename = "combo"
+    singular_name = "Combo"
+
+
+def _render_combo_form(request, combo, mode):
+    if request.method == "POST":
+        form = forms.ComboForm(request.POST, request.FILES, instance=combo)
+        items = forms.ComboItemFormSet(request.POST, instance=combo, prefix="comboitems")
+        if form.is_valid() and items.is_valid():
+            combo = form.save()
+            items.instance = combo
+            items.save()
+            messages.success(request, f"Combo {'created' if mode == 'create' else 'updated'}.")
+            return redirect("dashboard:combo-list")
+    else:
+        form = forms.ComboForm(instance=combo)
+        items = forms.ComboItemFormSet(instance=combo, prefix="comboitems")
+        if combo is not None:
+            items.extra = 0
+
+    item_empty_form = items.empty_form
+    for f in [form, *items.forms, item_empty_form]:
+        _style(f)
+
+    context = {
+        "nav_section": "combos",
+        "page_title": f"{'Add' if mode == 'create' else 'Edit'} Combo",
+        "form": form,
+        "items": items,
+        "item_empty_form": item_empty_form,
+        "form_mode": mode,
+        "combo": combo,
+        "cancel_url": reverse("dashboard:combo-list"),
+    }
+    return render(request, "dashboard/catalog/combo_form.html", context)
+
+
+@dashboard_required
+@require_http_methods(["GET", "POST"])
+def combo_create(request):
+    return _render_combo_form(request, None, "create")
+
+
+@dashboard_required
+@require_http_methods(["GET", "POST"])
+def combo_update(request, pk):
+    combo = get_object_or_404(Combo, pk=pk)
+    return _render_combo_form(request, combo, "edit")
 
 
 def _render_product_form(request, product, mode):

@@ -85,6 +85,7 @@ class CartSummaryLine:
     quantity: int
     unit_price_at_add: Decimal
     line_subtotal: Decimal
+    combo_name_snapshot: str = ""
 
     @property
     def available_stock(self) -> int:
@@ -267,15 +268,22 @@ def get_cart_summary(*, cart: Cart) -> CartSummary:
     from cart.services import _resolve_unit_price
 
     for item in items:
-        try:
-            unit_price = _resolve_unit_price(
-                product=item.product,
-                variant=item.variant,
-                user=user,
-                quantity=item.quantity,
-            )
-        except Product.DoesNotExist:
+        if item.combo_id:
+            # Combo lines are priced at add-time (see cart.services.add_combo_to_cart)
+            # as a prorated share of the combo's fixed price — never recomputed
+            # from the live catalog price, or the combo discount would vanish
+            # the moment this summary is rendered.
             unit_price = item.unit_price_at_add
+        else:
+            try:
+                unit_price = _resolve_unit_price(
+                    product=item.product,
+                    variant=item.variant,
+                    user=user,
+                    quantity=item.quantity,
+                )
+            except Product.DoesNotExist:
+                unit_price = item.unit_price_at_add
 
         line_subtotal = unit_price * item.quantity
         subtotal += line_subtotal
@@ -287,6 +295,7 @@ def get_cart_summary(*, cart: Cart) -> CartSummary:
             quantity=item.quantity,
             unit_price_at_add=unit_price,
             line_subtotal=line_subtotal,
+            combo_name_snapshot=item.combo_name_snapshot,
         )
         lines.append(line)
         # Checks the specific variant's stock when this line has one, instead

@@ -206,30 +206,37 @@
                 <div class="section-title">Bill To</div>
                 <div class="customer-details">
                     <div class="customer-name">
-                        {% if order.delivery_address_snapshot.name %}
-                            {{ order.delivery_address_snapshot.name }}
+                        {% if order.billing_address_display.name %}
+                            {{ order.billing_address_display.name }}
                         {% elif order.customer_profile and order.customer_profile.user.get_full_name %}
                             {{ order.customer_profile.user.get_full_name }}
                         {% else %}
                             Guest Customer
                         {% endif %}
                     </div>
-                    {% if order.delivery_address_snapshot.line1 %}<div>{{ order.delivery_address_snapshot.line1 }}</div>{% endif %}
-                    {% if order.delivery_address_snapshot.line2 %}
-                        <div>{{ order.delivery_address_snapshot.line2 }}</div>
+                    {% if order.billing_address_display.company_name %}
+                        <div>{{ order.billing_address_display.company_name }}</div>
                     {% endif %}
-                    <div>{{ order.delivery_address_snapshot.city }}{% if order.delivery_address_snapshot.state %}, {{ order.delivery_address_snapshot.state }}{% endif %} {{ order.delivery_address_snapshot.pincode }}</div>
-                    
-                    {% if order.delivery_address_snapshot.email %}
-                        <div>{{ order.delivery_address_snapshot.email }}</div>
+                    {% if order.billing_address_display.line1 %}<div>{{ order.billing_address_display.line1 }}</div>{% endif %}
+                    {% if order.billing_address_display.line2 %}
+                        <div>{{ order.billing_address_display.line2 }}</div>
+                    {% endif %}
+                    <div>{{ order.billing_address_display.city }}{% if order.billing_address_display.state %}, {{ order.billing_address_display.state }}{% endif %} {{ order.billing_address_display.pincode }}</div>
+
+                    {% if order.billing_address_display.email %}
+                        <div>{{ order.billing_address_display.email }}</div>
                     {% elif order.customer_profile %}
                         <div>{{ order.customer_profile.user.email }}</div>
                     {% endif %}
-                    
-                    {% if order.delivery_address_snapshot.phone %}
-                        <div>{{ order.delivery_address_snapshot.phone }}</div>
+
+                    {% if order.billing_address_display.phone %}
+                        <div>{{ order.billing_address_display.phone }}</div>
                     {% elif order.customer_profile and order.customer_profile.get_phone %}
                         <div>{{ order.customer_profile.get_phone }}</div>
+                    {% endif %}
+
+                    {% if order.billing_address_display.gstin %}
+                        <div>GSTIN: {{ order.billing_address_display.gstin }}</div>
                     {% endif %}
                 </div>
             </div>
@@ -287,6 +294,9 @@
                         <span class="item-name">{{ item.product.name }}</span>
                         {% if item.variant %}
                             <span class="item-variant">{{ item.variant.name }}</span>
+                        {% endif %}
+                        {% if item.combo_name_snapshot %}
+                            <span class="item-variant">Part of combo: {{ item.combo_name_snapshot }}</span>
                         {% endif %}
                     </td>
                     {% if order.has_gst_details %}<td>{{ item.hsn_code_snapshot|default:"—" }}</td>{% endif %}

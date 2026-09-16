@@ -197,6 +197,7 @@ def place_order(
             variant=line.variant,
             quantity=line.quantity,
             unit_price=line.unit_price_at_add,
+            combo_name_snapshot=line.combo_name_snapshot,
             hsn_code_snapshot=gst_line.hsn_code,
             gst_rate_percent_snapshot=gst_line.gst_rate_percent,
             taxable_value=gst_line.taxable_value,

@@ -1,0 +1,108 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}{% if form_mode == "edit" %}Edit{% else %}Add{% endif %} Combo{% endblock %}
+{% block page_title %}{% if form_mode == "edit" %}Edit Combo{% else %}Add Combo{% endif %}{% endblock %}
+{% block breadcrumbs %}<p class="mb-0 text-secondary">Bundle existing products together at one fixed price</p>{% endblock %}
+
+{% block content %}
+<form id="combo-form" method="post" enctype="multipart/form-data" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+
+  <div class="row g-3">
+    <div class="col-12 col-xl-8">
+      <div class="card mb-3">
+        <div class="card-header panel-header">
+          <div>
+            <h3 class="panel-title">Combo details</h3>
+            <p class="panel-sub">The combo price is what the customer pays in total for one unit of this combo — the discount vs. the products' normal combined price is split proportionally across them at add-to-cart time, so each product's own tax stays correct.</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-12">{% include "dashboard/partials/_field.html" with field=form.name %}</div>
+            <div class="col-md-6">{% include "dashboard/partials/_field.html" with field=form.slug %}</div>
+            <div class="col-md-6">{% include "dashboard/partials/_field.html" with field=form.combo_price %}</div>
+            <div class="col-md-6">{% include "dashboard/partials/_field.html" with field=form.image %}</div>
+            <div class="col-md-6">{% include "dashboard/partials/_field.html" with field=form.display_order %}</div>
+            <div class="col-12">{% include "dashboard/partials/_field.html" with field=form.description %}</div>
+            <div class="col-12">{% include "dashboard/partials/_field.html" with field=form.is_active %}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3" data-formset="comboitems">
+        <div class="card-header panel-header">
+          <div>
+            <h3 class="panel-title">Products in this combo</h3>
+            <p class="panel-sub">Each product keeps its own HSN code and GST rate at checkout — pick a variant when the product has one.</p>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary" data-formset-add><i class="ti ti-plus me-1"></i>Add product</button>
+        </div>
+        <div class="card-body p-0">
+          {{ items.management_form }}
+          {% if items.non_form_errors %}
+          <div class="alert alert-danger mx-3 mt-3 mb-0">{{ items.non_form_errors|join:", " }}</div>
+          {% endif %}
+          <div class="table-responsive">
+            <table class="table repeater align-middle mb-0">
+              <thead>
+                <tr>
+                  <th class="d-none"></th>
+                  <th>Product</th>
+                  <th>Variant</th>
+                  <th style="width:120px">Quantity</th>
+                  <th class="text-center" style="width:80px">Remove</th>
+                </tr>
+              </thead>
+              <tbody data-formset-body>
+                {% for iform in items %}
+                <tr>
+                  <td class="d-none">{{ iform.id }}</td>
+                  <td data-label="Product">
+                    {{ iform.product }}
+                    {% if iform.product.errors %}<div class="text-danger small mt-1">{{ iform.product.errors|join:", " }}</div>{% endif %}
+                  </td>
+                  <td data-label="Variant">
+                    {{ iform.variant }}
+                  </td>
+                  <td data-label="Quantity">
+                    {{ iform.quantity }}
+                    {% if iform.quantity.errors %}<div class="text-danger small mt-1">{{ iform.quantity.errors|join:", " }}</div>{% endif %}
+                  </td>
+                  <td class="text-center" data-label="Remove">
+                    {% if iform.instance.pk %}
+                    <label class="form-check d-inline-flex m-0" title="Delete on save">{{ iform.DELETE }}</label>
+                    {% else %}
+                    <button type="button" class="btn btn-icon btn-sm btn-light text-danger" data-row-remove><i class="ti ti-trash"></i></button>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <template data-formset-empty>
+            <tr>
+              <td class="d-none">{{ item_empty_form.id }}</td>
+              <td data-label="Product">{{ item_empty_form.product }}</td>
+              <td data-label="Variant">{{ item_empty_form.variant }}</td>
+              <td data-label="Quantity">{{ item_empty_form.quantity }}</td>
+              <td class="text-center" data-label="Remove"><button type="button" class="btn btn-icon btn-sm btn-light text-danger" data-row-remove><i class="ti ti-trash"></i></button></td>
+            </tr>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-4">
+      <div class="card">
+        <div class="card-body d-flex flex-column gap-2">
+          <button type="submit" class="btn btn-primary">{% if form_mode == "edit" %}Save changes{% else %}Create combo{% endif %}</button>
+          <a href="{{ cancel_url }}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}

@@ -926,6 +926,11 @@ body.mobile-search-open {
   color: #fff;
 }
 
+.product-badge--combo {
+  background: var(--floward-text);
+  color: #fff;
+}
+
 
 .chip-scroll {
   display: flex;

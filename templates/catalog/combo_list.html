@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Combos" %} | ZAYE LENNOX{% endblock %}
+
+{% block content %}
+<div class="container page-container plp-page">
+  <div class="plp-toolbar">
+    <div>
+      <h1 class="section-title mb-0">{% trans "Combo Offers" %}</h1>
+      <p class="section-subtitle mt-1">{% trans "Curated product bundles at one fixed price" %}</p>
+    </div>
+  </div>
+  <div class="row g-3 mt-2">
+    {% for combo in combos %}
+    <div class="col-6 col-md-4 col-lg-3 product-grid-item">
+      {% include "catalog/partials/combo_card.html" with combo=combo %}
+    </div>
+    {% empty %}
+    <div class="col-12 text-center py-5">
+      <p class="text-muted mb-3">{% trans "No combo offers currently available." %}</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from django import forms
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -10,6 +11,8 @@ from accounts.models import CustomerProfile
 from catalog.models import (
     Brand,
     Category,
+    Combo,
+    ComboItem,
     Product,
     ProductDocument,
     ProductImage,
@@ -410,6 +413,67 @@ ProductVariantFormSet = forms.inlineformset_factory(
     extra=1,
     can_delete=True,
 )
+
+class ComboForm(SlugAutoMixin):
+    class Meta:
+        model = Combo
+        fields = ["name", "slug", "description", "image", "combo_price", "is_active", "display_order"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["slug"].required = False
+
+
+class ComboItemForm(forms.ModelForm):
+    class Meta:
+        model = ComboItem
+        fields = ["product", "variant", "quantity"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Include the row's already-saved product/variant even if it has
+        # since been deactivated — otherwise editing any other field on an
+        # existing combo whose component was deactivated would render a
+        # <select> without its current value, which Django/browsers resolve
+        # inconsistently (blank, or silently falling back to another option
+        # and swapping the combo's actual component on save).
+        product_filter = Q(is_active=True)
+        if self.instance.pk and self.instance.product_id:
+            product_filter |= Q(pk=self.instance.product_id)
+        self.fields["product"].queryset = Product.objects.filter(product_filter).order_by("name")
+        self.fields["variant"].queryset = ProductVariant.objects.select_related("product").order_by(
+            "product__name", "name"
+        )
+        self.fields["variant"].required = False
+
+    def clean_quantity(self):
+        quantity = self.cleaned_data.get("quantity")
+        if quantity is not None and quantity < 1:
+            raise forms.ValidationError("Quantity must be at least 1.")
+        return quantity
+
+    def clean(self):
+        cleaned = super().clean()
+        product = cleaned.get("product")
+        variant = cleaned.get("variant")
+        if product and variant and variant.product_id != product.pk:
+            self.add_error("variant", "This variant does not belong to the selected product.")
+        if product and not variant and product.variants.exists():
+            self.add_error(
+                "variant",
+                "This product has variants — pick one, since it can't be sold without a variant selection.",
+            )
+        return cleaned
+
+
+ComboItemFormSet = forms.inlineformset_factory(
+    Combo,
+    ComboItem,
+    form=ComboItemForm,
+    extra=1,
+    can_delete=True,
+)
+
 
 class ProductImageForm(forms.ModelForm):
     class Meta:

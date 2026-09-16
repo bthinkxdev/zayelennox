@@ -165,6 +165,20 @@ class Order(TimeStampedModel):
         """CGST/SGST/IGST split of this order's total_tax_amount."""
         return split_by_supply_type(tax_amount=self.total_tax_amount, is_interstate=self.is_interstate)
 
+    @property
+    def billing_address_display(self) -> dict:
+        """
+        Address to show in the invoice's "Bill To" section.
+
+        Falls back to the delivery address snapshot when no distinct billing
+        address was captured at checkout (the default case, and every order
+        placed before billing addresses existed) — so "Bill To" and "Ship To"
+        render identically unless the customer explicitly set a billing
+        address different from delivery.
+        """
+        billing = (self.invoice_details or {}).get("billing")
+        return billing or self.delivery_address_snapshot
+
 
 class OrderItem(TimeStampedModel):
     """Immutable purchased line on an order."""
@@ -194,6 +208,12 @@ class OrderItem(TimeStampedModel):
         max_digits=12,
         decimal_places=2,
         verbose_name="Unit price",
+    )
+    combo_name_snapshot = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name="Combo name snapshot",
+        help_text="Name of the combo this line was purchased as part of, if any.",
     )
     hsn_code_snapshot = models.CharField(max_length=8, blank=True, verbose_name="HSN/SAC Code")
     gst_rate_percent_snapshot = models.DecimalField(

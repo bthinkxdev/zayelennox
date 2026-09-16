@@ -28,3 +28,15 @@ class VariantRequiredError(CartError):
     missing/invalid variant_id must be rejected here rather than silently
     falling back to the product's stock figure.
     """
+
+
+class ComboLineNotAdjustableError(CartError):
+    """
+    Raised when trying to change the quantity of a single combo component.
+
+    Combo lines are priced as a prorated share of the combo's fixed price
+    (see cart.services.add_combo_to_cart) — adjusting one component's
+    quantity independently would desync it from its siblings and invalidate
+    that pricing. Remove and re-add the combo at a different quantity
+    instead (see cart.services.remove_combo_from_cart).
+    """

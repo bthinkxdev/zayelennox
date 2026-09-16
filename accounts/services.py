@@ -382,6 +382,38 @@ def set_default_address(*, customer_profile: CustomerProfile, address_id: int) -
 
 
 @transaction.atomic
+def set_billing_address(*, customer_profile: CustomerProfile, address_id: int) -> Address:
+    """
+    Atomically set one address as the customer's billing address.
+
+    Mirrors ``set_default_address`` — uses select_for_update to prevent
+    concurrent calls leaving two billing addresses.
+    Params:
+        customer_profile: Owner profile.
+        address_id: Primary key of the address to promote.
+    Returns:
+        Updated Address instance.
+    """
+    addresses = Address.objects.select_for_update().filter(customer_profile=customer_profile)
+    address = addresses.get(pk=address_id)
+    addresses.exclude(pk=address_id).update(is_billing=False)
+    address.is_billing = True
+    address.save(update_fields=["is_billing", "updated_at"])
+    customer_profile.default_billing_address = address
+    customer_profile.save(update_fields=["default_billing_address", "updated_at"])
+    return address
+
+
+@transaction.atomic
+def clear_billing_address(*, customer_profile: CustomerProfile) -> None:
+    """Unset the customer's billing address so checkout falls back to the delivery address."""
+    Address.objects.filter(customer_profile=customer_profile, is_billing=True).update(is_billing=False)
+    if customer_profile.default_billing_address_id:
+        customer_profile.default_billing_address = None
+        customer_profile.save(update_fields=["default_billing_address", "updated_at"])
+
+
+@transaction.atomic
 def update_address(
     *,
     customer_profile: CustomerProfile,
@@ -469,9 +501,15 @@ def delete_address(*, customer_profile: CustomerProfile, address_id: int) -> Non
         address_id: Primary key of the address to remove.
     """
     address = Address.objects.get(pk=address_id, customer_profile=customer_profile)
+    update_fields = []
     if customer_profile.default_address_id == address.pk:
         customer_profile.default_address = None
-        customer_profile.save(update_fields=["default_address", "updated_at"])
+        update_fields.append("default_address")
+    if customer_profile.default_billing_address_id == address.pk:
+        customer_profile.default_billing_address = None
+        update_fields.append("default_billing_address")
+    if update_fields:
+        customer_profile.save(update_fields=[*update_fields, "updated_at"])
     address.delete()
 
 

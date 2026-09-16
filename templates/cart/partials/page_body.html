@@ -35,8 +35,19 @@
             <div class="text-danger small mt-1">{{ error }}</div>
             {% endif %}
             {% if line.gift_snapshot %}<div class="small text-floward mb-1">{% trans "Gift customized" %}</div>{% endif %}
+            {% if line.combo_name_snapshot %}<div class="small text-floward mb-1">{% trans "Part of combo:" %} {{ line.combo_name_snapshot }}</div>{% endif %}
 
             <div class="d-flex align-items-center justify-content-between mt-2">
+              {% if line.combo_name_snapshot %}
+              <span class="qty-stepper__value">{% trans "Qty" %} {{ line.quantity }}</span>
+              <form method="post" action="{% url 'cart:combo-remove' %}">
+                {% csrf_token %}
+                <input type="hidden" name="combo_id" value="{{ line.item.combo_id }}">
+                <button class="btn btn-sm btn-ghost text-danger" type="button" hx-post="{% url 'cart:combo-remove' %}" hx-target="#cart-page-body" hx-swap="outerHTML" hx-include="closest form" aria-label="{% trans 'Remove combo' %}" title="{% trans 'Remove combo' %}">
+                  {% trans "Remove combo" %}
+                </button>
+              </form>
+              {% else %}
               <div class="qty-stepper d-flex align-items-center border rounded-pill overflow-hidden" style="width: fit-content;">
                 <form method="post" action="{% url 'cart:quantity' %}">
                   {% csrf_token %}
@@ -62,6 +73,7 @@
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
                 </button>
               </form>
+              {% endif %}
             </div>
           </div>
         </li>
