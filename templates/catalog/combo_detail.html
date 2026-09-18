@@ -36,7 +36,7 @@
             {% for item in combo.items.all %}
             <li class="d-flex justify-content-between align-items-center py-2{% if not forloop.last %} border-bottom{% endif %}">
               <span>
-                <a href="{% url 'catalog:pdp' slug=item.product.slug %}" class="text-dark text-decoration-none">
+                <a href="{% url 'catalog:pdp' slug=item.product.slug %}{% if item.variant %}?variant_id={{ item.variant.pk }}{% endif %}" class="text-dark text-decoration-none">
                   {{ item.product.name }}{% if item.variant %} — {{ item.variant.name }}{% endif %}
                 </a>
               </span>
@@ -47,19 +47,60 @@
         </div>
       </div>
 
-      {% if combo.is_available %}
-      <form method="post" action="{% url 'cart:combo-add' %}" hx-post="{% url 'cart:combo-add' %}" hx-target="#cart-drawer-body" hx-swap="innerHTML">
-        {% csrf_token %}
-        <input type="hidden" name="combo_id" value="{{ combo.pk }}">
-        <input type="hidden" name="quantity" value="1">
-        <button type="submit" class="btn btn-floward btn-lg w-100">
-          {% trans "Add Combo to Cart" %}
-        </button>
-      </form>
-      {% else %}
-      <button type="button" class="btn btn-secondary btn-lg w-100" disabled>{% trans "Currently Unavailable" %}</button>
-      <p class="text-muted small mt-2">{% trans "One or more products in this combo are out of stock." %}</p>
-      {% endif %}
+      <div id="combo-purchase-actions-wrap">
+        <div id="combo-purchase-actions"
+          hx-get="{{ request.path }}"
+          hx-select="#combo-purchase-actions"
+          hx-swap="outerHTML"
+          hx-trigger="pageshow from:window, cartItemAdded from:body, cartUpdated from:body">
+          {% if combo.is_available and max_combo_qty > 0 %}
+          <div class="qty-stepper jm-pdp-qty mb-3" aria-label="{% trans 'Quantity' %}">
+            <button class="qty-stepper__btn" type="button"
+              onclick="let inp = document.getElementById('combo-qty'); let msg = document.getElementById('combo-qty-limit-msg'); if(inp.value > 1) { inp.value = parseInt(inp.value, 10) - 1; document.querySelectorAll('.combo-qty-input').forEach(i => i.value = inp.value); } if(msg) msg.classList.add('d-none');"
+              aria-label="{% trans 'Decrease quantity' %}">&minus;</button>
+            <input type="number" id="combo-qty" class="qty-stepper__value combo-qty-input"
+              value="1" min="1" max="{{ max_combo_qty }}" readonly
+              aria-label="{% trans 'Quantity' %}">
+            <button class="qty-stepper__btn" type="button"
+              onclick="let inp = document.getElementById('combo-qty'); let max = parseInt(inp.getAttribute('max'), 10) || 1; let msg = document.getElementById('combo-qty-limit-msg'); if(parseInt(inp.value, 10) < max) { inp.value = parseInt(inp.value, 10) + 1; document.querySelectorAll('.combo-qty-input').forEach(i => i.value = inp.value); } if(msg) msg.classList.toggle('d-none', parseInt(inp.value, 10) < max);"
+              aria-label="{% trans 'Increase quantity' %}">&plus;</button>
+          </div>
+          <div id="combo-qty-limit-msg" class="text-danger small mt-1 mb-3 d-none">
+            {% blocktrans %}Only {{ max_combo_qty }} of this combo available — {{ limiting_component_name }}'s stock won't cover more.{% endblocktrans %}
+          </div>
+
+          {% if combo_in_cart %}
+          <a href="{% url 'cart:page' %}" class="btn btn-outline-floward btn-lg w-100 mb-2">
+            {% trans "View Cart" %}
+          </a>
+          {% else %}
+          <form method="post" action="{% url 'cart:combo-add' %}" hx-post="{% url 'cart:combo-add' %}" hx-target="#cart-drawer-body" hx-swap="innerHTML" class="mb-2">
+            {% csrf_token %}
+            <input type="hidden" name="combo_id" value="{{ combo.pk }}">
+            <input type="hidden" name="quantity" class="combo-qty-input" value="1">
+            <button type="submit" class="btn btn-outline-floward btn-lg w-100">
+              {% trans "Add Combo to Cart" %}
+            </button>
+          </form>
+          {% endif %}
+
+          <form method="post" action="{% url 'cart:combo-add' %}" hx-post="{% url 'cart:combo-add' %}" hx-target="#cart-drawer-body" hx-swap="innerHTML">
+            {% csrf_token %}
+            <input type="hidden" name="combo_id" value="{{ combo.pk }}">
+            <input type="hidden" name="quantity" class="combo-qty-input" value="1">
+            <button type="submit" name="buy_now" value="true" class="btn btn-floward btn-lg w-100">
+              {% trans "Buy Now" %}
+            </button>
+          </form>
+          {% elif combo.is_available %}
+          <button type="button" class="btn btn-secondary btn-lg w-100" disabled>{% trans "Currently Unavailable" %}</button>
+          <p class="text-muted small mt-2">{% trans "You already have the maximum available quantity of this combo's products in your cart." %}</p>
+          {% else %}
+          <button type="button" class="btn btn-secondary btn-lg w-100" disabled>{% trans "Currently Unavailable" %}</button>
+          <p class="text-muted small mt-2">{% trans "One or more products in this combo are out of stock." %}</p>
+          {% endif %}
+        </div>
+      </div>
     </div>
   </div>
 </div>

@@ -183,8 +183,8 @@
 
           var qtyLimitMsg = document.getElementById('pdp-qty-limit-msg');
           if (qtyLimitMsg) {
-            var atLimit = inStock && qtyInput && parseInt(qtyInput.value, 10) >= stock;
-            qtyLimitMsg.classList.toggle('d-none', !atLimit);
+
+            qtyLimitMsg.classList.add('d-none');
             qtyLimitMsg.textContent = 'Only ' + (stock || 1) + ' items available in stock.';
           }
 

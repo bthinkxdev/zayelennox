@@ -322,6 +322,13 @@ def add_combo_to_cart(*, cart: Cart, combo: Combo, quantity: int = 1) -> list[Ca
 
 
 @transaction.atomic
+def set_buy_now_combo(*, cart: Cart, combo: Combo, quantity: int = 1) -> list[CartItem]:
+
+    reset_cart(cart=cart)
+    return add_combo_to_cart(cart=cart, combo=combo, quantity=quantity)
+
+
+@transaction.atomic
 def remove_combo_from_cart(*, cart: Cart, combo_id: int) -> None:
     """Remove every cart line that was added as part of the given combo."""
     CartItem.objects.filter(cart=cart, combo_id=combo_id).delete()

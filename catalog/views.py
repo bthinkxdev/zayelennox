@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+from django.db.models import Sum
 from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.shortcuts import get_object_or_404, redirect
@@ -394,7 +395,48 @@ def combo_detail_view(request: HttpRequest, slug: str) -> HttpResponse:
     combo = get_combo_by_slug(slug=slug)
     if combo is None:
         raise Http404("Combo not found")
-    return render(request, "catalog/combo_detail.html", {"combo": combo})
+
+    from cart.models import CartItem
+    from cart.selectors import get_cart_for_request
+
+    cart = get_cart_for_request(request=request)
+    combo_items = list(combo.items.all())
+
+    reserved_by_key: dict[tuple[int, int | None], int] = {}
+    if cart and combo_items:
+        reserved_rows = (
+            CartItem.objects.filter(cart=cart)
+            .values("product_id", "variant_id")
+            .annotate(total=Sum("quantity"))
+        )
+        reserved_by_key = {(row["product_id"], row["variant_id"]): row["total"] for row in reserved_rows}
+
+    max_combo_qty = 0
+    limiting_component_name = ""
+    if combo.is_available:
+        for item in combo_items:
+            raw_stock = item.variant.stock_quantity if item.variant_id else item.product.stock_quantity
+            reserved = reserved_by_key.get((item.product_id, item.variant_id), 0)
+            available = max(raw_stock - reserved, 0)
+            item_max = available // item.quantity
+            if limiting_component_name == "" or item_max < max_combo_qty:
+                max_combo_qty = item_max
+                limiting_component_name = (
+                    f"{item.product.name} \u2014 {item.variant.name}" if item.variant_id else item.product.name
+                )
+
+    combo_in_cart = bool(cart) and CartItem.objects.filter(cart=cart, combo=combo).exists()
+
+    return render(
+        request,
+        "catalog/combo_detail.html",
+        {
+            "combo": combo,
+            "max_combo_qty": max_combo_qty,
+            "limiting_component_name": limiting_component_name,
+            "combo_in_cart": combo_in_cart,
+        },
+    )
 
 
 @require_POST

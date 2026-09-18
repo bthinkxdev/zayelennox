@@ -28,6 +28,7 @@ from cart.services import (
     remove_coupon,
     remove_cart_item,
     remove_combo_from_cart,
+    set_buy_now_combo,
     set_buy_now_item,
     toggle_wishlist,
 )
@@ -199,6 +200,26 @@ def cart_add_combo_view(request: HttpRequest) -> HttpResponse:
     combo_id = int(request.POST.get("combo_id", 0))
     quantity = int(request.POST.get("quantity", 1))
     combo = get_object_or_404(Combo, pk=combo_id, is_active=True)
+
+    buy_now = request.POST.get("buy_now") == "true"
+
+    if buy_now:
+      
+        buy_now_cart = get_or_create_buy_now_cart(request=request)
+        try:
+            set_buy_now_combo(cart=buy_now_cart, combo=combo, quantity=quantity)
+        except (InsufficientStockError, VariantRequiredError) as exc:
+            from django.contrib import messages
+            messages.error(request, str(exc))
+            return redirect(request.META.get("HTTP_REFERER", "/"))
+
+        from django.urls import reverse
+        checkout_url = reverse("checkout:checkout") + "?buy_now=1"
+        if request.headers.get("HX-Request"):
+            response = HttpResponse(status=204)
+            response["HX-Redirect"] = checkout_url
+            return response
+        return redirect(checkout_url)
 
     cart = get_or_create_cart(request=request)
     try:

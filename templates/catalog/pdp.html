@@ -44,7 +44,7 @@
           </p>
           <div id="pdp-low-stock-alert" class="text-danger small mt-1 fw-semibold {% if price_data.is_low_stock != 'true' %}d-none{% endif %}">{% trans "Only" %} <span id="pdp-low-stock-count">{{ resolved_stock }}</span> {% trans "left!" %}</div>
           {% if price_data.is_in_stock == 'true' %}
-          <div id="pdp-qty-limit-msg" class="text-danger small mt-1 {% if not cart_item or cart_item.quantity < resolved_stock %}d-none{% endif %}">
+          <div id="pdp-qty-limit-msg" class="text-danger small mt-1 d-none">
             {% trans "Only" %} {{ resolved_stock|default:1 }} {% trans "items available in stock." %}</div>
           {% endif %}
         </div>
