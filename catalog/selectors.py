@@ -11,6 +11,8 @@ from django.db.models import Avg, Case, Count, F, IntegerField, Min, Prefetch, Q
 
 from catalog.models import (
     Combo,
+    ComboDocument,
+    ComboImage,
     ModerationStatus,
     Product,
     ProductDocument,
@@ -791,15 +793,24 @@ def _combo_items_prefetch() -> Prefetch:
     )
 
 
+def _combo_images_prefetch() -> Prefetch:
+    """Shared prefetch for a combo's gallery images/videos, ordered for display."""
+    return Prefetch(
+        "images",
+        queryset=ComboImage.objects.order_by("-is_primary", "display_order"),
+    )
+
+
 def get_active_combos() -> list[Combo]:
     """
     Return active combos for storefront listing, ordered for display.
 
-    Query guarantee: 1 SELECT on combo + 1 prefetch SELECT on combo items.
+    Query guarantee: 1 SELECT on combo + 1 prefetch SELECT on combo items
+    + 1 prefetch SELECT on combo images.
     """
     return list(
         Combo.objects.filter(is_active=True)
-        .prefetch_related(_combo_items_prefetch())
+        .prefetch_related(_combo_items_prefetch(), _combo_images_prefetch())
         .order_by("display_order", "name")
     )
 
@@ -812,7 +823,14 @@ def get_combo_by_slug(*, slug: str) -> Optional[Combo]:
     """
     return (
         Combo.objects.filter(slug=slug, is_active=True)
-        .prefetch_related(_combo_items_prefetch())
+        .prefetch_related(
+            _combo_items_prefetch(),
+            _combo_images_prefetch(),
+            Prefetch(
+                "documents",
+                queryset=ComboDocument.objects.order_by("display_order", "title"),
+            ),
+        )
         .first()
     )
 

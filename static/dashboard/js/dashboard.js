@@ -233,6 +233,10 @@
       wrap.addEventListener("change", function (e) {
         var inp = e.target;
 
+        if (inp.hasAttribute && inp.hasAttribute("data-media-picker")) {
+          return;
+        }
+
         //only one image can be primary - checking one unchecks all others,
         //like a radio button (product image formset only; matched by name
         //suffix so this has no effect on other formsets, e.g. variants).
@@ -733,6 +737,76 @@
     filterAllRows();
   }
 
+  // ---- Product form: single combined image/video picker -----------------
+  // Product images used to have two separate <input type="file"> fields
+  // (one for "image", one for "video") sitting side by side in the same
+  // table cell. This collapses that into one visible file input per row
+  // that accepts both; the picked file is routed into whichever real
+  // (hidden) model field it belongs to based on its actual type, not on
+  // which input the vendor happened to click.
+  function isPickedFileVideo(file) {
+    if (file.type && file.type.indexOf("video/") === 0) return true;
+    return /\.(mp4|webm|ogg|mov)$/i.test(file.name || "");
+  }
+
+  function initProductImageMediaPicker() {
+    var wrap = document.querySelector('[data-formset="images"]');
+    if (!wrap) return;
+
+    wrap.addEventListener("change", function (e) {
+      var picker = e.target.closest ? e.target.closest("[data-media-picker]") : null;
+      if (!picker || !picker.files || !picker.files[0]) return;
+
+      var file = picker.files[0];
+      var row = picker.closest("tr");
+      if (!row) return;
+
+      var imageInput = row.querySelector("input[type='file'][name$='-image']");
+      var videoInput = row.querySelector("input[type='file'][name$='-video']");
+      if (!imageInput || !videoInput) return;
+
+      var isVideo = isPickedFileVideo(file);
+      var dt = new DataTransfer();
+      dt.items.add(file);
+
+      if (isVideo) {
+        videoInput.files = dt.files;
+        imageInput.value = "";
+      } else {
+        imageInput.files = dt.files;
+        videoInput.value = "";
+      }
+
+      //update the "existing file" label, if this row already had a saved file
+      var container = row.querySelector("[data-existing-file-container]");
+      var label = container ? container.querySelector("[data-file-label]") : null;
+      if (label) {
+        label.innerHTML = (isVideo
+          ? '<i class="ti ti-video me-1 text-success"></i>'
+          : '<i class="ti ti-photo me-1 text-success"></i>') + file.name;
+      }
+
+      //preview thumbnail - a video can't be shown as an <img src>, so it
+      //gets the same play-icon placeholder used for already-saved videos.
+      var prev = row.querySelector("[data-img-preview]");
+      if (prev) {
+        if (prev.src && prev.src.startsWith("blob:")) {
+          URL.revokeObjectURL(prev.src);
+        }
+        if (isVideo) {
+          prev.removeAttribute("src");
+          prev.title = file.name;
+          prev.classList.add("thumb-video-placeholder");
+        } else {
+          prev.src = URL.createObjectURL(file);
+          prev.classList.remove("thumb-video-placeholder");
+          prev.removeAttribute("title");
+        }
+        prev.classList.remove("d-none");
+      }
+    });
+  }
+
   function initPage() {
     initSidebar();
     initFormValidation();
@@ -746,6 +820,7 @@
     initVariantEmptyState();
     initProductFormPersistFiles();
     initComboFormPersistFiles();
+    initProductImageMediaPicker();
     initOrderStatusGuard();
     initSearchFormGuard();
     initTableLabels();
@@ -839,6 +914,12 @@
 
       var pickedFiles = [];
       Array.prototype.forEach.call(formEl.querySelectorAll('input[type="file"]'), function (input) {
+        //the combined image/video picker has no name of its own (it just
+        //routes into the real, uniquely-named hidden image/video inputs -
+        //see initProductImageMediaPicker) - those hidden inputs are what
+        //actually carry the file to persist, so skip the picker itself to
+        //avoid restoring into the wrong row's picker by an empty-name match.
+        if (input.hasAttribute("data-media-picker")) return;
         if (input.files && input.files[0]) {
           pickedFiles.push({ name: input.name, file: input.files[0] });
         }
@@ -908,6 +989,7 @@
       initVariantImagesToggle();
       initSimpleProductRequiredMarkers();
       initVariantEmptyState();
+      initProductImageMediaPicker();
     });
   }
 
@@ -915,6 +997,7 @@
     bindFilePersistForm("combo-form", function () {
       initFormsets();
       initComboVariantFilter();
+      initProductImageMediaPicker();
     });
   }
 

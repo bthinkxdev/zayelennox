@@ -234,6 +234,14 @@
             <img src="{{ doc.document_file.url }}" alt="{{ doc.title }}" class="img-fluid w-100 rounded"
               style="object-fit: contain;">
           </div>
+          {% elif doc.is_video %}
+          <div class="jm-pdp-doc-image mb-5 text-center">
+            <h2 class="mb-4"
+              style="font-family: 'Playfair Display', 'Times New Roman', serif; font-size: clamp(1.5rem, 4vw, 2.25rem); color: #1a1a1a;">
+              {{ doc.title }}</h2>
+            <video src="{{ doc.document_file.url }}" class="w-100 rounded" style="object-fit: contain;"
+              controls playsinline preload="metadata"></video>
+          </div>
           {% else %}
           <div class="jm-pdp-doc">
             <div>

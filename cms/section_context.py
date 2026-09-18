@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from catalog.selectors import (
+    get_active_combos,
     get_featured_brands,
     get_homepage_product_rails,
     get_products_for_section_config,
@@ -48,6 +49,7 @@ def build_section_context(
         "reviews": _reviews,
         "instagram_gallery": _instagram,
         "newsletter": _newsletter,
+        "combos": _combos,
     }
     builder = builders.get(section_type, _empty)
     if section_type in ("featured_products", "best_sellers", "new_arrivals"):
@@ -157,6 +159,10 @@ def _instagram(config: dict[str, Any]) -> dict[str, Any]:
 
 def _newsletter(config: dict[str, Any]) -> dict[str, Any]:
     return {"placeholder": config.get("placeholder", "")}
+
+
+def _combos(config: dict[str, Any]) -> dict[str, Any]:
+    return {"combos": get_active_combos()}
 
 
 def _empty(config: dict[str, Any]) -> dict[str, Any]:

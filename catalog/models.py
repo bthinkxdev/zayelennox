@@ -869,6 +869,76 @@ class Combo(TimeStampedModel):
         return True
 
 
+class ComboImage(TimeStampedModel):
+    """
+    Gallery image or video for a combo, shown in its storefront gallery.
+
+    """
+
+    combo = models.ForeignKey(
+        Combo,
+        on_delete=models.CASCADE,
+        related_name="images",
+        verbose_name="Combo",
+    )
+    image = models.ImageField(
+        upload_to="combos/images/",
+        blank=True,
+        verbose_name="Image",
+        help_text="Photo slide. Also used as the video's thumbnail when a video is uploaded below.",
+    )
+    video = models.FileField(
+        upload_to="combos/images/videos/",
+        blank=True,
+        verbose_name="Video",
+        validators=[FileExtensionValidator(["mp4", "webm", "ogg", "mov"])],
+        help_text="Video slide (mp4/webm). Takes priority over the photo in the gallery.",
+    )
+    alt_text = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Alt text",
+    )
+    display_order = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Display order",
+    )
+    is_primary = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name="Is primary",
+        help_text="Primary image shown on combo cards and rails.",
+    )
+
+    class Meta:
+        verbose_name = "Combo image"
+        verbose_name_plural = "Combo images"
+        ordering = ["-is_primary", "display_order"]
+        indexes = [
+            models.Index(fields=["combo", "is_primary"], name="cat_cimg_combo_primary_idx"),
+        ]
+
+    def clean(self):
+        super().clean()
+        if not self.image and not self.video:
+            raise ValidationError("Upload an image or a video.")
+
+    @property
+    def media_type(self) -> str:
+        return "video" if self.video else "image"
+
+    @property
+    def media_src(self) -> str:
+        if self.video:
+            return self.video.url
+        if self.image:
+            return self.image.url
+        return ""
+
+    def __str__(self) -> str:
+        return f"Image for {self.combo.slug}"
+
+
 class ComboItem(TimeStampedModel):
     """One product/variant + quantity component of a Combo."""
 
@@ -909,8 +979,63 @@ class ComboItem(TimeStampedModel):
         return f"{self.combo_id}: {self.product_id} x{self.quantity}"
 
 
+class ComboDocument(TimeStampedModel):
+    """Image/video/PDF description block for a combo — see ProductDocument, the same feature for a Product."""
+
+    combo = models.ForeignKey(
+        Combo,
+        on_delete=models.CASCADE,
+        related_name="documents",
+        verbose_name="Combo",
+    )
+    title = models.CharField(
+        max_length=150,
+        verbose_name="Title",
+        help_text="e.g., How it's used, What's included, Care instructions",
+    )
+    document_file = models.FileField(
+        upload_to="combos/documents/",
+        verbose_name="Document File",
+        help_text="Image, video, or PDF file.",
+    )
+    display_order = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Display order",
+        help_text="Lower values appear first.",
+    )
+
+    class Meta:
+        verbose_name = "Combo Document"
+        verbose_name_plural = "Combo Documents"
+        ordering = ["display_order", "title"]
+
+    @property
+    def filename(self) -> str:
+        import os
+        return os.path.basename(self.document_file.name) if self.document_file else ""
+
+    @property
+    def is_image(self) -> bool:
+        if not self.document_file:
+            return False
+        import os
+        ext = os.path.splitext(self.document_file.name)[1].lower()
+        return ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+
+    @property
+    def is_video(self) -> bool:
+        if not self.document_file:
+            return False
+        import os
+        ext = os.path.splitext(self.document_file.name)[1].lower()
+        return ext in ['.mp4', '.webm', '.ogg', '.mov']
+
+    def __str__(self) -> str:
+        return f"{self.combo.name} - {self.title}"
+
+
 class ProductDocument(TimeStampedModel):
-    """Downloadable document/manual for a product."""
+    """Image/video/PDF description block for a product."""
 
     product = models.ForeignKey(
         Product,
@@ -926,7 +1051,7 @@ class ProductDocument(TimeStampedModel):
     document_file = models.FileField(
         upload_to="products/documents/",
         verbose_name="Document File",
-        help_text="PDF format manuals or brochures.",
+        help_text="Image, video, or PDF file.",
     )
     display_order = models.PositiveIntegerField(
         default=0,
@@ -951,6 +1076,14 @@ class ProductDocument(TimeStampedModel):
         import os
         ext = os.path.splitext(self.document_file.name)[1].lower()
         return ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']
+
+    @property
+    def is_video(self) -> bool:
+        if not self.document_file:
+            return False
+        import os
+        ext = os.path.splitext(self.document_file.name)[1].lower()
+        return ext in ['.mp4', '.webm', '.ogg', '.mov']
 
     def __str__(self) -> str:
         return f"{self.product.name} - {self.title}"

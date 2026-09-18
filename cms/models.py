@@ -24,6 +24,7 @@ class HomepageSectionType(models.TextChoices):
     REVIEWS = "reviews", "Reviews"
     INSTAGRAM_GALLERY = "instagram_gallery", "Instagram Gallery"
     NEWSLETTER = "newsletter", "Newsletter"
+    COMBOS = "combos", "Combos"
 
 
 class PublishableModel(models.Model):

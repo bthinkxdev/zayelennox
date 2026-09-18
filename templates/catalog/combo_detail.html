@@ -7,13 +7,7 @@
 <div class="container page-container py-4">
   <div class="row g-4">
     <div class="col-md-6">
-      <div class="ratio ratio-1x1 rounded-3 overflow-hidden bg-light">
-        {% if combo.image %}
-        <img src="{{ combo.image.url }}" alt="{{ combo.name }}" class="object-fit-cover">
-        {% else %}
-        <img src="{% static 'img/product-placeholder.svg' %}" alt="{{ combo.name }}" class="object-fit-cover">
-        {% endif %}
-      </div>
+      {% include "catalog/partials/combo_gallery.html" with combo=combo %}
     </div>
 
     <div class="col-md-6">
@@ -103,5 +97,43 @@
       </div>
     </div>
   </div>
+
+  {% if combo.documents.all %}
+  <section class="mt-4 mt-lg-5 pt-4 border-top">
+    <div class="d-flex flex-column gap-2">
+      {% for doc in combo.documents.all %}
+      {% if doc.is_image %}
+      <div class="mb-5 text-center">
+        <h2 class="mb-4"
+          style="font-family: 'Playfair Display', 'Times New Roman', serif; font-size: clamp(1.5rem, 4vw, 2.25rem); color: #1a1a1a;">
+          {{ doc.title }}</h2>
+        <img src="{{ doc.document_file.url }}" alt="{{ doc.title }}" class="img-fluid w-100 rounded"
+          style="object-fit: contain;">
+      </div>
+      {% elif doc.is_video %}
+      <div class="mb-5 text-center">
+        <h2 class="mb-4"
+          style="font-family: 'Playfair Display', 'Times New Roman', serif; font-size: clamp(1.5rem, 4vw, 2.25rem); color: #1a1a1a;">
+          {{ doc.title }}</h2>
+        <video src="{{ doc.document_file.url }}" class="w-100 rounded" style="object-fit: contain;"
+          controls playsinline preload="metadata"></video>
+      </div>
+      {% else %}
+      <div class="jm-pdp-doc">
+        <div>
+          <h3 class="jm-pdp-doc__title">{{ doc.title }}</h3>
+          <span class="jm-pdp-doc__type">PDF {% trans "Document" %}</span>
+        </div>
+        <div class="jm-pdp-doc__actions">
+          <a href="{{ doc.document_file.url }}" target="_blank" rel="noopener"
+            class="btn btn-sm btn-outline-floward">{% trans "View" %}</a>
+          <a href="{{ doc.document_file.url }}" download class="btn btn-sm btn-floward">{% trans "Download" %}</a>
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
 </div>
 {% endblock %}

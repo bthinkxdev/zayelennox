@@ -200,6 +200,9 @@
             {% empty %}
             <a class="jm-mega__parent" href="{% url 'catalog:plp' %}">{% trans "All Products" %}</a>
             {% endfor %}
+            <div class="jm-mega__col">
+              <a class="jm-mega__parent" href="{% url 'catalog:combo-list' %}">{% trans "Combos" %}</a>
+            </div>
           </div>
         </div>
       </div>

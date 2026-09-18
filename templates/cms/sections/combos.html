@@ -1,0 +1,26 @@
+{% load i18n %}
+<section class="jm-section jm-rail-section">
+  <div class="container">
+    <div class="section-header jm-section-header">
+      <h2 class="section-title">{% include "cms/sections/_leaf_vine.html" %}<span class="section-title__text">{% if section_context.title %}{{ section_context.title }}{% else %}{% trans "Combos" %}{% endif %}</span>{% include "cms/sections/_leaf_vine.html" with mirror=True %}</h2>
+      <a href="{% url 'catalog:combo-list' %}" class="section-cta">{% trans "View All" %}</a>
+    </div>
+    <div class="jm-featured__rail">
+      <button type="button" class="jm-rail-arrow jm-rail-arrow--prev" data-rail-scroll="prev" aria-label="{% trans 'Previous combos' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="product-rail-scroll jm-product-rail__track" role="list" data-rail-track>
+        {% for combo in section_context.combos %}
+        <div class="product-rail-item" role="listitem">
+          {% include "catalog/partials/combo_card.html" with combo=combo %}
+        </div>
+        {% empty %}
+        <p class="text-muted small px-2">{% trans "No combos available." %}</p>
+        {% endfor %}
+      </div>
+      <button type="button" class="jm-rail-arrow jm-rail-arrow--next" data-rail-scroll="next" aria-label="{% trans 'Next combos' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+  </div>
+</section>

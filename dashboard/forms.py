@@ -12,6 +12,8 @@ from catalog.models import (
     Brand,
     Category,
     Combo,
+    ComboDocument,
+    ComboImage,
     ComboItem,
     Product,
     ProductDocument,
@@ -417,7 +419,7 @@ ProductVariantFormSet = forms.inlineformset_factory(
 class ComboForm(SlugAutoMixin):
     class Meta:
         model = Combo
-        fields = ["name", "slug", "description", "image", "combo_price", "is_active", "display_order"]
+        fields = ["name", "slug", "description", "combo_price", "is_active", "display_order"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -487,10 +489,88 @@ class ComboItemForm(forms.ModelForm):
         return cleaned
 
 
+class BaseComboItemFormSet(forms.BaseInlineFormSet):
+    """
+    Requires at least one surviving product row.
+
+    """
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            # A per-row error (e.g. missing variant) already blocks save;
+            # do not pile on with the "add a product" message too.
+            return
+        for form in self.forms:
+            if not hasattr(form, "cleaned_data"):
+                continue
+            if self.can_delete and form.cleaned_data.get("DELETE"):
+                continue
+            if form.cleaned_data.get("product"):
+                return
+        raise forms.ValidationError("Add at least one product to this combo before saving.")
+
+
 ComboItemFormSet = forms.inlineformset_factory(
     Combo,
     ComboItem,
     form=ComboItemForm,
+    formset=BaseComboItemFormSet,
+    extra=1,
+    can_delete=True,
+)
+
+
+class ComboDocumentForm(forms.ModelForm):
+    class Meta:
+        model = ComboDocument
+        fields = ["title", "document_file", "display_order"]
+        widgets = {
+            "document_file": forms.FileInput(),
+        }
+        error_messages = {
+            "title": {"required": "Title is required."},
+            "document_file": {"required": "File is required."},
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["display_order"].required = False
+        if not self.instance.pk:
+            self.initial["display_order"] = None
+
+    def clean_display_order(self):
+        val = self.cleaned_data.get("display_order")
+        return val if val is not None else 0
+
+
+ComboDocumentFormSet = forms.inlineformset_factory(
+    Combo,
+    ComboDocument,
+    form=ComboDocumentForm,
+    extra=1,
+    can_delete=True,
+)
+
+
+class ComboImageForm(forms.ModelForm):
+    class Meta:
+        model = ComboImage
+        fields = ["image", "video", "alt_text", "display_order", "is_primary"]
+        widgets = {
+            "image": forms.ClearableFileInput(attrs={"accept": "image/*"}),
+            "video": forms.ClearableFileInput(attrs={"accept": "video/mp4,video/webm,video/ogg,.mov"}),
+        }
+        error_messages = {
+            "alt_text": {"required": "Alt text is required."},
+            "display_order": {"required": "Display order is required."},
+        }
+
+
+ComboImageFormSet = forms.inlineformset_factory(
+    Combo,
+    ComboImage,
+    form=ComboImageForm,
     extra=1,
     can_delete=True,
 )

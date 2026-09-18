@@ -150,20 +150,36 @@ def _render_combo_form(request, combo, mode):
     if request.method == "POST":
         form = forms.ComboForm(request.POST, request.FILES, instance=combo)
         items = forms.ComboItemFormSet(request.POST, instance=combo, prefix="comboitems")
-        if form.is_valid() and items.is_valid():
+        images = forms.ComboImageFormSet(
+            request.POST, request.FILES, instance=combo, prefix="images"
+        )
+        documents = forms.ComboDocumentFormSet(
+            request.POST, request.FILES, instance=combo, prefix="documents"
+        )
+        if form.is_valid() and items.is_valid() and images.is_valid() and documents.is_valid():
             combo = form.save()
             items.instance = combo
             items.save()
+            images.instance = combo
+            images.save()
+            documents.instance = combo
+            documents.save()
             messages.success(request, f"Combo {'created' if mode == 'create' else 'updated'}.")
             return redirect("dashboard:combo-list")
     else:
         form = forms.ComboForm(instance=combo)
         items = forms.ComboItemFormSet(instance=combo, prefix="comboitems")
+        images = forms.ComboImageFormSet(instance=combo, prefix="images")
+        documents = forms.ComboDocumentFormSet(instance=combo, prefix="documents")
         if combo is not None:
             items.extra = 0
+            images.extra = 0
+            documents.extra = 0
 
     item_empty_form = items.empty_form
-    for f in [form, *items.forms, item_empty_form]:
+    image_empty_form = images.empty_form
+    document_empty_form = documents.empty_form
+    for f in [form, *items.forms, item_empty_form, *images.forms, image_empty_form, *documents.forms, document_empty_form]:
         _style(f)
 
     context = {
@@ -172,6 +188,10 @@ def _render_combo_form(request, combo, mode):
         "form": form,
         "items": items,
         "item_empty_form": item_empty_form,
+        "images": images,
+        "image_empty_form": image_empty_form,
+        "documents": documents,
+        "document_empty_form": document_empty_form,
         "form_mode": mode,
         "combo": combo,
         "cancel_url": reverse("dashboard:combo-list"),
