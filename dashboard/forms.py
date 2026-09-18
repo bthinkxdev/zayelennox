@@ -961,10 +961,12 @@ class SiteSettingsForm(forms.ModelForm):
         "twitter_url",
         "whatsapp_number",
         "vendor_email",
+        "shop_address",
         "gstin",
         "pan_number",
         "registered_state",
         "tax_rate_percent",
+        "use_shiprocket_delivery_charge",
         "default_shipping_charge",
         "active_payment_gateway",
         "razorpay_key_id",
@@ -992,10 +994,12 @@ class SiteSettingsForm(forms.ModelForm):
             "twitter_url",
             "whatsapp_number",
             "vendor_email",
+            "shop_address",
             "gstin",
             "pan_number",
             "registered_state",
             "tax_rate_percent",
+            "use_shiprocket_delivery_charge",
             "default_shipping_charge",
             "active_payment_gateway",
             "razorpay_key_id",
@@ -1011,6 +1015,9 @@ class SiteSettingsForm(forms.ModelForm):
         ]
         labels = {
             "vendor_email": "Email",
+        }
+        widgets = {
+            "shop_address": forms.Textarea(attrs={"rows": 3}),
         }
 
     def __init__(self, *args, **kwargs):

@@ -115,23 +115,9 @@
               <div id="error-guest_pincode" class="text-danger small mt-1"></div>
               <div id="delivery-check-result" class="small mt-2"></div>
               <div id="shipping-details-panel" class="border rounded p-3 mt-2" style="display:none; background:#f8f9fa;">
-                <div class="fw-semibold mb-2">{% trans "Shipping Details" %}</div>
-                <div class="d-flex justify-content-between small mb-1">
-                  <span class="text-muted">{% trans "Courier Partner" %}</span>
-                  <span id="ship-courier-name" class="fw-semibold"></span>
-                </div>
-                <div class="d-flex justify-content-between small mb-1">
-                  <span class="text-muted">{% trans "Estimated Delivery" %}</span>
-                  <span id="ship-eta"></span>
-                </div>
-                <div class="d-flex justify-content-between small mb-2 pb-2 border-bottom">
-                  <span class="text-muted">{% trans "Shipping Charge" %}</span>
-                  <span id="ship-charge" class="fw-semibold"></span>
-                </div>
-                <div id="ship-other-couriers-wrap" style="display:none;">
-                  <div class="small text-muted mb-1">{% trans "Other available couriers" %}</div>
-                  <ul id="ship-other-couriers" class="small ps-3 mb-0"></ul>
-                </div>
+                <div class="fw-semibold mb-2">{% trans "Choose a delivery option" %}</div>
+                <div id="ship-courier-options"></div>
+                <div id="ship-courier-select-error" class="small text-danger mt-2" style="display:none;"></div>
               </div>
             </div>
           </div>
@@ -904,11 +890,9 @@
     var pincodeInput = document.getElementById('checkout-pincode');
     var resultBox = document.getElementById('delivery-check-result');
     var shipPanel = document.getElementById('shipping-details-panel');
-    var shipCourierName = document.getElementById('ship-courier-name');
-    var shipEta = document.getElementById('ship-eta');
-    var shipCharge = document.getElementById('ship-charge');
-    var shipOtherWrap = document.getElementById('ship-other-couriers-wrap');
-    var shipOtherList = document.getElementById('ship-other-couriers');
+    var shipCourierOptions = document.getElementById('ship-courier-options');
+    var shipCourierSelectError = document.getElementById('ship-courier-select-error');
+    var selectCourierUrl = "{% url 'shipping:select-courier' %}";
 
     var currencySymbol = "{{ display_currency.symbol }}";
 
@@ -951,8 +935,79 @@
 
     function resetShippingPanel() {
       if (shipPanel) shipPanel.style.display = 'none';
-      if (shipOtherWrap) shipOtherWrap.style.display = 'none';
-      if (shipOtherList) shipOtherList.innerHTML = '';
+      if (shipCourierOptions) shipCourierOptions.innerHTML = '';
+      if (shipCourierSelectError) shipCourierSelectError.style.display = 'none';
+      currentSelectedCourierId = null;
+    }
+
+    function renderCourierOptions(couriers, selectedId) {
+      if (!shipCourierOptions) return;
+      shipCourierOptions.innerHTML = couriers.map(function (c) {
+        var id = String(c.courier_id);
+        var checked = id === String(selectedId) ? ' checked' : '';
+        var days = c.estimated_delivery_days ? (c.estimated_delivery_days + " {% trans 'day(s)' %}") : '';
+        return (
+          '<label class="d-flex justify-content-between align-items-center small mb-2 pb-2 border-bottom">' +
+            '<span>' +
+              '<input type="radio" name="ship_courier_choice" class="form-check-input me-2" value="' + id + '"' + checked + '>' +
+              '<span class="fw-semibold">' + (c.courier_name || '') + '</span>' +
+              (days ? ' <span class="text-muted">(' + days + ')</span>' : '') +
+            '</span>' +
+            '<span class="fw-semibold">' + formatMoney(parseFloat(c.freight_charge) || 0) + '</span>' +
+          '</label>'
+        );
+      }).join('');
+    }
+
+    function selectCourier(courierId, previousId) {
+      if (shipCourierSelectError) shipCourierSelectError.style.display = 'none';
+      var body = new URLSearchParams();
+      body.set('courier_id', courierId);
+
+      fetch(selectCourierUrl, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': '{{ csrf_token }}',
+          'X-Requested-With': 'XMLHttpRequest',
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: body.toString()
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (!data.ok) {
+            var revert = shipCourierOptions ? shipCourierOptions.querySelector('input[value="' + previousId + '"]') : null;
+            if (revert) revert.checked = true;
+            currentSelectedCourierId = previousId;
+            if (shipCourierSelectError) {
+              shipCourierSelectError.style.display = 'block';
+              shipCourierSelectError.textContent = data.error || "{% trans 'Could not update the delivery option. Please re-check your pincode.' %}";
+            }
+            return;
+          }
+          updateOrderSummary(parseFloat(data.shipping_charge) || 0);
+        })
+        .catch(function () {
+          var revert = shipCourierOptions ? shipCourierOptions.querySelector('input[value="' + previousId + '"]') : null;
+          if (revert) revert.checked = true;
+          currentSelectedCourierId = previousId;
+          if (shipCourierSelectError) {
+            shipCourierSelectError.style.display = 'block';
+            shipCourierSelectError.textContent = "{% trans 'Could not update the delivery option. Please re-check your pincode.' %}";
+          }
+        });
+    }
+
+    var currentSelectedCourierId = null;
+
+    if (shipCourierOptions) {
+      shipCourierOptions.addEventListener('change', function (e) {
+        var target = e.target;
+        if (!target || target.name !== 'ship_courier_choice') return;
+        var previousId = currentSelectedCourierId;
+        currentSelectedCourierId = target.value;
+        selectCourier(target.value, previousId);
+      });
     }
 
     var deliveryCheckToken = 0;
@@ -981,25 +1036,21 @@
             var charge = parseFloat(data.shipping_charge) || 0;
             if (shipPanel) {
               shipPanel.style.display = 'block';
-              if (shipCourierName) shipCourierName.textContent = data.courier_name || '—';
-              if (shipEta) {
-                shipEta.textContent = data.estimated_delivery_days
-                  ? data.estimated_delivery_days + " {% trans 'day(s)' %}"
-                  : '—';
-              }
-              if (shipCharge) shipCharge.textContent = formatMoney(charge);
-
-              if (data.available_couriers && data.available_couriers.length > 1 && shipOtherWrap && shipOtherList) {
-                var others = data.available_couriers.filter(function (c) {
-                  return c.courier_name !== data.courier_name;
-                });
-                if (others.length) {
-                  shipOtherList.innerHTML = others.map(function (c) {
-                    var days = c.estimated_delivery_days ? (c.estimated_delivery_days + " {% trans 'day(s)' %}") : '';
-                    return '<li>' + (c.courier_name || '') + ' — ' + formatMoney(parseFloat(c.freight_charge) || 0) + (days ? ' (' + days + ')' : '') + '</li>';
-                  }).join('');
-                  shipOtherWrap.style.display = 'block';
-                }
+              if (data.available_couriers && data.available_couriers.length) {
+                currentSelectedCourierId = data.selected_courier_id != null
+                  ? String(data.selected_courier_id)
+                  : String(data.available_couriers[0].courier_id);
+                renderCourierOptions(data.available_couriers, currentSelectedCourierId);
+              } else if (shipCourierOptions) {
+                currentSelectedCourierId = null;
+                var eta = data.estimated_delivery_days
+                  ? (' (' + data.estimated_delivery_days + " {% trans 'day(s)' %}" + ')')
+                  : '';
+                shipCourierOptions.innerHTML =
+                  '<div class="d-flex justify-content-between small">' +
+                    '<span class="text-muted">{% trans "Shipping Charge" %}' + eta + '</span>' +
+                    '<span class="fw-semibold">' + formatMoney(charge) + '</span>' +
+                  '</div>';
               }
             }
 

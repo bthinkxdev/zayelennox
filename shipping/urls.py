@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from django.urls import path
 
-from shipping.views import check_serviceability_view
+from shipping.views import check_serviceability_view, select_courier_view
 from shipping.webhook_views import ShiprocketWebhookView
 
 app_name = "shipping"
@@ -12,4 +12,5 @@ app_name = "shipping"
 urlpatterns = [
     path("webhooks/courier-tracking/", ShiprocketWebhookView.as_view(), name="shiprocket-webhook"),
     path("check-serviceability/", check_serviceability_view, name="check-serviceability"),
+    path("select-courier/", select_courier_view, name="select-courier"),
 ]

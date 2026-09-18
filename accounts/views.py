@@ -968,9 +968,11 @@ def email_otp_verify_view(request: HttpRequest) -> HttpResponse:
 def customer_invoice_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Render the HTML invoice for a customer order."""
     from orders.models import Order
-    from core.models import SiteSettings
+    from django.conf import settings as django_settings
     from django.shortcuts import get_object_or_404
-    
+
+    from core.services import get_site_settings
+
     order = get_object_or_404(
         Order.objects.select_related("customer_profile__user", "currency", "cart"), 
         pk=pk
@@ -986,8 +988,11 @@ def customer_invoice_detail(request: HttpRequest, pk: int) -> HttpResponse:
             from django.http import Http404
             raise Http404("Invoice not found.")
 
+    site_settings = get_site_settings()
+
     context = {
         "order": order,
-        "site_settings": SiteSettings.objects.first(),
+        "site_settings": site_settings,
+        "shop_address": site_settings.shop_address or django_settings.STORE_ADDRESS,
     }
     return render(request, "shared/order_invoice.html", context)

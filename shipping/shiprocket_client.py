@@ -146,6 +146,16 @@ class ShiprocketClient:
                         response.text[:500],
                     )
                     last_exc = ShiprocketAPIError(f"Shiprocket server error {response.status_code}")
+                elif response.status_code == 401:
+        
+                    logger.warning(
+                        "Shiprocket %s %s got 401 on attempt %s - clearing cached token and retrying",
+                        method,
+                        path,
+                        attempt,
+                    )
+                    cache.delete("shiprocket_token")
+                    last_exc = ShiprocketAPIError(self._extract_error_message(response))
                 elif 400 <= response.status_code < 500:
                     
                     message = self._extract_error_message(response)

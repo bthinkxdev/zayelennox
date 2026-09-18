@@ -227,6 +227,12 @@ class SiteSettings(TimeStampedModel):
         help_text="Your GST-registered state. Compared to each order's delivery state "
         "to decide CGST+SGST (same state) vs IGST (different state).",
     )
+    shop_address = models.TextField(
+        blank=True,
+        verbose_name="Shop Address",
+        help_text="Full postal address shown on the storefront and on customer invoices/bills. "
+        "Falls back to the server's STORE_ADDRESS setting when left blank.",
+    )
     default_currency = models.ForeignKey(
         Currency,
         on_delete=models.PROTECT,
@@ -239,7 +245,23 @@ class SiteSettings(TimeStampedModel):
     # math. Deliberately not repurposed for GST — see Product.gst_rate_percent
     # and SiteSettings.registered_state instead.
     tax_rate_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-    default_shipping_charge = models.DecimalField(max_digits=10, decimal_places=2, default=50)
+    use_shiprocket_delivery_charge = models.BooleanField(
+        default=True,
+        verbose_name="Charge customers Shiprocket's live rate",
+        help_text="When on, checkout charges customers Shiprocket's live-quoted courier rate "
+        "for their delivery pincode. When off, every order is charged the flat 'Default "
+        "shipping charge' below instead. Either way, orders are still created and shipped "
+        "through Shiprocket exactly the same — this only controls what the customer pays "
+        "for delivery.",
+    )
+    default_shipping_charge = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=50,
+        verbose_name="Default shipping charge",
+        help_text="Flat delivery charge applied to every order when the Shiprocket live rate "
+        "above is switched off.",
+    )
     card_gateway_public_key_env = models.CharField(
         max_length=80,
         default="CARD_GATEWAY_PUBLIC_KEY",

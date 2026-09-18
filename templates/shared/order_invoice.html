@@ -159,6 +159,15 @@
             color: #718096;
             font-style: italic;
         }
+        .company-address-footer {
+            margin-top: 20px;
+            padding-top: 12px;
+            border-top: 1px solid #e2e8f0;
+            text-align: center;
+            font-size: 9pt;
+            color: #a0aec0;
+            line-height: 1.5;
+        }
     </style>
 </head>
 <body>
@@ -379,6 +388,12 @@
                 <p>Thank you for your order!</p>
             </div>
         </div>
+
+        {% if shop_address %}
+        <div class="company-address-footer">
+            {{ site_settings.site_name|default:"Our Store" }} &middot; {{ shop_address|linebreaksbr }}
+        </div>
+        {% endif %}
     </div>
 
     <script>

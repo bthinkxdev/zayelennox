@@ -187,14 +187,18 @@ def order_payment_transition(request: HttpRequest, pk: int) -> HttpResponse:
 @require_http_methods(["GET"])
 def order_invoice_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Render the HTML invoice for an order."""
-    from core.models import SiteSettings
+    from django.conf import settings as django_settings
+
+    from core.services import get_site_settings
     order = get_object_or_404(
         Order.objects.select_related("customer_profile__user", "currency"), pk=pk
     )
-    
+    site_settings = get_site_settings()
+
     context = {
         "order": order,
-        "site_settings": SiteSettings.objects.first(),
+        "site_settings": site_settings,
+        "shop_address": site_settings.shop_address or django_settings.STORE_ADDRESS,
     }
     return render(request, "shared/order_invoice.html", context)
 

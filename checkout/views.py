@@ -505,16 +505,23 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
 
     shipping_charge_override = None
     delivery_pincode = session.address.pincode if session.address_id else None
-    from shipping.views import SESSION_KEY as SHIPROCKET_SESSION_KEY
 
-    stored_quote = request.session.get(SHIPROCKET_SESSION_KEY)
-    if delivery_pincode and stored_quote and stored_quote.get("pincode") == delivery_pincode:
-        from decimal import Decimal
+    from core.services import get_site_settings
 
-        try:
-            shipping_charge_override = Decimal(str(stored_quote.get("shipping_charge", 0)))
-        except Exception:
-            shipping_charge_override = None
+    site_settings = get_site_settings()
+    if site_settings.use_shiprocket_delivery_charge:
+        from shipping.views import SESSION_KEY as SHIPROCKET_SESSION_KEY
+
+        stored_quote = request.session.get(SHIPROCKET_SESSION_KEY)
+        if delivery_pincode and stored_quote and stored_quote.get("pincode") == delivery_pincode:
+            from decimal import Decimal
+
+            try:
+                shipping_charge_override = Decimal(str(stored_quote.get("shipping_charge", 0)))
+            except Exception:
+                shipping_charge_override = None
+    else:
+        shipping_charge_override = site_settings.default_shipping_charge
 
     try:
         from catalog.exceptions import InsufficientStockError

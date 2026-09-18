@@ -80,9 +80,11 @@ def storefront(request: HttpRequest) -> dict[str, Any]:
     
     from cms.models import Page
 
+    site_settings = get_site_settings()
+
     return {
-        "site_settings": get_site_settings(),
-        "store_address": settings.STORE_ADDRESS,
+        "site_settings": site_settings,
+        "store_address": site_settings.shop_address or settings.STORE_ADDRESS,
         "store_phone": settings.STORE_PHONE,
         "category_tree": get_category_tree(),
         "current_search_category": _resolve_current_category(request),
