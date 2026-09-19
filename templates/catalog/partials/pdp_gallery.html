@@ -9,7 +9,7 @@
                data-gallery-video
                src="{{ item.url }}"
                {% if item.poster %}poster="{{ item.poster }}"{% endif %}
-               muted playsinline controls preload="metadata"></video>
+               muted loop playsinline controls preload="metadata"></video>
         {% else %}
         <img class="jm-pdp-gallery__image zoom-image object-fit-contain"
              src="{{ item.url }}"

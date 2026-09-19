@@ -313,10 +313,33 @@
         track.style.transition = on ? 'transform 0.3s ease' : 'none';
       };
 
+      // Slides are direct children of the track, each holding an <img> or a <video>.
+      var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+      // A video that scrolls away or slides out stops and rewinds, so it starts
+      // from the beginning the next time it comes into view.
       var pauseInactiveVideos = function () {
-        Array.prototype.forEach.call(track.querySelectorAll('video'), function (v, i) {
-          if (i !== state.index && !v.paused) v.pause();
+        Array.prototype.forEach.call(track.children, function (slide, i) {
+          var v = slide.querySelector('video');
+          if (!v || i === state.index) return;
+          if (!v.paused) v.pause();
+          if (v.currentTime > 0) v.currentTime = 0;
         });
+      };
+
+      // Product videos autoplay silently and loop as soon as their slide is shown
+      // (browsers only allow autoplay when muted, so mute is set as a property too -
+      // the attribute alone isn't honoured on every mobile browser).
+      var playActiveVideo = function () {
+        var slide = track.children[state.index];
+        var v = slide && slide.querySelector('video');
+        if (!v || reduceMotion) return;
+        v.muted = true;
+        v.defaultMuted = true;
+        v.loop = true;
+        v.playsInline = true;
+        var attempt = v.play();
+        if (attempt && attempt.catch) attempt.catch(function () { /* autoplay blocked: controls stay available */ });
       };
 
       var syncActiveClasses = function () {
@@ -337,6 +360,7 @@
         track.style.transform = 'translateX(' + (-state.index * 100) + '%)';
         pauseInactiveVideos();
         syncActiveClasses();
+        playActiveVideo();
       };
 
       stage.addEventListener('pointerdown', function (e) {
@@ -390,6 +414,21 @@
       stage.addEventListener('pointerleave', function (e) {
         if (state.dragging && e.pointerId === state.pointerId) endDrag(e);
       });
+
+      // Only play while the gallery is actually on screen.
+      if ('IntersectionObserver' in window) {
+        new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              playActiveVideo();
+            } else {
+              Array.prototype.forEach.call(track.querySelectorAll('video'), function (v) {
+                if (!v.paused) v.pause();
+              });
+            }
+          });
+        }, { threshold: 0.4 }).observe(stage);
+      }
 
       state.goTo = goTo;
       root._pdpGalleryState = state;

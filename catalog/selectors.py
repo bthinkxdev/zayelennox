@@ -815,6 +815,31 @@ def get_active_combos() -> list[Combo]:
     )
 
 
+def get_combos_teaser() -> Optional[dict[str, str]]:
+    """
+    Data for the homepage "Combos" tile beside the categories.
+
+    Returns None when no combo is active (so the tile isn't shown), else
+    ``{"cover": <image url or "">}`` from the first combo that has a photo.
+
+    Query guarantee: 1 SELECT on combos + 1 prefetch SELECT on their images.
+    """
+    combos = list(
+        Combo.objects.filter(is_active=True)
+        .prefetch_related(_combo_images_prefetch())
+        .order_by("display_order", "name")[:6]
+    )
+    if not combos:
+        return None
+    for combo in combos:
+        for item in combo.images.all():
+            if item.image:
+                return {"cover": item.image.url}
+        if combo.image:
+            return {"cover": combo.image.url}
+    return {"cover": ""}
+
+
 def get_combo_by_slug(*, slug: str) -> Optional[Combo]:
     """
     Return one active combo with its components hydrated, or None.

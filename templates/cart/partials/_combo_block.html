@@ -1,0 +1,98 @@
+{% load i18n static %}
+{% comment %}
+  One combo in the cart, shown and controlled as a single unit.
+  Expects: block (cart.selectors.CartComboBlock), target + swap (htmx target of the
+  surface it's rendered in), is_drawer ("1" for the sidebar cart), compact (True for the sidebar).
+  Also reads error / error_combo_id from the surrounding context.
+{% endcomment %}
+<article class="cart-combo{% if compact %} cart-combo--compact{% endif %}{% if block.has_stock_issue %} cart-combo--issue{% endif %}"
+         aria-label="{% blocktrans with name=block.name %}Combo: {{ name }}{% endblocktrans %}">
+  <header class="cart-combo__head">
+    <a class="cart-combo__cover" href="{% url 'catalog:combo-detail' slug=block.combo.slug %}" tabindex="-1" aria-hidden="true">
+      {% if block.cover_url %}
+      <img src="{{ block.cover_url }}" alt="" loading="lazy">
+      {% else %}
+      <img src="{% static 'img/product-placeholder.svg' %}" alt="" class="cart-line__img--placeholder">
+      {% endif %}
+    </a>
+    <div class="cart-combo__title">
+      <span class="product-badge product-badge--combo">{% trans "Combo" %}</span>
+      <a href="{% url 'catalog:combo-detail' slug=block.combo.slug %}" class="cart-combo__name">{{ block.name }}</a>
+      <span class="cart-combo__sub">
+        {% blocktrans count counter=block.lines|length %}{{ counter }} product{% plural %}{{ counter }} products{% endblocktrans %}{% if block.units and block.units > 1 %} · {{ block.units }} &times; {% trans "combo" %}{% endif %}
+      </span>
+    </div>
+    <div class="cart-combo__price">
+      <span class="cart-combo__total">{{ display_currency.symbol }} {{ block.total }}</span>
+      {% if block.savings %}<span class="cart-combo__was">{{ display_currency.symbol }} {{ block.normal_total }}</span>{% endif %}
+    </div>
+  </header>
+
+  {% if block.savings %}
+  <p class="cart-combo__save">{% trans "You save" %} {{ display_currency.symbol }} {{ block.savings }}</p>
+  {% endif %}
+
+  <ul class="cart-combo__items">
+    {% for line in block.lines %}
+    <li class="cart-combo__item">
+      {% with line.display_image as primary_image %}
+      <span class="cart-combo__thumb">
+        {% if primary_image.image %}
+        <img src="{{ primary_image.image.url }}" alt="" loading="lazy">
+        {% else %}
+        <img src="{% static 'img/product-placeholder.svg' %}" alt="" class="cart-line__img--placeholder">
+        {% endif %}
+      </span>
+      {% endwith %}
+      <span class="cart-combo__item-body">
+        <a href="{% url 'catalog:pdp' slug=line.product.slug %}{% if line.variant %}?variant_id={{ line.variant.pk }}{% endif %}" class="cart-combo__item-name">{{ line.product.name }}</a>
+        {% if line.variant %}<span class="cart-combo__item-meta">{{ line.variant.name }}</span>{% endif %}
+        {% if not line.is_in_stock %}
+        <span class="cart-combo__item-alert">{% trans "Out of stock" %}</span>
+        {% elif line.quantity > line.available_stock %}
+        <span class="cart-combo__item-alert">{% trans "Only" %} {{ line.available_stock }} {% trans "in stock" %}</span>
+        {% endif %}
+      </span>
+      <span class="cart-combo__item-qty">&times;{{ line.quantity }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+
+  {% if error and error_combo_id == block.combo.pk %}
+  <p class="cart-combo__error" role="alert">{{ error }}</p>
+  {% endif %}
+
+  <footer class="cart-combo__foot">
+    {% if block.units %}
+    <div class="qty-stepper d-flex align-items-center border rounded-pill overflow-hidden" role="group" aria-label="{% trans 'Combo quantity' %}">
+      <form method="post" action="{% url 'cart:combo-quantity' %}">
+        {% csrf_token %}
+        <input type="hidden" name="combo_id" value="{{ block.combo.pk }}">
+        <input type="hidden" name="delta" value="-1">
+        <input type="hidden" name="is_drawer" value="{{ is_drawer }}">
+        <button class="qty-stepper__btn" type="button" hx-post="{% url 'cart:combo-quantity' %}" hx-target="{{ target }}" hx-swap="{{ swap }}" hx-include="closest form" aria-label="{% trans 'Decrease combo quantity' %}" {% if block.units <= 1 %}disabled{% endif %}>&minus;</button>
+      </form>
+      <span class="qty-stepper__value" aria-live="polite">{{ block.units }}</span>
+      <form method="post" action="{% url 'cart:combo-quantity' %}">
+        {% csrf_token %}
+        <input type="hidden" name="combo_id" value="{{ block.combo.pk }}">
+        <input type="hidden" name="delta" value="1">
+        <input type="hidden" name="is_drawer" value="{{ is_drawer }}">
+        <button class="qty-stepper__btn" type="button" hx-post="{% url 'cart:combo-quantity' %}" hx-target="{{ target }}" hx-swap="{{ swap }}" hx-include="closest form" aria-label="{% trans 'Increase combo quantity' %}">&plus;</button>
+      </form>
+    </div>
+    {% else %}
+    <span></span>
+    {% endif %}
+
+    <form method="post" action="{% url 'cart:combo-remove' %}">
+      {% csrf_token %}
+      <input type="hidden" name="combo_id" value="{{ block.combo.pk }}">
+      <input type="hidden" name="is_drawer" value="{{ is_drawer }}">
+      <button class="cart-combo__remove" type="button" hx-post="{% url 'cart:combo-remove' %}" hx-target="{{ target }}" hx-swap="{{ swap }}" hx-include="closest form" aria-label="{% blocktrans with name=block.name %}Remove combo {{ name }}{% endblocktrans %}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        {% trans "Remove combo" %}
+      </button>
+    </form>
+  </footer>
+</article>

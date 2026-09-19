@@ -50,6 +50,7 @@
                   video.src = item.url;
                   if (item.poster) video.poster = item.poster;
                   video.muted = true;
+                  video.loop = true;
                   video.playsInline = true;
                   video.controls = true;
                   video.preload = 'metadata';

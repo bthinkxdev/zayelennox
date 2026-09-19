@@ -38,6 +38,9 @@
               <div class="text-muted" id="dash-addr-{{ address.pk }}-body">
                 {{ address.line1 }}{% if address.line2 %}, {{ address.line2 }}{% endif %}, {{ address.display_city }}{% if address.pincode %} - {{ address.pincode }}{% endif %}
               </div>
+              {% if not address.is_deliverable %}
+              <div class="text-danger fw-semibold" style="font-size: 0.7rem;" id="dash-addr-{{ address.pk }}-warn">{% trans "Incomplete — missing" %} {% for label in address.delivery_problems.values %}{{ label }}{% if not forloop.last %}, {% endif %}{% endfor %}. {% trans "Tap Edit to complete it." %}</div>
+              {% endif %}
             </div>
             <button type="button" class="btn btn-link btn-sm p-0 small flex-shrink-0 jm-dash-edit-address-btn"
               data-update-url="{% url 'checkout:address-update' address_id=address.pk %}"
@@ -46,7 +49,7 @@
               data-phone="{{ dashboard.profile.phone|default:'' }}"
               data-line1="{{ address.line1|default:'' }}"
               data-line2="{{ address.line2|default:'' }}"
-              data-city="{{ address.city_name|default:'' }}"
+              data-city="{{ address.display_city|default:'' }}"
               data-state="{{ address.state_name|default:'' }}"
               data-pincode="{{ address.pincode|default:'' }}"
               data-label-text="{{ address.label|default:'' }}">
@@ -377,6 +380,8 @@
             if (result.ok && result.payload.success) {
               var addr = result.payload.address;
               var body = document.getElementById('dash-addr-' + editAddressId + '-body');
+              var warn = document.getElementById('dash-addr-' + editAddressId + '-warn');
+              if (warn && addr && addr.is_deliverable) warn.remove();
               if (body && addr) {
                 body.textContent = addr.line1 + (addr.line2 ? ', ' + addr.line2 : '') +
                   (addr.city_name ? ', ' + addr.city_name : '') + (addr.pincode ? ' - ' + addr.pincode : '');

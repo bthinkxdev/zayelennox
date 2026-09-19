@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Optional
 
 from django.db import transaction
@@ -15,7 +15,12 @@ from cart.exceptions import (
     VariantRequiredError,
 )
 from cart.models import Cart, CartItem
-from cart.selectors import get_buy_now_cart_for_request, get_cart_for_request, get_cart_summary
+from cart.selectors import (
+    combo_units,
+    get_buy_now_cart_for_request,
+    get_cart_for_request,
+    get_cart_summary,
+)
 from catalog.models import Combo, Product, ProductVariant
 from catalog.selectors import get_variant_price
 from core.selectors import get_default_currency
@@ -240,18 +245,59 @@ def add_to_cart(
     return item
 
 
+def _allocate_combo_price(
+    *, normal_totals: list[Decimal], per_combo_quantities: list[int], price_paise: int
+) -> list[int]:
+    """
+    Split one combo's price into a per-unit price (in whole paise) for each component.
+
+    Shares are proportional to each component's normal price. Rounding to whole paise
+    leaves a remainder, which is pushed onto a component whose per-combo quantity divides
+    it, so that ``sum(unit price × quantity)`` equals the combo price exactly. That is
+    always possible when some component's quantity is 1 (the usual case); otherwise it's
+    exact whenever the quantities share a factor of the remainder, and never off by
+    as much as the smallest component quantity in paise.
+
+    Allocating per single combo (not per quantity ordered) means N combos cost exactly
+    N × the combo price, with no drift as the quantity changes.
+    """
+    total_normal = sum(normal_totals)
+    if total_normal <= 0:
+        return [0] * len(normal_totals)
+
+    units = [
+        int((total / total_normal * price_paise / qty).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+        for total, qty in zip(normal_totals, per_combo_quantities)
+    ]
+    remainder = price_paise - sum(u * q for u, q in zip(units, per_combo_quantities))
+    if not remainder:
+        return units
+
+    # Smallest quantity first (finest adjustment), then the priciest component.
+    order = sorted(range(len(units)), key=lambda i: (per_combo_quantities[i], -normal_totals[i]))
+    for i in order:
+        step = remainder // per_combo_quantities[i]
+        if remainder % per_combo_quantities[i] == 0 and units[i] + step >= 0:
+            units[i] += step
+            return units
+    i = order[0]
+    step = int(remainder / per_combo_quantities[i])  # toward zero: closest we can get
+    if units[i] + step >= 0:
+        units[i] += step
+    return units
+
+
 @transaction.atomic
 def add_combo_to_cart(*, cart: Cart, combo: Combo, quantity: int = 1) -> list[CartItem]:
     """
     Add every component of a combo to the cart as its own line, at a
     prorated share of the combo's fixed price.
 
-    The discount between ``combo.combo_price`` and the sum of the
-    components' normal prices is split across components proportionally to
-    their own normal price, so each product's HSN/GST taxable value stays
-    correct — a combo itself is never a taxable line. All-or-nothing: if any
-    component can't be added (out of stock, missing variant), the whole
-    call raises and nothing is added.
+    The combo price is split across the components in proportion to their
+    normal prices (see ``_allocate_combo_price``), so each product's HSN/GST
+    taxable value stays correct — a combo itself is never a taxable line.
+    All-or-nothing: if any component can't be added (out of stock, missing
+    variant), the whole call raises and nothing is added.
 
     Raises:
         VariantRequiredError: A component product needs a variant selection.
@@ -271,51 +317,32 @@ def add_combo_to_cart(*, cart: Cart, combo: Combo, quantity: int = 1) -> list[Ca
         else None
     )
 
-    normal_line_totals: list[Decimal] = []
-    for combo_item in combo_items:
-        line_quantity = combo_item.quantity * quantity
-        normal_unit_price = _resolve_unit_price(
+    normal_totals = [
+        _resolve_unit_price(
             product=combo_item.product,
             variant=combo_item.variant,
             user=user,
-            quantity=line_quantity,
+            quantity=combo_item.quantity,
         )
-        normal_line_totals.append(normal_unit_price * line_quantity)
-
-    total_normal = sum(normal_line_totals)
-    combo_total = combo.combo_price * quantity
-
-    if total_normal <= 0:
-        prorated_line_totals = [Decimal("0.00") for _ in combo_items]
-    else:
-        prorated_line_totals = [
-            (line_total / total_normal * combo_total).quantize(Decimal("0.01"))
-            for line_total in normal_line_totals
-        ]
-        # Correct rounding drift on the last line so the lines sum to
-        # exactly combo_total (paise-level remainder from quantize above).
-        remainder = combo_total - sum(prorated_line_totals)
-        prorated_line_totals[-1] += remainder
+        * combo_item.quantity
+        for combo_item in combo_items
+    ]
+    unit_paise = _allocate_combo_price(
+        normal_totals=normal_totals,
+        per_combo_quantities=[combo_item.quantity for combo_item in combo_items],
+        price_paise=int((combo.combo_price * 100).quantize(Decimal(1))),
+    )
 
     added_items: list[CartItem] = []
-    for combo_item, line_total in zip(combo_items, prorated_line_totals):
-        line_quantity = combo_item.quantity * quantity
-        # CartItem stores one unit_price for the whole line, so a combo
-        # component with quantity > 1 can lose or gain a paisa or two here
-        # if line_total doesn't divide evenly — bounded to a few paise per
-        # such line and self-consistent from this point on (every downstream
-        # total is summed from these stored unit prices, never recomputed
-        # against combo_price), the same tolerance any per-unit-priced cart
-        # line has when splitting a discount across a quantity.
-        unit_price = (line_total / line_quantity).quantize(Decimal("0.01"))
+    for combo_item, paise in zip(combo_items, unit_paise):
         added_items.append(
             add_to_cart(
                 cart=cart,
                 product=combo_item.product,
                 variant=combo_item.variant,
-                quantity=line_quantity,
+                quantity=combo_item.quantity * quantity,
                 combo=combo,
-                unit_price_override=unit_price,
+                unit_price_override=Decimal(paise) / 100,
             )
         )
     return added_items
@@ -332,6 +359,48 @@ def set_buy_now_combo(*, cart: Cart, combo: Combo, quantity: int = 1) -> list[Ca
 def remove_combo_from_cart(*, cart: Cart, combo_id: int) -> None:
     """Remove every cart line that was added as part of the given combo."""
     CartItem.objects.filter(cart=cart, combo_id=combo_id).delete()
+
+
+@transaction.atomic
+def change_combo_quantity(*, cart: Cart, combo_id: int, delta: int) -> int:
+    """
+    Add or remove whole combos (``delta`` of +1/-1), never below one.
+
+    A combo's lines are priced as a fixed share of its combo price at the moment
+    they're added, so resizing re-adds the combo at the new quantity (all-or-nothing:
+    if it can't be added — out of stock, no longer available — the existing lines
+    are left exactly as they were). Use ``remove_combo_from_cart`` to delete it.
+
+    Returns:
+        The combo quantity now in the cart.
+
+    Raises:
+        CartItemNotFoundError: The combo isn't in this cart.
+        ComboLineNotAdjustableError: The combo is no longer offered, or was edited
+            after it was added so the cart lines no longer make up whole combos.
+        InsufficientStockError / VariantRequiredError: The new quantity can't be added.
+    """
+    lines = list(CartItem.objects.select_for_update().filter(cart=cart, combo_id=combo_id))
+    if not lines:
+        raise CartItemNotFoundError("That combo is no longer in your cart.")
+
+    combo = Combo.objects.filter(pk=combo_id, is_active=True).first()
+    if combo is None:
+        raise ComboLineNotAdjustableError("This combo is no longer available — you can remove it from your cart.")
+
+    units = combo_units(items=lines, combo_items=list(combo.items.all()))
+    if units is None:
+        raise ComboLineNotAdjustableError(
+            "This combo has changed since you added it — remove it and add it again."
+        )
+
+    new_units = max(units + delta, 1)
+    if new_units == units:
+        return units
+
+    CartItem.objects.filter(pk__in=[line.pk for line in lines]).delete()
+    add_combo_to_cart(cart=cart, combo=combo, quantity=new_units)
+    return new_units
 
 
 @transaction.atomic
@@ -487,9 +556,13 @@ def merge_carts(*, guest_cart: Cart, user_profile) -> None:
         return
 
     for item in guest_cart.items.all():
+        # Match on the combo too: a standalone line must never be absorbed into a
+        # combo line (or the reverse), or it would inherit that combo's locked price
+        # and stop adding up to whole combos.
         user_item = user_cart.items.filter(
             product=item.product,
             variant=item.variant,
+            combo=item.combo,
         ).first()
         if user_item:
             user_item.quantity += item.quantity

@@ -45,6 +45,13 @@ def get_shiprocket_config() -> dict:
     }
 
 
+def _to_int(value) -> Optional[int]:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
 class ShiprocketClient:
     """Thin wrapper around the Shiprocket v1 external API."""
 
@@ -121,12 +128,13 @@ class ShiprocketClient:
 
         return f"Shiprocket returned an error (HTTP {response.status_code})."
 
-    def _request(self, method: str, path: str, *, json=None, params=None, timeout=None):
+    def _request(self, method: str, path: str, *, json=None, params=None, timeout=None, max_retries=None):
         url = f"{self.base_url}{path}"
         timeout = timeout or self.timeout
+        max_retries = max_retries or self.max_retries
         last_exc: Optional[Exception] = None
 
-        for attempt in range(1, self.max_retries + 1):
+        for attempt in range(1, max_retries + 1):
             try:
                 logger.info("Shiprocket %s %s attempt %s", method, path, attempt)
                 response = requests.request(
@@ -183,14 +191,14 @@ class ShiprocketClient:
                     logger.warning("Shiprocket response body: %s", exc.response.text)
                 last_exc = exc
 
-            if attempt < self.max_retries:
+            if attempt < max_retries:
                 time.sleep(min(2 ** attempt, 5))
 
         logger.error(
-            "Shiprocket %s %s failed after %s attempts: %s", method, path, self.max_retries, last_exc, exc_info=True
+            "Shiprocket %s %s failed after %s attempts: %s", method, path, max_retries, last_exc, exc_info=True
         )
         raise ShiprocketAPIError(
-            f"Could not reach Shiprocket for this step after {self.max_retries} attempts. Please try again shortly."
+            f"Could not reach Shiprocket for this step after {max_retries} attempts. Please try again shortly."
         )
 
     # ---------- Public API methods ----------
@@ -299,6 +307,8 @@ class ShiprocketClient:
         breadth: float,
         height: float,
         is_cod: bool = False,
+        max_retries: Optional[int] = None,
+        timeout: Optional[int] = None,
     ) -> dict:
         """Check if delivery is possible to the destination pincode."""
         params = {
@@ -310,31 +320,54 @@ class ShiprocketClient:
             "height": height,
             "cod": 1 if is_cod else 0,
         }
-        data = self._request("GET", "/courier/serviceability/", params=params)
+        data = self._request(
+            "GET", "/courier/serviceability/", params=params, max_retries=max_retries, timeout=timeout
+        )
         logger.info("Serviceability check: %s -> %s", pickup_pincode, delivery_pincode)
         return data
 
-    def get_shipping_rates(self, pickup_pincode, delivery_pincode, weight, length, breadth, height, is_cod=False):
-        data = self.check_serviceability(pickup_pincode, delivery_pincode, weight, length, breadth, height, is_cod)
+    def get_shipping_rates(
+        self,
+        pickup_pincode,
+        delivery_pincode,
+        weight,
+        length,
+        breadth,
+        height,
+        is_cod=False,
+        max_retries=None,
+        timeout=None,
+    ):
+        """
+        Normalised courier options for a parcel. Couriers Shiprocket flags as
+        blocked are dropped; ranking/tagging is left to ``shipping.rates``.
+        """
+        data = self.check_serviceability(
+            pickup_pincode, delivery_pincode, weight, length, breadth, height, is_cod,
+            max_retries=max_retries, timeout=timeout,
+        )
+        payload = data.get("data") or {}
         available_couriers = []
-        for courier in (data.get("data", {}).get("available_courier_companies") or []):
+        for courier in payload.get("available_courier_companies") or []:
+            if str(courier.get("blocked") or 0) not in ("0", ""):
+                continue
+            days = _to_int(courier.get("estimated_delivery_days"))
+            eta_hours = _to_int(courier.get("etd_hours"))
             available_couriers.append(
                 {
                     "courier_id": courier.get("courier_company_id"),
                     "courier_name": courier.get("courier_name"),
-                    "rate": float(courier.get("rate", 0)),
-                    "freight_charge": float(courier.get("freight_charge", 0)),
-                    "cod_charges": float(courier.get("cod_charges", 0)),
-                    "estimated_delivery_days": courier.get("estimated_delivery_days"),
-                    "cod_supported": bool(courier.get("cod", False)),
+                    "freight_charge": float(courier.get("freight_charge") or courier.get("rate") or 0),
+                    "estimated_delivery_days": days,
+                    "etd": courier.get("etd") or "",
+                    "eta_hours": eta_hours if eta_hours is not None else (days * 24 if days is not None else None),
+                    "rating": float(courier.get("rating") or 0),
+                    "is_surface": bool(courier.get("is_surface", False)),
                 }
             )
         return {
-            "is_serviceable": len(available_couriers) > 0,
-            "pickup_pincode": pickup_pincode,
-            "delivery_pincode": delivery_pincode,
             "available_couriers": available_couriers,
-            "recommended_courier": available_couriers[0] if available_couriers else None,
+            "recommended_courier_id": payload.get("recommended_courier_company_id"),
         }
 
     def track_shipment(self, awb_code: str) -> dict:

@@ -16,7 +16,7 @@ from cart.exceptions import (
     InsufficientStockError,
     VariantRequiredError,
 )
-from cart.forms import CartCouponForm, CartQuantityForm
+from cart.forms import CartComboForm, CartComboQuantityForm, CartCouponForm, CartQuantityForm
 from cart.selectors import get_cart_count, get_cart_for_request, get_cart_summary, get_wishlist_count
 from cart.services import (
     add_combo_to_cart,
@@ -27,6 +27,7 @@ from cart.services import (
     get_or_create_cart,
     remove_coupon,
     remove_cart_item,
+    change_combo_quantity,
     remove_combo_from_cart,
     set_buy_now_combo,
     set_buy_now_item,
@@ -36,7 +37,7 @@ from catalog.selectors import get_product_for_cart_add
 from marketing.exceptions import InvalidCouponError
 
 
-def _cart_drawer_response(request: HttpRequest, *, error: str | None = None, error_item_id: int | None = None, hx_triggers: dict | None = None) -> HttpResponse:
+def _cart_drawer_response(request: HttpRequest, *, error: str | None = None, error_item_id: int | None = None, error_combo_id: int | None = None, hx_triggers: dict | None = None) -> HttpResponse:
     """Render cart drawer partial; optionally attach HTMX trigger headers."""
     cart = get_cart_for_request(request=request)
     summary = get_cart_summary(cart=cart) if cart else None
@@ -50,6 +51,7 @@ def _cart_drawer_response(request: HttpRequest, *, error: str | None = None, err
             "has_active_coupons": has_any_active_coupons(),
             "error": error,
             "error_item_id": error_item_id,
+            "error_combo_id": error_combo_id,
         },
     )
     if hx_triggers:
@@ -64,7 +66,7 @@ def cart_drawer_view(request: HttpRequest) -> HttpResponse:
 
 
 def _cart_page_response(
-    request: HttpRequest, *, error: str | None = None, error_item_id: int | None = None, hx_triggers: dict | None = None
+    request: HttpRequest, *, error: str | None = None, error_item_id: int | None = None, error_combo_id: int | None = None, hx_triggers: dict | None = None
 ) -> HttpResponse:
     """Render the standalone cart page's swappable body; optionally attach HTMX triggers."""
     cart = get_cart_for_request(request=request)
@@ -78,6 +80,7 @@ def _cart_page_response(
             "cart_count": summary.item_count if summary else 0,
             "error": error,
             "error_item_id": error_item_id,
+            "error_combo_id": error_combo_id,
             "has_active_coupons": has_any_active_coupons(),
         },
     )
@@ -197,9 +200,14 @@ def cart_add_combo_view(request: HttpRequest) -> HttpResponse:
 
     from catalog.models import Combo
 
-    combo_id = int(request.POST.get("combo_id", 0))
-    quantity = int(request.POST.get("quantity", 1))
-    combo = get_object_or_404(Combo, pk=combo_id, is_active=True)
+    form = CartComboForm(request.POST)
+    if not form.is_valid():
+        raise Http404("Combo not found.")
+    try:
+        quantity = int(request.POST.get("quantity", 1))
+    except ValueError:
+        quantity = 1
+    combo = get_object_or_404(Combo, pk=form.cleaned_data["combo_id"], is_active=True)
 
     buy_now = request.POST.get("buy_now") == "true"
 
@@ -237,18 +245,47 @@ def cart_add_combo_view(request: HttpRequest) -> HttpResponse:
     )
 
 
+def _combo_response(request: HttpRequest, *, is_drawer: bool, **kwargs) -> HttpResponse:
+    """Re-render whichever cart surface (drawer or page) the combo action came from."""
+    if is_drawer:
+        return _cart_drawer_response(request, **kwargs)
+    return _cart_page_response(request, **kwargs)
+
+
+def _is_drawer_request(request: HttpRequest) -> bool:
+    return request.POST.get("is_drawer") == "1" or request.headers.get("HX-Target") == "cart-drawer-body"
+
+
 @require_POST
 def cart_remove_combo_view(request: HttpRequest) -> HttpResponse:
-    """Remove every cart line belonging to a combo; works from drawer or page."""
-    is_drawer = request.POST.get("is_drawer") == "1" or request.headers.get("HX-Target") == "cart-drawer-body"
+    """Remove a whole combo (all its lines) from the cart; works from drawer or page."""
+    is_drawer = _is_drawer_request(request)
+    form = CartComboForm(request.POST)
     cart = get_cart_for_request(request=request)
-    if cart:
-        remove_combo_from_cart(cart=cart, combo_id=int(request.POST.get("combo_id", 0)))
+    if form.is_valid() and cart:
+        remove_combo_from_cart(cart=cart, combo_id=form.cleaned_data["combo_id"])
+    return _combo_response(request, is_drawer=is_drawer, hx_triggers={"cartUpdated": None})
 
-    triggers = {"cartUpdated": None}
-    if is_drawer:
-        return _cart_drawer_response(request, hx_triggers=triggers)
-    return _cart_page_response(request, hx_triggers=triggers)
+
+@require_POST
+def cart_combo_quantity_view(request: HttpRequest) -> HttpResponse:
+    """Add or remove one whole combo (+1/-1); works from drawer or page."""
+    is_drawer = _is_drawer_request(request)
+    form = CartComboQuantityForm(request.POST)
+    cart = get_cart_for_request(request=request)
+    if not form.is_valid() or cart is None:
+        return _combo_response(
+            request, is_drawer=is_drawer, error=_("Could not update the combo."), hx_triggers={"cartUpdated": None}
+        )
+
+    combo_id = form.cleaned_data["combo_id"]
+    try:
+        change_combo_quantity(cart=cart, combo_id=combo_id, delta=form.cleaned_data["delta"])
+    except CartItemNotFoundError:
+        return _combo_response(request, is_drawer=is_drawer, hx_triggers={"cartUpdated": None})
+    except (ComboLineNotAdjustableError, InsufficientStockError, VariantRequiredError) as exc:
+        return _combo_response(request, is_drawer=is_drawer, error=str(exc), error_combo_id=combo_id)
+    return _combo_response(request, is_drawer=is_drawer, hx_triggers={"cartUpdated": None})
 
 
 @require_POST

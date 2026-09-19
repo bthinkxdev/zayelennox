@@ -10,7 +10,7 @@ from django.db.models import Prefetch, Sum
 from django.http import HttpRequest
 
 from cart.models import Cart, CartItem
-from catalog.models import Product, ProductImage
+from catalog.models import Combo, ComboImage, ComboItem, Product, ProductImage
 from delivery.selectors import get_delivery_charge
 
 _CART_CACHE_ATTR = "_floward_resolved_cart"
@@ -88,6 +88,11 @@ class CartSummaryLine:
     combo_name_snapshot: str = ""
 
     @property
+    def is_combo(self) -> bool:
+        """Cart templates render standalone lines and CartComboBlocks from one list; this tells them apart."""
+        return False
+
+    @property
     def available_stock(self) -> int:
         """
         Stock actually available for this specific line.
@@ -138,11 +143,94 @@ class CartSummaryLine:
 
 
 @dataclass
+class CartComboBlock:
+    """
+    One combo in the cart: its component lines, shown and controlled as a single unit.
+
+    ``units`` is how many of the combo the customer has (each line's quantity is
+    its per-combo quantity × units). It is None when the combo's definition was
+    edited after this was added and the lines no longer add up to whole combos —
+    the block is still shown and removable, just not resizable.
+    """
+
+    combo: Combo
+    lines: list[CartSummaryLine] = field(default_factory=list)
+    units: Optional[int] = None
+    total: Decimal = Decimal("0.00")
+    normal_total: Optional[Decimal] = None
+    savings: Decimal = Decimal("0.00")
+    cover_url: str = ""
+    has_stock_issue: bool = False
+
+    @property
+    def is_combo(self) -> bool:
+        return True
+
+    @property
+    def name(self) -> str:
+        return self.combo.name
+
+
+def combo_units(*, items, combo_items) -> Optional[int]:
+    """
+    How many of a combo a set of cart lines makes up, or None if they don't form whole combos.
+
+    ``items`` are CartItems of one combo; ``combo_items`` the combo's current
+    ComboItem rows. Every component must be present and each line's quantity must be
+    the same whole multiple of its per-combo quantity.
+    """
+    per_combo = {(ci.product_id, ci.variant_id): ci.quantity for ci in combo_items}
+    if len(items) != len(per_combo):
+        return None
+    multiples = set()
+    for item in items:
+        needed = per_combo.get((item.product_id, item.variant_id))
+        if not needed or item.quantity % needed:
+            return None
+        multiples.add(item.quantity // needed)
+    return multiples.pop() if len(multiples) == 1 else None
+
+
+def _build_combo_block(combo: Combo, lines: list[CartSummaryLine]) -> CartComboBlock:
+    combo_items = list(combo.items.all())
+    units = combo_units(items=[line.item for line in lines], combo_items=combo_items)
+    total = sum((line.line_subtotal for line in lines), Decimal("0.00"))
+
+    normal_total = None
+    savings = Decimal("0.00")
+    if units:
+        normal_total = combo.normal_price * units
+        savings = max(normal_total - total, Decimal("0.00"))
+
+    cover_url = ""
+    for image in combo.images.all():
+        if image.image:
+            cover_url = image.image.url
+            break
+    if not cover_url and combo.image:
+        cover_url = combo.image.url
+
+    return CartComboBlock(
+        combo=combo,
+        lines=lines,
+        units=units,
+        total=total,
+        normal_total=normal_total,
+        savings=savings,
+        cover_url=cover_url,
+        has_stock_issue=any(
+            not line.is_in_stock or line.quantity > line.available_stock for line in lines
+        ),
+    )
+
+
+@dataclass
 class CartSummary:
     """Computed cart totals — single selector call, no N+1."""
 
     cart: Cart
     lines: list[CartSummaryLine] = field(default_factory=list)
+    blocks: list[Any] = field(default_factory=list)
     subtotal: Decimal = Decimal("0.00")
     coupon_code: str = ""
     coupon_discount: Decimal = Decimal("0.00")
@@ -189,7 +277,11 @@ def get_cart_product_ids(*, request: HttpRequest) -> set[int]:
     cart = get_cart_for_request(request=request)
     if not cart:
         return set()
-    return set(CartItem.objects.filter(cart=cart).values_list("product_id", flat=True))
+    # Combo components don't count: a product sitting in the cart only inside a combo
+    # can still be added on its own from its card/PDP.
+    return set(
+        CartItem.objects.filter(cart=cart, combo__isnull=True).values_list("product_id", flat=True)
+    )
 
 
 def _wishlist_items_qs(*, request: HttpRequest):
@@ -238,8 +330,17 @@ def get_cart_summary(*, cart: Cart) -> CartSummary:
             "product__category",
             "product__brand",
             "variant",
+            "combo",
         )
         .prefetch_related(
+            Prefetch(
+                "combo__items",
+                queryset=ComboItem.objects.select_related("product", "variant", "variant__product"),
+            ),
+            Prefetch(
+                "combo__images",
+                queryset=ComboImage.objects.order_by("-is_primary", "display_order"),
+            ),
             Prefetch(
                 "product__images",
                 queryset=ProductImage.objects.filter(is_primary=True).order_by("display_order"),
@@ -335,9 +436,29 @@ def get_cart_summary(*, cart: Cart) -> CartSummary:
 
     grand_total = max(subtotal - coupon_discount + delivery_charge, Decimal("0.00"))
 
+    # Standalone lines stay as they are; all lines of one combo collapse into a
+    # single block placed where its first line was. (A line whose combo was
+    # deleted has combo_id NULL and correctly shows as an ordinary product.)
+    blocks: list[Any] = []
+    combo_lines: dict[int, list[CartSummaryLine]] = {}
+    for line in lines:
+        combo_id = line.item.combo_id
+        if combo_id is None:
+            blocks.append(line)
+        elif combo_id in combo_lines:
+            combo_lines[combo_id].append(line)
+        else:
+            combo_lines[combo_id] = [line]
+            blocks.append(combo_id)
+    blocks = [
+        _build_combo_block(combo_lines[b][0].item.combo, combo_lines[b]) if isinstance(b, int) else b
+        for b in blocks
+    ]
+
     return CartSummary(
         cart=cart,
         lines=lines,
+        blocks=blocks,
         subtotal=subtotal,
         coupon_code=coupon_code,
         coupon_discount=coupon_discount,

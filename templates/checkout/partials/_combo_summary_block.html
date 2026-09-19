@@ -1,0 +1,36 @@
+{% load i18n static %}
+{% comment %}
+  One combo in the checkout order summary: a header for the combo, then each product on its own
+  line with its own quantity, HSN and GST (they're taxed separately). Expects: block (CartComboBlock).
+{% endcomment %}
+<div class="sum-combo">
+  <div class="sum-combo__head">
+    <div class="sum-combo__title">
+      <span class="product-badge product-badge--combo">{% trans "Combo" %}</span>
+      <span class="sum-combo__name">{{ block.name }}</span>
+    </div>
+    <span class="sum-combo__total">{{ display_currency.symbol }} {{ block.total }}</span>
+  </div>
+  <div class="sum-combo__sub">
+    {% blocktrans count counter=block.lines|length %}{{ counter }} product{% plural %}{{ counter }} products{% endblocktrans %}{% if block.units and block.units > 1 %} · {{ block.units }} &times; {% trans "combo" %}{% endif %}{% if block.savings %} · <span class="text-success">{% trans "You save" %} {{ display_currency.symbol }} {{ block.savings }}</span>{% endif %}
+  </div>
+  <ul class="sum-combo__items">
+    {% for line in block.lines %}
+    <li class="sum-combo__item">
+      <div class="sum-combo__item-body">
+        <div class="sum-combo__item-name">{{ line.product.name }}{% if line.variant %} <span class="text-muted fw-normal">· {{ line.variant.name }}</span>{% endif %}</div>
+        <div class="sum-combo__item-meta">{% trans "Qty:" %} {{ line.quantity }}{% if line.effective_hsn_code %} &middot; {% trans "HSN" %} {{ line.effective_hsn_code }} &middot; {% trans "Incl. GST" %} {{ line.effective_gst_rate_percent }}%{% endif %}</div>
+        {% if not line.is_in_stock %}
+        <div class="sum-combo__item-alert">{% trans "Out of stock" %}</div>
+        {% elif line.quantity > line.available_stock %}
+        <div class="sum-combo__item-alert">{% trans "Only" %} {{ line.available_stock }} {% trans "items available in stock." %}</div>
+        {% endif %}
+      </div>
+      <span class="sum-combo__item-amount">{{ display_currency.symbol }} {{ line.line_subtotal }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% if block.has_stock_issue and buy_now_mode %}
+  <a href="{% url 'catalog:combo-detail' slug=block.combo.slug %}" class="btn btn-sm btn-outline-danger py-0 px-2 mt-1" style="font-size: 0.7rem; line-height: 1.5; text-decoration: none;">{% trans "Edit Item" %}</a>
+  {% endif %}
+</div>

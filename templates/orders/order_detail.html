@@ -24,16 +24,24 @@
         </div>
         <div class="card-body p-0">
           <ul class="list-group list-group-flush">
-            {% for item in items %}
-            <li class="list-group-item p-3">
+            {% regroup items by combo_name_snapshot as item_groups %}
+            {% for group in item_groups %}
+            {% if group.grouper %}
+            <li class="list-group-item order-combo__head">
+              <span class="product-badge product-badge--combo">{% trans "Combo" %}</span>
+              <span class="fw-semibold">{{ group.grouper }}</span>
+              <span class="text-muted small">
+                &middot; {% blocktrans count counter=group.list|length %}{{ counter }} product{% plural %}{{ counter }} products{% endblocktrans %}
+              </span>
+            </li>
+            {% endif %}
+            {% for item in group.list %}
+            <li class="list-group-item p-3{% if group.grouper %} order-combo__item{% endif %}">
               <div class="row align-items-center">
                 <div class="col-8 col-sm-6">
                   <span class="fw-bold d-block">{{ item.product.name }}</span>
                   {% if item.variant %}
                   <small class="text-muted">{{ item.variant.name }}</small>
-                  {% endif %}
-                  {% if item.combo_name_snapshot %}
-                  <small class="text-floward d-block">{% trans "Part of combo:" %} {{ item.combo_name_snapshot }}</small>
                   {% endif %}
                   {% if order.order_status == 'delivered' %}
                   <div class="mt-2">
@@ -89,6 +97,7 @@
                 </div>
               </div>
             </li>
+            {% endfor %}
             {% endfor %}
           </ul>
         </div>

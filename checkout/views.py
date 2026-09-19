@@ -261,11 +261,16 @@ def checkout_view(request: HttpRequest) -> HttpResponse:
 
     addresses = []
     billing_addresses = []
+    selected_address_id = None
     if profile:
         # Show every saved address as a choice, not just the default/first one
         # (get_saved_addresses already orders default-first, then newest).
         addresses = get_saved_addresses(customer_profile=profile)["results"]
         billing_addresses = [a for a in addresses if a.is_billing]
+        # Preselect the first address we can actually ship to, so an incomplete
+        # older address is never the silent default.
+        preselected = next((a for a in addresses if a.is_deliverable), None) or (addresses[0] if addresses else None)
+        selected_address_id = preselected.pk if preselected else None
 
     selected_gateway_key = None
     if session.order:
@@ -305,6 +310,7 @@ def checkout_view(request: HttpRequest) -> HttpResponse:
             "gst_breakdown": gst_breakdown,
             "checkout_session": session,
             "addresses": addresses,
+            "selected_address_id": selected_address_id,
             "billing_addresses": billing_addresses,
             "payment_gateways": available_gateways,
             "selected_gateway_key": selected_gateway_key,
@@ -351,6 +357,23 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
             customer_profile=profile,
         )
         if address:
+            problems = address.delivery_problems
+            if problems:
+                # Older addresses can lack a pincode/state; without them there's no
+                # courier quote and the shipment can't be booked, so never let one through.
+                missing = ", ".join(problems.values())
+                return render(
+                    request,
+                    "checkout/partials/errors.html",
+                    {
+                        "errors": {
+                            "address_id": [
+                                f"“{address.label}” is missing its {missing}. Tap Edit to complete it, then place your order."
+                            ]
+                        }
+                    },
+                    status=200,
+                )
             update_checkout_session(checkout_session=session, address=address)
 
     if not address:
@@ -503,25 +526,13 @@ def checkout_place_order_view(request: HttpRequest) -> HttpResponse:
             status=200,
         )
 
-    shipping_charge_override = None
-    delivery_pincode = session.address.pincode if session.address_id else None
+    from shipping.rates import resolve_order_shipping_charge
 
-    from core.services import get_site_settings
-
-    site_settings = get_site_settings()
-    if site_settings.use_shiprocket_delivery_charge:
-        from shipping.views import SESSION_KEY as SHIPROCKET_SESSION_KEY
-
-        stored_quote = request.session.get(SHIPROCKET_SESSION_KEY)
-        if delivery_pincode and stored_quote and stored_quote.get("pincode") == delivery_pincode:
-            from decimal import Decimal
-
-            try:
-                shipping_charge_override = Decimal(str(stored_quote.get("shipping_charge", 0)))
-            except Exception:
-                shipping_charge_override = None
-    else:
-        shipping_charge_override = site_settings.default_shipping_charge
+    shipping_charge_override = resolve_order_shipping_charge(
+        request,
+        cart=cart,
+        pincode=session.address.pincode if session.address_id else None,
+    )
 
     try:
         from catalog.exceptions import InsufficientStockError
@@ -652,6 +663,7 @@ def checkout_address_update_view(request: HttpRequest, address_id: int) -> HttpR
                 "city_name": address.city_name,
                 "state_name": address.state_name,
                 "pincode": address.pincode,
+                "is_deliverable": address.is_deliverable,
                 "display": display,
             },
             "name": name,

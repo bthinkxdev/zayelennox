@@ -1,4 +1,5 @@
 {% load i18n %}
+{% if section_context.combos %}
 <section class="jm-section jm-rail-section">
   <div class="container">
     <div class="section-header jm-section-header">
@@ -14,9 +15,7 @@
         <div class="product-rail-item" role="listitem">
           {% include "catalog/partials/combo_card.html" with combo=combo %}
         </div>
-        {% empty %}
-        <p class="text-muted small px-2">{% trans "No combos available." %}</p>
-        {% endfor %}
+                {% endfor %}
       </div>
       <button type="button" class="jm-rail-arrow jm-rail-arrow--next" data-rail-scroll="next" aria-label="{% trans 'Next combos' %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
@@ -24,3 +23,4 @@
     </div>
   </div>
 </section>
+{% endif %}

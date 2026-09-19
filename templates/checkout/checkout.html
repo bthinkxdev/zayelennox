@@ -28,97 +28,122 @@
           <h2>{% trans "Delivery Address" %}</h2>
 
           {% if addresses %}
-          <div class="mb-4" id="saved-address-list">
-            <label class="form-label small fw-bold">{% trans "Choose a saved address:" %}</label>
+          <div id="saved-address-list" class="co-choice-list mb-2" role="radiogroup" aria-label="{% trans 'Saved addresses' %}">
             {% for address in addresses %}
-            <div class="form-check mb-2 d-flex align-items-start justify-content-between gap-2">
-              <div class="flex-grow-1">
-                <input class="form-check-input jm-saved-address-radio" type="radio" name="address_id" value="{{ address.pk }}"
-                  id="addr-{{ address.pk }}" {% if forloop.first %}checked{% endif %}>
-                <label class="form-check-label small" for="addr-{{ address.pk }}" id="addr-{{ address.pk }}-label">{{ address.label }} — {{ address.line1 }}, {{ address.display_city }}{% if address.pincode %} - {{ address.pincode }}{% endif %}</label>
-              </div>
-              <button type="button" class="btn btn-link btn-sm p-0 small flex-shrink-0 jm-edit-address-btn"
+            <div class="co-choice">
+              <input class="form-check-input co-choice__input jm-saved-address-radio" type="radio" name="address_id" value="{{ address.pk }}"
+                id="addr-{{ address.pk }}" data-pincode="{{ address.pincode|default:'' }}"
+                data-complete="{% if address.is_deliverable %}1{% else %}0{% endif %}"
+                {% if address.pk == selected_address_id %}checked{% endif %}>
+              <label class="co-choice__body" for="addr-{{ address.pk }}">
+                <span class="co-choice__title" id="addr-{{ address.pk }}-title">{{ address.label }}</span>
+                <span class="co-choice__meta" id="addr-{{ address.pk }}-label">{{ address.line1 }}{% if address.line2 %}, {{ address.line2 }}{% endif %}, {{ address.display_city }}{% if address.pincode %} - {{ address.pincode }}{% endif %}</span>
+                <span class="co-choice__warn"{% if address.is_deliverable %} hidden{% endif %} id="addr-{{ address.pk }}-warn">{% trans "Incomplete — missing" %} <span data-missing>{% for label in address.delivery_problems.values %}{{ label }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>. {% trans "Tap Edit to complete it." %}</span>
+              </label>
+              <button type="button" class="co-choice__action jm-edit-address-btn"
                 data-update-url="{% url 'checkout:address-update' address_id=address.pk %}"
                 data-address-id="{{ address.pk }}"
                 data-name="{{ request.user.first_name|default:'' }}"
                 data-phone="{{ checkout_session.customer_profile.phone|default:'' }}"
                 data-line1="{{ address.line1|default:'' }}"
                 data-line2="{{ address.line2|default:'' }}"
-                data-city="{{ address.city_name|default:'' }}"
+                data-city="{{ address.display_city|default:'' }}"
                 data-state="{{ address.state_name|default:'' }}"
                 data-pincode="{{ address.pincode|default:'' }}"
-                data-label-text="{{ address.label|default:'' }}">
+                data-label-text="{{ address.label|default:'' }}"
+                aria-label="{% blocktrans with label=address.label %}Edit {{ label }}{% endblocktrans %}">
                 {% trans "Edit" %}
               </button>
             </div>
             {% endfor %}
           </div>
+          <div id="error-address_id" class="text-danger small mb-2"></div>
 
-          <div class="text-center my-3"><span class="bg-white px-2 small text-muted">{% trans "— OR —" %}</span></div>
-
-          <button type="button" id="toggle-new-address-btn" class="btn btn-outline-dark btn-sm mb-3">
+          <button type="button" id="toggle-new-address-btn" class="co-add-btn">
             {% trans "+ Add a new address" %}
           </button>
           {% endif %}
 
-          <div id="new-address-form-fields" class="mt-2{% if addresses %} d-none{% endif %}">
-            <label class="form-label small fw-bold mb-3">{% trans "Enter Delivery Details:" %}</label>
-
-            <div class="row g-2 mb-3">
+          <div id="new-address-form-fields" class="{% if addresses %}d-none {% endif %}mt-3">
+            <p class="co-subtitle">{% trans "Contact" %}</p>
+            <div class="row g-3 mb-3">
               <div class="col-md-6">
-                <label class="form-label small">{% trans "Full Name" %} <span class="text-danger">*</span></label>
-                <input type="text" name="guest_name" class="form-control form-control-sm" value="{{ checkout_session.customer_profile.user.first_name|default:'' }}">
+                <label class="form-label" for="co-guest-name">{% trans "Full Name" %} <span class="text-danger">*</span></label>
+                <input type="text" id="co-guest-name" name="guest_name" class="form-control" autocomplete="name"
+                  value="{{ checkout_session.customer_profile.user.first_name|default:'' }}">
                 <div id="error-guest_name" class="text-danger small mt-1"></div>
               </div>
               <div class="col-md-6">
-                <label class="form-label small">{% trans "Phone Number" %} <span class="text-danger">*</span></label>
-                <input type="tel" inputmode="numeric" maxlength="10" name="guest_phone" class="form-control form-control-sm" placeholder="{% trans '10-digit mobile number' %}" value="{{ checkout_session.customer_profile.phone|default:'' }}">
+                <label class="form-label" for="co-guest-phone">{% trans "Phone Number" %} <span class="text-danger">*</span></label>
+                <input type="tel" id="co-guest-phone" inputmode="numeric" maxlength="10" name="guest_phone" class="form-control"
+                  autocomplete="tel-national" placeholder="{% trans '10-digit mobile number' %}"
+                  value="{{ checkout_session.customer_profile.phone|default:'' }}">
                 <div id="error-guest_phone" class="text-danger small mt-1"></div>
               </div>
+              {% if not request.user.is_authenticated %}
+              <div class="col-12">
+                <label class="form-label" for="co-guest-email">{% trans "Email Address" %} <span class="text-danger">*</span></label>
+                <input type="email" id="co-guest-email" name="guest_email" class="form-control" autocomplete="email" inputmode="email"
+                  value="{{ checkout_session.customer_profile.user.email|default:'' }}">
+                <div id="error-guest_email" class="text-danger small mt-1"></div>
+              </div>
+              {% endif %}
             </div>
-            {% if not request.user.is_authenticated %}
-            <div class="mb-3">
-              <label class="form-label small">{% trans "Email Address" %} <span class="text-danger">*</span></label>
-              <input type="email" name="guest_email" class="form-control form-control-sm" value="{{ checkout_session.customer_profile.user.email|default:'' }}">
-              <div id="error-guest_email" class="text-danger small mt-1"></div>
-            </div>
-            {% endif %}
 
-            <div class="mb-3">
-              <label class="form-label small">{% trans "Address Line 1" %} <span class="text-danger">*</span></label>
-              <input type="text" name="guest_address_line1" class="form-control form-control-sm" value="{{ checkout_session.address.line1|default:'' }}">
-              <div id="error-guest_address_line1" class="text-danger small mt-1"></div>
-            </div>
-            <div class="mb-3">
-              <label class="form-label small">{% trans "Address Line 2 (Optional)" %}</label>
-              <input type="text" name="guest_address_line2" class="form-control form-control-sm" value="{{ checkout_session.address.line2|default:'' }}">
-            </div>
-            <div class="row g-2 mb-3">
-              <div class="col-md-6">
-                <label class="form-label small">{% trans "City / Town" %} <span class="text-danger">*</span></label>
-                <input type="text" name="guest_city_name" class="form-control form-control-sm" value="{{ checkout_session.address.city_name|default:'' }}">
+            <p class="co-subtitle">{% trans "Address" %}</p>
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label" for="co-guest-line1">{% trans "Address Line 1" %} <span class="text-danger">*</span></label>
+                <input type="text" id="co-guest-line1" name="guest_address_line1" class="form-control" autocomplete="address-line1"
+                  placeholder="{% trans 'House / flat no., building, street' %}"
+                  value="{{ checkout_session.address.line1|default:'' }}">
+                <div id="error-guest_address_line1" class="text-danger small mt-1"></div>
+              </div>
+              <div class="col-12">
+                <label class="form-label" for="co-guest-line2">{% trans "Address Line 2" %} <span class="text-muted fw-normal">({% trans "optional" %})</span></label>
+                <input type="text" id="co-guest-line2" name="guest_address_line2" class="form-control" autocomplete="address-line2"
+                  placeholder="{% trans 'Landmark, area' %}"
+                  value="{{ checkout_session.address.line2|default:'' }}">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="checkout-pincode">{% trans "Pincode" %} <span class="text-danger">*</span></label>
+                <input type="text" inputmode="numeric" maxlength="6" id="checkout-pincode" name="guest_pincode" class="form-control"
+                  autocomplete="postal-code" placeholder="{% trans '6 digits' %}"
+                  value="{{ checkout_session.address.pincode|default:'' }}">
+                <div id="error-guest_pincode" class="text-danger small mt-1"></div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="co-guest-city">{% trans "City / Town" %} <span class="text-danger">*</span></label>
+                <input type="text" id="co-guest-city" name="guest_city_name" class="form-control" autocomplete="address-level2"
+                  value="{{ checkout_session.address.city_name|default:'' }}">
                 <div id="error-guest_city_name" class="text-danger small mt-1"></div>
               </div>
-              <div class="col-md-6">
-                <label class="form-label small">{% trans "State" %} <span class="text-danger">*</span></label>
-                <input type="text" name="guest_state_name" class="form-control form-control-sm" value="{{ checkout_session.address.state_name|default:'' }}">
+              <div class="col-md-4">
+                <label class="form-label" for="co-guest-state">{% trans "State" %} <span class="text-danger">*</span></label>
+                <input type="text" id="co-guest-state" name="guest_state_name" class="form-control" autocomplete="address-level1"
+                  value="{{ checkout_session.address.state_name|default:'' }}">
                 <div id="error-guest_state_name" class="text-danger small mt-1"></div>
               </div>
             </div>
+            <div class="form-text mt-2">{% trans "Enter your pincode to see delivery options and charges." %}</div>
+          </div>
 
-            <div class="mb-2">
-              <label class="form-label small">{% trans "Pincode" %} <span class="text-danger">*</span></label>
-              <input type="text" inputmode="numeric" maxlength="6" id="checkout-pincode" name="guest_pincode"
-                class="form-control form-control-sm" style="max-width: 160px;"
-                value="{{ checkout_session.address.pincode|default:'' }}">
-              <div class="form-text small text-muted mb-0">{% trans "Type your pincode to check delivery availability and charge." %}</div>
-              <div id="error-guest_pincode" class="text-danger small mt-1"></div>
-              <div id="delivery-check-result" class="small mt-2"></div>
-              <div id="shipping-details-panel" class="border rounded p-3 mt-2" style="display:none; background:#f8f9fa;">
-                <div class="fw-semibold mb-2">{% trans "Choose a delivery option" %}</div>
-                <div id="ship-courier-options"></div>
-                <div id="ship-courier-select-error" class="small text-danger mt-2" style="display:none;"></div>
+          {# Outside the new-address block on purpose: it must stay visible when a saved address is selected. #}
+          <div id="delivery-options" class="mt-3">
+            <div id="delivery-check-result" class="co-status" aria-live="polite"></div>
+            <div id="shipping-details-panel" class="co-panel mt-2" style="display:none;">
+              <div class="co-panel__head">
+                <div>
+                  <div class="co-panel__title">{% trans "Choose a delivery option" %}</div>
+                  <div class="co-panel__sub" id="ship-pincode-label"></div>
+                </div>
+                <div class="co-seg" role="group" aria-label="{% trans 'Sort delivery options' %}">
+                  <button type="button" class="is-active" aria-pressed="true" data-ship-sort="price">{% trans "Cheapest" %}</button>
+                  <button type="button" aria-pressed="false" data-ship-sort="time">{% trans "Fastest" %}</button>
+                </div>
               </div>
+              <div id="ship-courier-options" class="co-choice-list" role="radiogroup" aria-label="{% trans 'Delivery options' %}"></div>
+              <div id="ship-courier-select-error" class="small text-danger mt-2" style="display:none;"></div>
             </div>
           </div>
         </div>
@@ -126,71 +151,73 @@
         <div class="checkout-step">
           <h2>{% trans "Billing Address" %}</h2>
 
-          <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" name="billing_same_as_delivery" value="1"
+          <div class="form-check form-switch co-switch">
+            <input class="form-check-input" type="checkbox" role="switch" name="billing_same_as_delivery" value="1"
               id="billing-same-as-delivery" checked>
-            <label class="form-check-label small" for="billing-same-as-delivery">
+            <label class="form-check-label" for="billing-same-as-delivery">
               {% trans "Same as delivery address" %}
             </label>
           </div>
 
-          <div id="billing-address-section" class="d-none">
+          <div id="billing-address-section" class="d-none mt-3">
             {% if billing_addresses %}
-            <div class="mb-4" id="saved-billing-address-list">
-              <label class="form-label small fw-bold">{% trans "Choose a saved billing address:" %}</label>
+            <div class="co-choice-list mb-2" id="saved-billing-address-list" role="radiogroup" aria-label="{% trans 'Saved billing addresses' %}">
               {% for address in billing_addresses %}
-              <div class="form-check mb-2">
-                <input class="form-check-input" type="radio" name="billing_address_id" value="{{ address.pk }}"
+              <div class="co-choice">
+                <input class="form-check-input co-choice__input" type="radio" name="billing_address_id" value="{{ address.pk }}"
                   id="billing-addr-{{ address.pk }}" {% if forloop.first %}checked{% endif %}>
-                <label class="form-check-label small" for="billing-addr-{{ address.pk }}">
-                  {{ address.label }}{% if address.company_name %} ({{ address.company_name }}){% endif %} — {{ address.line1 }}, {{ address.display_city }}{% if address.pincode %} - {{ address.pincode }}{% endif %}
+                <label class="co-choice__body" for="billing-addr-{{ address.pk }}">
+                  <span class="co-choice__title">{{ address.label }}{% if address.company_name %} · {{ address.company_name }}{% endif %}</span>
+                  <span class="co-choice__meta">{{ address.line1 }}, {{ address.display_city }}{% if address.pincode %} - {{ address.pincode }}{% endif %}{% if address.gstin %} · GSTIN {{ address.gstin }}{% endif %}</span>
                 </label>
               </div>
               {% endfor %}
             </div>
-            <div class="text-center my-3"><span class="bg-white px-2 small text-muted">{% trans "— OR —" %}</span></div>
-            <button type="button" id="toggle-new-billing-address-btn" class="btn btn-outline-dark btn-sm mb-3">
+            <button type="button" id="toggle-new-billing-address-btn" class="co-add-btn">
               {% trans "+ Add a new billing address" %}
             </button>
             {% endif %}
 
-            <div id="new-billing-address-fields" class="mt-2{% if billing_addresses %} d-none{% endif %}">
-              <label class="form-label small fw-bold mb-3">{% trans "Enter Billing Details:" %}</label>
-
-              <div class="mb-3">
-                <label class="form-label small">{% trans "Company Name (Optional)" %}</label>
-                <input type="text" name="billing_company_name" class="form-control form-control-sm">
-              </div>
-              <div class="mb-3">
-                <label class="form-label small">{% trans "GSTIN (Optional)" %}</label>
-                <input type="text" name="billing_gstin" class="form-control form-control-sm" style="text-transform: uppercase;">
-                <div id="error-billing_gstin" class="text-danger small mt-1"></div>
-              </div>
-              <div class="mb-3">
-                <label class="form-label small">{% trans "Address Line 1" %} <span class="text-danger">*</span></label>
-                <input type="text" name="billing_line1" class="form-control form-control-sm">
-                <div id="error-billing_line1" class="text-danger small mt-1"></div>
-              </div>
-              <div class="mb-3">
-                <label class="form-label small">{% trans "Address Line 2 (Optional)" %}</label>
-                <input type="text" name="billing_line2" class="form-control form-control-sm">
-              </div>
-              <div class="row g-2 mb-3">
+            <div id="new-billing-address-fields" class="{% if billing_addresses %}d-none {% endif %}mt-3">
+              <p class="co-subtitle">{% trans "Business details" %} <span class="text-muted fw-normal text-lowercase">({% trans "optional — for a GST invoice" %})</span></p>
+              <div class="row g-3 mb-3">
                 <div class="col-md-6">
-                  <label class="form-label small">{% trans "City / Town" %} <span class="text-danger">*</span></label>
-                  <input type="text" name="billing_city_name" class="form-control form-control-sm">
+                  <label class="form-label" for="co-billing-company">{% trans "Company Name" %}</label>
+                  <input type="text" id="co-billing-company" name="billing_company_name" class="form-control" autocomplete="organization">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="co-billing-gstin">{% trans "GSTIN" %}</label>
+                  <input type="text" id="co-billing-gstin" name="billing_gstin" class="form-control text-uppercase" maxlength="15" autocapitalize="characters" autocomplete="off">
+                  <div id="error-billing_gstin" class="text-danger small mt-1"></div>
+                </div>
+              </div>
+
+              <p class="co-subtitle">{% trans "Billing address" %}</p>
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label" for="co-billing-line1">{% trans "Address Line 1" %} <span class="text-danger">*</span></label>
+                  <input type="text" id="co-billing-line1" name="billing_line1" class="form-control" autocomplete="billing address-line1">
+                  <div id="error-billing_line1" class="text-danger small mt-1"></div>
+                </div>
+                <div class="col-12">
+                  <label class="form-label" for="co-billing-line2">{% trans "Address Line 2" %} <span class="text-muted fw-normal">({% trans "optional" %})</span></label>
+                  <input type="text" id="co-billing-line2" name="billing_line2" class="form-control" autocomplete="billing address-line2">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="co-billing-pincode">{% trans "Pincode" %} <span class="text-danger">*</span></label>
+                  <input type="text" id="co-billing-pincode" inputmode="numeric" maxlength="6" name="billing_pincode" class="form-control" autocomplete="billing postal-code">
+                  <div id="error-billing_pincode" class="text-danger small mt-1"></div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="co-billing-city">{% trans "City / Town" %} <span class="text-danger">*</span></label>
+                  <input type="text" id="co-billing-city" name="billing_city_name" class="form-control" autocomplete="billing address-level2">
                   <div id="error-billing_city_name" class="text-danger small mt-1"></div>
                 </div>
-                <div class="col-md-6">
-                  <label class="form-label small">{% trans "State" %} <span class="text-danger">*</span></label>
-                  <input type="text" name="billing_state_name" class="form-control form-control-sm">
+                <div class="col-md-4">
+                  <label class="form-label" for="co-billing-state">{% trans "State" %} <span class="text-danger">*</span></label>
+                  <input type="text" id="co-billing-state" name="billing_state_name" class="form-control" autocomplete="billing address-level1">
                   <div id="error-billing_state_name" class="text-danger small mt-1"></div>
                 </div>
-              </div>
-              <div class="mb-2">
-                <label class="form-label small">{% trans "Pincode" %} <span class="text-danger">*</span></label>
-                <input type="text" inputmode="numeric" maxlength="6" name="billing_pincode" class="form-control form-control-sm" style="max-width: 160px;">
-                <div id="error-billing_pincode" class="text-danger small mt-1"></div>
               </div>
             </div>
           </div>
@@ -198,17 +225,24 @@
 
         <div class="checkout-step">
           <h2>{% trans "Payment Method" %}</h2>
-          {% for key, adapter in payment_gateways.items %}
-          <div class="form-check mb-2">
-            <input class="form-check-input" type="radio" name="gateway_key" value="{{ key }}" id="gw-{{ key }}" 
-              {% if selected_gateway_key == key %}checked{% elif not selected_gateway_key and forloop.first %}checked{% endif %}>
-            <label class="form-check-label small" for="gw-{{ key }}">{{ adapter.display_name }}</label>
+          <div class="co-choice-list" role="radiogroup" aria-label="{% trans 'Payment method' %}">
+            {% for key, adapter in payment_gateways.items %}
+            <div class="co-choice">
+              <input class="form-check-input co-choice__input" type="radio" name="gateway_key" value="{{ key }}" id="gw-{{ key }}"
+                {% if selected_gateway_key == key %}checked{% elif not selected_gateway_key and forloop.first %}checked{% endif %}>
+              <label class="co-choice__body" for="gw-{{ key }}">
+                <span class="co-choice__title">{{ adapter.display_name }}</span>
+              </label>
+            </div>
+            {% empty %}
+            <div class="text-danger small">{% trans "Online payment is temporarily unavailable. Please try again shortly or contact support." %}</div>
+            {% endfor %}
           </div>
-          {% empty %}
-          <div class="text-danger small">{% trans "Online payment is temporarily unavailable. Please try again shortly or contact support." %}</div>
-          {% endfor %}
           <div id="error-gateway_key" class="text-danger small mt-1"></div>
-
+          <p class="co-note">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            {% trans "Payments are processed securely. Prices include GST." %}
+          </p>
         </div>
 
       </form>
@@ -410,12 +444,10 @@
         
         var targetId = event.detail.target ? event.detail.target.id : '';
         if (targetId === 'checkout-right-column') {
-          // Re-run the delivery check if we had one, to re-apply Shiprocket rates
-          var pincodeInputEl = document.getElementById('checkout-pincode');
-          if (pincodeInputEl && pincodeInputEl.value.length === 6 && typeof scheduleDeliveryCheck === 'function') {
-             // Reset the lastCheckedPincode so it bypasses the "already checked" guard
-             lastCheckedPincode = '';
-             scheduleDeliveryCheck();
+          // The refreshed summary shows the server's default shipping; re-apply the
+          // customer's chosen courier for whichever address is selected (typed or saved).
+          if (typeof scheduleDeliveryCheck === 'function') {
+            scheduleDeliveryCheck(true);
           }
         }
       });
@@ -500,6 +532,17 @@
     function validateNewAddressFields() {
       var savedAddressChecked = document.querySelector('input[name="address_id"]:checked');
       if (savedAddressChecked) {
+        if (savedAddressChecked.getAttribute('data-complete') === '0') {
+          var missing = document.querySelector('#addr-' + savedAddressChecked.value + '-warn [data-missing]');
+          setFieldError(
+            'address_id',
+            "{% trans 'This address is missing' %} " + (missing ? missing.textContent : '') +
+            ". {% trans 'Tap Edit to complete it before placing your order.' %}"
+          );
+          savedAddressChecked.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return false;
+        }
+        setFieldError('address_id', '');
         return true;
       }
 
@@ -856,8 +899,35 @@
             if (result.ok && result.payload.success) {
               var addr = result.payload.address;
               var label = document.getElementById('addr-' + editAddressId + '-label');
-              if (label && addr) {
-                label.textContent = addr.display;
+              var titleEl = document.getElementById('addr-' + editAddressId + '-title');
+              var editBtn = document.querySelector('.jm-edit-address-btn[data-address-id="' + editAddressId + '"]');
+              if (addr) {
+                if (titleEl) titleEl.textContent = addr.label;
+                if (label) {
+                  label.textContent = addr.line1 + (addr.line2 ? ', ' + addr.line2 : '') +
+                    (addr.city_name ? ', ' + addr.city_name : '') + (addr.pincode ? ' - ' + addr.pincode : '');
+                }
+                // Server decides whether the address can now be delivered to.
+                var radioEl = document.getElementById('addr-' + editAddressId);
+                var warnEl = document.getElementById('addr-' + editAddressId + '-warn');
+                if (radioEl) radioEl.setAttribute('data-complete', addr.is_deliverable ? '1' : '0');
+                if (warnEl) warnEl.hidden = !!addr.is_deliverable;
+                if (addr.is_deliverable) setFieldError('address_id', '');
+                // Keep the Edit button's prefill in sync so reopening it shows the saved values.
+                if (editBtn) {
+                  editBtn.setAttribute('data-line1', addr.line1 || '');
+                  editBtn.setAttribute('data-line2', addr.line2 || '');
+                  editBtn.setAttribute('data-city', addr.city_name || '');
+                  editBtn.setAttribute('data-state', addr.state_name || '');
+                  editBtn.setAttribute('data-pincode', addr.pincode || '');
+                  if (result.payload.name) editBtn.setAttribute('data-name', result.payload.name);
+                  if (result.payload.phone) editBtn.setAttribute('data-phone', result.payload.phone);
+                }
+              }
+              if (addr) {
+                document.dispatchEvent(new CustomEvent('jm:address-updated', {
+                  detail: { id: editAddressId, pincode: addr.pincode }
+                }));
               }
               if (editModal) editModal.hide();
             } else if (result.payload.errors) {
@@ -900,13 +970,20 @@
       return currencySymbol + amount.toFixed(2);
     }
 
+    // data-server-value is what the server rendered and never changes. Read it directly:
+    // a legitimate 0 (free/unset shipping) must not fall through to the last displayed value.
+    function serverAmount(el) {
+      var v = parseFloat(el.getAttribute('data-server-value'));
+      return isNaN(v) ? 0 : v;
+    }
+
     function updateOrderSummary(shippingCharge) {
       var summaryShippingEl = document.getElementById('summary-shipping');
       var summaryTotalEl = document.getElementById('summary-total');
       if (!summaryShippingEl || !summaryTotalEl) return;
       
-      var serverTotal = parseFloat(summaryTotalEl.getAttribute('data-server-value')) || parseFloat(summaryTotalEl.getAttribute('data-value')) || 0;
-      var serverShipping = parseFloat(summaryShippingEl.getAttribute('data-server-value')) || parseFloat(summaryShippingEl.getAttribute('data-value')) || 0;
+      var serverTotal = serverAmount(summaryTotalEl);
+      var serverShipping = serverAmount(summaryShippingEl);
       var baseAfterDiscount = serverTotal - serverShipping;
 
       var total = baseAfterDiscount + shippingCharge;
@@ -923,8 +1000,8 @@
       var summaryTotalEl = document.getElementById('summary-total');
       if (!summaryShippingEl || !summaryTotalEl) return;
       
-      var serverTotal = parseFloat(summaryTotalEl.getAttribute('data-server-value')) || parseFloat(summaryTotalEl.getAttribute('data-value')) || 0;
-      var serverShipping = parseFloat(summaryShippingEl.getAttribute('data-server-value')) || parseFloat(summaryShippingEl.getAttribute('data-value')) || 0;
+      var serverTotal = serverAmount(summaryTotalEl);
+      var serverShipping = serverAmount(summaryShippingEl);
       
       summaryShippingEl.setAttribute('data-value', serverShipping.toFixed(2));
       summaryShippingEl.textContent = formatMoney(serverShipping);
@@ -940,24 +1017,86 @@
       currentSelectedCourierId = null;
     }
 
+    var TAG_LABELS = {
+      cheapest: "{% trans 'Cheapest' %}",
+      fastest: "{% trans 'Fastest' %}",
+      recommended: "{% trans 'Recommended' %}"
+    };
+    var lastCouriers = [];
+    var sortMode = 'price';
+
+    function el(tag, className, text) {
+      var node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    function sortedCouriers(couriers) {
+      var list = couriers.slice();
+      var eta = function (c) { return c.eta_hours != null ? c.eta_hours : Infinity; };
+      list.sort(function (a, b) {
+        return sortMode === 'time'
+          ? (eta(a) - eta(b)) || (a.freight_charge - b.freight_charge)
+          : (a.freight_charge - b.freight_charge) || (eta(a) - eta(b));
+      });
+      return list;
+    }
+
+    // "Sep 22, 2026" (Shiprocket's etd) -> "Tue, 22 Sep"; falls back to the raw text.
+    function formatEta(etd) {
+      var d = new Date(etd);
+      if (isNaN(d.getTime())) return etd;
+      return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+    }
+
+    function formatDays(days) {
+      return days + ' ' + (days === 1 ? "{% trans 'day' %}" : "{% trans 'days' %}");
+    }
+
     function renderCourierOptions(couriers, selectedId) {
       if (!shipCourierOptions) return;
-      shipCourierOptions.innerHTML = couriers.map(function (c) {
+      lastCouriers = couriers;
+      shipCourierOptions.textContent = '';
+      sortedCouriers(couriers).forEach(function (c) {
         var id = String(c.courier_id);
-        var checked = id === String(selectedId) ? ' checked' : '';
-        var days = c.estimated_delivery_days ? (c.estimated_delivery_days + " {% trans 'day(s)' %}") : '';
-        return (
-          '<label class="d-flex justify-content-between align-items-center small mb-2 pb-2 border-bottom">' +
-            '<span>' +
-              '<input type="radio" name="ship_courier_choice" class="form-check-input me-2" value="' + id + '"' + checked + '>' +
-              '<span class="fw-semibold">' + (c.courier_name || '') + '</span>' +
-              (days ? ' <span class="text-muted">(' + days + ')</span>' : '') +
-            '</span>' +
-            '<span class="fw-semibold">' + formatMoney(parseFloat(c.freight_charge) || 0) + '</span>' +
-          '</label>'
-        );
-      }).join('');
+        var label = el('label', 'co-choice');
+
+        var radio = el('input', 'form-check-input co-choice__input');
+        radio.type = 'radio';
+        radio.name = 'ship_courier_choice';
+        radio.value = id;
+        radio.checked = id === String(selectedId);
+        label.appendChild(radio);
+
+        var body = el('span', 'co-choice__body');
+        var title = el('span', 'co-choice__title', c.courier_name || '');
+        (c.tags || []).forEach(function (tag) {
+          if (TAG_LABELS[tag]) title.appendChild(el('span', 'co-tag co-tag--' + tag, TAG_LABELS[tag]));
+        });
+        body.appendChild(title);
+        var when = [];
+        if (c.etd) when.push("{% trans 'Arrives' %} " + formatEta(c.etd));
+        if (c.estimated_delivery_days) when.push(formatDays(c.estimated_delivery_days));
+        if (when.length) body.appendChild(el('span', 'co-choice__meta', when.join(' · ')));
+        label.appendChild(body);
+
+        label.appendChild(el('span', 'co-choice__price', formatMoney(parseFloat(c.freight_charge) || 0)));
+        shipCourierOptions.appendChild(label);
+      });
+      document.querySelectorAll('[data-ship-sort]').forEach(function (btn) {
+        var active = btn.getAttribute('data-ship-sort') === sortMode;
+        btn.classList.toggle('is-active', active);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
     }
+
+    document.querySelectorAll('[data-ship-sort]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        sortMode = btn.getAttribute('data-ship-sort');
+        renderCourierOptions(lastCouriers, currentSelectedCourierId);
+      });
+    });
 
     function selectCourier(courierId, previousId) {
       if (shipCourierSelectError) shipCourierSelectError.style.display = 'none';
@@ -1014,105 +1153,188 @@
     var deliveryCheckTimer = null;
     var lastCheckedPincode = '';
 
+    // action: optional {label, run} rendered as a link-button after the message.
+    function showCheckMessage(text, cssClass, action, loading) {
+      resultBox.className = 'co-status ' + cssClass;
+      resultBox.textContent = '';
+      if (loading) {
+        var spinner = el('span', 'spinner-border spinner-border-sm me-2');
+        spinner.setAttribute('aria-hidden', 'true');
+        resultBox.appendChild(spinner);
+      }
+      resultBox.appendChild(document.createTextNode(text));
+      if (action) {
+        var btn = el('button', 'btn btn-link btn-sm p-0 ms-2 align-baseline', action.label);
+        btn.type = 'button';
+        btn.addEventListener('click', action.run);
+        resultBox.appendChild(btn);
+      }
+    }
+
+    var retryAction = {
+      label: "{% trans 'Retry' %}",
+      run: function () { scheduleDeliveryCheck(true); }
+    };
+
+    // The selected saved address, if it can't be delivered to yet (no pincode/state on older addresses).
+    function incompleteSelectedAddress() {
+      var newFieldsOpen = newAddressFields && !newAddressFields.classList.contains('d-none');
+      if (newFieldsOpen) return null;
+      var checked = document.querySelector('.jm-saved-address-radio:checked');
+      return checked && checked.getAttribute('data-complete') === '0' ? checked : null;
+    }
+
+    function openEditFor(radio) {
+      var btn = document.querySelector('.jm-edit-address-btn[data-address-id="' + radio.value + '"]');
+      if (btn) btn.click();
+    }
+
     function runDeliveryCheck(pincode) {
       var requestToken = ++deliveryCheckToken;
-      resultBox.className = 'small mt-2 text-muted';
-      resultBox.textContent = "{% trans 'Checking delivery availability...' %}";
+      showCheckMessage("{% trans 'Checking delivery options...' %}", 'text-muted', false, true);
+
+      var controller = window.AbortController ? new AbortController() : null;
+      var abortTimer = controller ? setTimeout(function () { controller.abort(); }, 25000) : null;
 
       fetch(
         "{% url 'shipping:check-serviceability' %}?pincode=" + encodeURIComponent(pincode) +
-        "{% if buy_now_mode %}&buy_now=1{% endif %}"
+        "{% if buy_now_mode %}&buy_now=1{% endif %}",
+        controller ? { signal: controller.signal } : undefined
       )
         .then(function (r) { return r.json(); })
         .then(function (data) {
           if (requestToken !== deliveryCheckToken) return; // stale response, pincode changed since
           if (!data.ok) {
-            resultBox.className = 'small mt-2 text-muted';
-            resultBox.textContent = data.error || "{% trans 'Could not verify delivery right now.' %}";
+            // Don't remember this pincode as "checked" — a failed lookup must be retryable.
+            lastCheckedPincode = '';
+            showCheckMessage(
+              data.error || "{% trans 'Could not fetch delivery options right now. Please try again.' %}",
+              'text-danger', data.retryable !== false ? retryAction : null
+            );
           } else if (data.is_serviceable) {
-            resultBox.className = 'small mt-2 text-success fw-semibold';
-            resultBox.textContent = "{% trans '✓ Delivery available to this pincode' %}";
+            lastCheckedPincode = pincode;
+            showCheckMessage("{% trans '✓ Delivery available to this pincode' %}", 'text-success fw-semibold');
 
             var charge = parseFloat(data.shipping_charge) || 0;
+            var pinLabel = document.getElementById('ship-pincode-label');
+            if (pinLabel) pinLabel.textContent = "{% trans 'Delivering to' %} " + pincode;
             if (shipPanel) {
               shipPanel.style.display = 'block';
               if (data.available_couriers && data.available_couriers.length) {
-                currentSelectedCourierId = data.selected_courier_id != null
-                  ? String(data.selected_courier_id)
-                  : String(data.available_couriers[0].courier_id);
+                currentSelectedCourierId = String(data.selected_courier_id);
                 renderCourierOptions(data.available_couriers, currentSelectedCourierId);
               } else if (shipCourierOptions) {
                 currentSelectedCourierId = null;
+                lastCouriers = [];
+                shipCourierOptions.textContent = '';
+                var flat = el('div', 'd-flex justify-content-between small');
                 var eta = data.estimated_delivery_days
                   ? (' (' + data.estimated_delivery_days + " {% trans 'day(s)' %}" + ')')
                   : '';
-                shipCourierOptions.innerHTML =
-                  '<div class="d-flex justify-content-between small">' +
-                    '<span class="text-muted">{% trans "Shipping Charge" %}' + eta + '</span>' +
-                    '<span class="fw-semibold">' + formatMoney(charge) + '</span>' +
-                  '</div>';
+                flat.appendChild(el('span', 'text-muted', "{% trans 'Shipping Charge' %}" + eta));
+                flat.appendChild(el('span', 'fw-semibold', formatMoney(charge)));
+                shipCourierOptions.appendChild(flat);
               }
             }
 
             updateOrderSummary(charge);
           } else {
-            resultBox.className = 'small mt-2 text-danger fw-semibold';
-            resultBox.textContent = "{% trans 'Sorry, we cannot deliver to this pincode yet.' %}";
+            lastCheckedPincode = pincode;
+            showCheckMessage("{% trans 'Sorry, we cannot deliver to this pincode yet.' %}", 'text-danger fw-semibold');
             updateOrderSummary(0);
           }
         })
         .catch(function () {
           if (requestToken !== deliveryCheckToken) return;
-          resultBox.className = 'small mt-2 text-muted';
-          resultBox.textContent = "{% trans 'Could not verify delivery right now.' %}";
+          lastCheckedPincode = '';
+          showCheckMessage("{% trans 'Could not fetch delivery options right now. Please try again.' %}", 'text-danger', retryAction);
+        })
+        .finally(function () {
+          if (abortTimer) clearTimeout(abortTimer);
         });
     }
 
-    function scheduleDeliveryCheck() {
-      if (!pincodeInput || !resultBox) return;
-      var pincode = pincodeInput.value.trim();
+    // The pincode that will actually be delivered to: the typed one while the
+    // new-address form is open, otherwise the selected saved address's.
+    function resolveDeliveryPincode() {
+      var newFieldsOpen = newAddressFields && !newAddressFields.classList.contains('d-none');
+      if (newFieldsOpen || !savedAddressRadios.length) {
+        return pincodeInput ? pincodeInput.value.trim() : '';
+      }
+      var checked = document.querySelector('.jm-saved-address-radio:checked');
+      return checked ? (checked.getAttribute('data-pincode') || '').trim() : '';
+    }
+
+    function scheduleDeliveryCheck(force) {
+      if (!resultBox) return;
+      var pincode = resolveDeliveryPincode();
 
       if (deliveryCheckTimer) {
         clearTimeout(deliveryCheckTimer);
         deliveryCheckTimer = null;
       }
 
-      if (!/^[1-9][0-9]{5}$/.test(pincode)) {
-      
+      var incomplete = incompleteSelectedAddress();
+      if (incomplete) {
         deliveryCheckToken++;
         lastCheckedPincode = '';
-        resultBox.className = 'small mt-2';
+        resetShippingPanel();
+        resetOrderSummaryToDefault();
+        showCheckMessage(
+          "{% trans 'This address is missing details needed for delivery.' %}", 'text-danger',
+          { label: "{% trans 'Complete it' %}", run: function () { openEditFor(incomplete); } }
+        );
+        return;
+      }
+
+      if (!/^[1-9][0-9]{5}$/.test(pincode)) {
+        deliveryCheckToken++;
+        lastCheckedPincode = '';
+        resultBox.className = 'co-status';
         resultBox.textContent = '';
         resetShippingPanel();
         resetOrderSummaryToDefault();
         return;
       }
 
-      if (pincode === lastCheckedPincode) {
+      if (pincode === lastCheckedPincode && force !== true) {
         return; // already checked this exact pincode, avoid a redundant call
       }
 
       // Small debounce so a still-typing/paste-in-progress user doesn't fire
       // a Shiprocket lookup per keystroke once they cross 6 digits.
       deliveryCheckTimer = setTimeout(function () {
-        lastCheckedPincode = pincode;
         resetShippingPanel();
         runDeliveryCheck(pincode);
-      }, 400);
+      }, force === true ? 0 : 400);
     }
 
-    if (pincodeInput && resultBox) {
-      ['input', 'keyup', 'change', 'paste'].forEach(function (evtName) {
-        pincodeInput.addEventListener(evtName, function () {
-          // Let the keystroke land / paste resolve before reading the value.
-          setTimeout(scheduleDeliveryCheck, 0);
+    if (resultBox) {
+      if (pincodeInput) {
+        ['input', 'keyup', 'change', 'paste'].forEach(function (evtName) {
+          pincodeInput.addEventListener(evtName, function () {
+            // Let the keystroke land / paste resolve before reading the value.
+            setTimeout(scheduleDeliveryCheck, 0);
+          });
         });
+      }
+
+      // Switching saved address / opening the new-address form changes the destination.
+      savedAddressRadios.forEach(function (radio) {
+        radio.addEventListener('change', function () { scheduleDeliveryCheck(); });
+      });
+      if (toggleNewAddressBtn) {
+        toggleNewAddressBtn.addEventListener('click', function () { scheduleDeliveryCheck(); });
+      }
+      // An edited saved address may carry a new pincode.
+      document.addEventListener('jm:address-updated', function (e) {
+        var radio = document.getElementById('addr-' + e.detail.id);
+        if (radio) radio.setAttribute('data-pincode', e.detail.pincode || '');
+        scheduleDeliveryCheck();
       });
 
-      // Auto-check on load too, in case a saved/prefilled pincode is already valid.
-      if (/^[1-9][0-9]{5}$/.test(pincodeInput.value.trim())) {
-        scheduleDeliveryCheck();
-      }
+      // Auto-check on load for whichever address is preselected.
+      scheduleDeliveryCheck();
     }
   });
 </script>

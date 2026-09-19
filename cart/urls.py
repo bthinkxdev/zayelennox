@@ -15,6 +15,7 @@ urlpatterns = [
     path("add/", views.cart_add_view, name="add"),
     path("combo/add/", views.cart_add_combo_view, name="combo-add"),
     path("combo/remove/", views.cart_remove_combo_view, name="combo-remove"),
+    path("combo/quantity/", views.cart_combo_quantity_view, name="combo-quantity"),
     path("remove/", views.cart_remove_view, name="remove"),
     path("page/remove/", views.cart_page_remove_view, name="page-remove"),
     path("quantity/", views.cart_quantity_view, name="quantity"),

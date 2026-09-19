@@ -32,6 +32,21 @@
         <span class="jm-cat-arch__label">{{ category.name }}</span>
       </a>
       {% endfor %}
+      {% if section_context.combos_teaser %}
+      <a href="{% url 'catalog:combo-list' %}" class="jm-cat-arch jm-cat-arch--combos jm-cat-arch--sand">
+        <span class="jm-cat-arch__media">
+          {% if section_context.combos_teaser.cover %}
+          <img src="{{ section_context.combos_teaser.cover }}" alt="" loading="lazy" width="220" height="300">
+          {% else %}
+          <span class="jm-cat-arch__fallback-icon" aria-hidden="true">
+            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 16l18-8 18 8-18 8-18-8Z"/><path d="M6 16v16l18 8 18-8V16"/><path d="M24 24v16"/></svg>
+          </span>
+          {% endif %}
+        </span>
+        <span class="jm-cat-arch__scrim" aria-hidden="true"></span>
+        <span class="jm-cat-arch__label">{% trans "Combos" %}</span>
+      </a>
+      {% endif %}
       <a href="{% url 'catalog:plp' %}" class="jm-cat-arch jm-cat-arch--all {% cycle jm_arch_tone %}">
         <span class="jm-cat-arch__media">
           <span class="jm-cat-arch__fallback-icon" aria-hidden="true">

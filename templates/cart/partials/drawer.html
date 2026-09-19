@@ -1,12 +1,18 @@
 {% load i18n %}
 {% load static %}
 {% if summary and summary.lines %}
-{% if error and not error_item_id %}
+{% if error and not error_item_id and not error_combo_id %}
 <div class="alert alert-danger py-2 small m-3 mb-0" role="alert">{{ error }}</div>
 {% endif %}
 <div class="cart-drawer-scroll">
   <ul class="list-unstyled mb-0">
-    {% for line in summary.lines %}
+    {% for block in summary.blocks %}
+    {% if block.is_combo %}
+    <li class="cart-combo-li">
+      {% include "cart/partials/_combo_block.html" with block=block target="#cart-drawer-body" swap="innerHTML" is_drawer="1" compact=True %}
+    </li>
+    {% else %}
+    {% with line=block %}
     <li class="cart-line">
     <div class="cart-line__img-wrap">
       {% with line.display_image as primary_image %}
@@ -33,9 +39,7 @@
       <div class="text-danger small mt-1">{{ error }}</div>
       {% endif %}
       {% if line.gift_snapshot %}<div class="small text-floward mb-1">{% trans "Gift customized" %}</div>{% endif %}
-      {% if line.combo_name_snapshot %}<div class="small text-floward mb-1">{% trans "Part of combo:" %} {{ line.combo_name_snapshot }}</div>{% endif %}
 
-      {% if not line.combo_name_snapshot %}
       <div class="qty-stepper d-flex align-items-center border rounded-pill overflow-hidden mt-2" style="width: fit-content;">
         <form method="post" action="{% url 'cart:quantity' %}">
           {% csrf_token %}
@@ -57,26 +61,16 @@
           <button class="qty-stepper__btn" type="button" hx-post="{% url 'cart:quantity' %}" hx-target="#cart-drawer-body" hx-swap="innerHTML" hx-include="closest form" aria-label="{% trans 'Increase quantity' %}" style="padding: 2px 8px; font-size: 14px; border: none; background: transparent;">&plus;</button>
         </form>
       </div>
-      {% else %}
-      <div class="small text-muted mt-2">{% trans "Qty" %} {{ line.quantity }}</div>
-      {% endif %}
     </div>
 
-    {% if line.combo_name_snapshot %}
-    <form method="post" action="{% url 'cart:combo-remove' %}">
-      {% csrf_token %}
-      <input type="hidden" name="combo_id" value="{{ line.item.combo_id }}">
-      <input type="hidden" name="is_drawer" value="1">
-      <button class="btn btn-sm btn-ghost text-danger" type="button" hx-post="{% url 'cart:combo-remove' %}" hx-target="#cart-drawer-body" hx-swap="innerHTML" hx-include="closest form" aria-label="{% trans 'Remove combo' %}">×</button>
-    </form>
-    {% else %}
     <form method="post" action="{% url 'cart:remove' %}">
       {% csrf_token %}
       <input type="hidden" name="cart_item_id" value="{{ line.item.pk }}">
       <button class="btn btn-sm btn-ghost text-danger" type="button" hx-post="{% url 'cart:remove' %}" hx-target="#cart-drawer-body" hx-swap="innerHTML" hx-include="closest form" aria-label="{% trans 'Remove' %}">×</button>
     </form>
-    {% endif %}
     </li>
+    {% endwith %}
+    {% endif %}
     {% endfor %}
   </ul>
 </div>

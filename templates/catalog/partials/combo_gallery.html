@@ -10,7 +10,7 @@
                data-gallery-video
                src="{{ item.media_src }}"
                {% if item.image %}poster="{{ item.image.url }}"{% endif %}
-               muted playsinline controls preload="metadata"></video>
+               muted loop playsinline controls preload="metadata"></video>
         {% else %}
         <img class="jm-pdp-gallery__image zoom-image object-fit-contain"
              src="{{ item.media_src }}"

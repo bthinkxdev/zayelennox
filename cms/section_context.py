@@ -6,6 +6,7 @@ from typing import Any
 
 from catalog.selectors import (
     get_active_combos,
+    get_combos_teaser,
     get_featured_brands,
     get_homepage_product_rails,
     get_products_for_section_config,
@@ -114,7 +115,10 @@ def _shop_by_recipient(config: dict[str, Any]) -> dict[str, Any]:
 
 
 def _shop_by_category(config: dict[str, Any]) -> dict[str, Any]:
-    return {"categories": get_root_categories(category_ids=None)}
+    return {
+        "categories": get_root_categories(category_ids=None),
+        "combos_teaser": get_combos_teaser(),
+    }
 
 
 def _featured(

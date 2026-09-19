@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import re
+
 from django.conf import settings
 from django.db import models
 
 from core.models import TimeStampedModel
+
+DELIVERY_PINCODE_RE = re.compile(r"^[1-9][0-9]{5}$")
 
 
 class OTPPurpose(models.TextChoices):
@@ -171,6 +175,31 @@ class Address(TimeStampedModel):
     def display_city(self) -> str:
         """City name for display/invoices: prefers the new free-text field, falls back to the legacy FK."""
         return self.city_name or (self.city.name if self.city_id else "")
+
+    @property
+    def delivery_problems(self) -> dict[str, str]:
+        """
+        What this address is missing to be shipped to, as ``{field: label}``.
+
+        Older (city-based) addresses were saved without a pincode or state, but
+        courier quotes and booking both need them, so checkout treats any
+        address with a problem here as incomplete and asks for it to be
+        completed rather than letting the order through.
+        """
+        problems: dict[str, str] = {}
+        if not (self.line1 or "").strip():
+            problems["line1"] = "address line 1"
+        if not ((self.city_name or "").strip() or self.city_id):
+            problems["city_name"] = "city"
+        if not (self.state_name or "").strip():
+            problems["state_name"] = "state"
+        if not DELIVERY_PINCODE_RE.match((self.pincode or "").strip()):
+            problems["pincode"] = "pincode"
+        return problems
+
+    @property
+    def is_deliverable(self) -> bool:
+        return not self.delivery_problems
     is_default = models.BooleanField(
         default=False,
         db_index=True,

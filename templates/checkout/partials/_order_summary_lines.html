@@ -1,5 +1,9 @@
 {% load i18n %}
-{% for line in summary.lines %}
+{% for block in summary.blocks %}
+{% if block.is_combo %}
+{% include "checkout/partials/_combo_summary_block.html" %}
+{% else %}
+{% with line=block %}
 <div class="d-flex align-items-center justify-content-between py-2 border-bottom gap-2">
   <div class="d-flex align-items-center gap-2 text-truncate" style="min-width: 0;">
     {% with line.display_image as primary_image %}
@@ -28,9 +32,6 @@
       {% if line.effective_hsn_code %}
       <div class="text-muted" style="font-size: 0.7rem;">{% trans "HSN" %} {{ line.effective_hsn_code }} &middot; {% trans "Incl. GST" %} {{ line.effective_gst_rate_percent }}%</div>
       {% endif %}
-      {% if line.combo_name_snapshot %}
-      <div class="text-floward" style="font-size: 0.7rem;">{% trans "Part of combo:" %} {{ line.combo_name_snapshot }}</div>
-      {% endif %}
 
       {% if not line.is_in_stock %}
       <div class="d-flex align-items-center gap-2 mt-1">
@@ -51,4 +52,6 @@
   </div>
   <span class="flex-shrink-0 fw-semibold" style="font-size: 0.875rem;">{{ display_currency.symbol }} {{ line.line_subtotal }}</span>
 </div>
+{% endwith %}
+{% endif %}
 {% endfor %}
