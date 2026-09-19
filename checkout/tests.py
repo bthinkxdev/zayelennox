@@ -15,6 +15,7 @@ from checkout.models import CheckoutSession
 from core.models import Currency
 from core.services import get_site_settings
 from orders.models import Order
+from shipping.exceptions import ShiprocketAPIError
 from shipping.rates import fetch_courier_options, resolve_order_shipping_charge
 from shipping.shiprocket_client import shiprocket_client
 
@@ -158,3 +159,200 @@ class SavedAddressShippingTests(_Base):
             fetch_courier_options(cart=cart, pincode="682001")
             fetch_courier_options(cart=cart, pincode="682001")
         self.assertEqual(rates.call_count, 1)
+
+
+class FreeDeliveryTests(_Base):
+    """
+    The vendor's "Charge customers for delivery" switch: when off, no delivery charge reaches
+    the cart, checkout, order total, payment amount or bill - while Shiprocket keeps working.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.set_charging(False)
+        self.address()  # complete saved address (682001)
+
+    def set_charging(self, on: bool):
+        site = get_site_settings()
+        site.charge_for_delivery = on
+        site.save()
+
+    def cart(self):
+        from cart.models import Cart
+
+        return Cart.objects.get(customer_profile=self.profile, is_buy_now=False)
+
+    def request_with_session(self):
+        from django.test import RequestFactory
+
+        request = RequestFactory().get("/")
+        request.user = self.user
+        request.session = self.client.session
+        return request
+
+    def place(self, *, override=None, key="k-free"):
+        from checkout.services import place_order
+
+        session = CheckoutSession.objects.create(
+            cart=self.cart(), customer_profile=self.profile, address=Address.objects.first()
+        )
+        return place_order(
+            checkout_session_id=session.pk, idempotency_key=key, customer_profile=self.profile,
+            shipping_charge_override=override,
+        )
+
+    # ---- cart -----------------------------------------------------------
+    def test_cart_summary_never_includes_a_delivery_charge(self):
+        from cart.models import Cart
+        from cart.selectors import get_cart_summary
+
+        Cart.objects.filter(pk=self.cart().pk).update(delivery_charge=Decimal("40.00"))
+        summary = get_cart_summary(cart=self.cart())
+        self.assertTrue(summary.free_delivery)
+        self.assertEqual(summary.delivery_charge, Decimal("0.00"))
+        self.assertEqual(summary.grand_total, summary.subtotal)
+
+        self.set_charging(True)  # regression: the stored charge applies again
+        summary = get_cart_summary(cart=self.cart())
+        self.assertFalse(summary.free_delivery)
+        self.assertEqual(summary.delivery_charge, Decimal("40.00"))
+        self.assertEqual(summary.grand_total, summary.subtotal + Decimal("40.00"))
+
+    def test_cart_page_and_sidebar_cart_say_free(self):
+        for url in ("/cart/", "/cart/drawer/"):
+            html = self.client.get(url).content.decode()
+            self.assertIn(">Free<", html, url)
+            self.assertNotIn("Calculated at checkout", html, url)
+        self.set_charging(True)
+        self.assertIn("Calculated at checkout", self.client.get("/cart/").content.decode())
+        self.assertNotIn(">Free<", self.client.get("/cart/drawer/").content.decode())
+
+    # ---- checkout page --------------------------------------------------
+    def test_checkout_page_announces_free_delivery_and_shows_no_charge(self):
+        html = self.client.get("/checkout/").content.decode()
+        self.assertIn("Free delivery", html)
+        self.assertIn('class="co-free"', html)
+        self.assertIn("var freeDelivery = true;", html)
+        self.assertRegex(html, r'id="summary-shipping" data-server-value="0\.0+" data-value="0\.0+" class="text-success fw-semibold">Free<')
+        self.assertRegex(html, r'id="summary-total" data-server-value="100\.0+"')  # the product's price, nothing added
+
+    def test_checkout_page_is_unchanged_when_delivery_is_charged(self):
+        self.set_charging(True)
+        html = self.client.get("/checkout/").content.decode()
+        self.assertNotIn('class="co-free"', html)
+        self.assertIn("var freeDelivery = false;", html)
+        self.assertNotIn(">Free<", html.split('id="summary-shipping"')[1][:200])
+
+    # ---- Shiprocket still works, but never prices ---------------------------
+    def test_serviceability_check_still_uses_shiprocket_but_returns_no_price_or_choice(self):
+        with mock.patch.object(shiprocket_client, "get_shipping_rates", return_value=COURIERS) as rates:
+            data = self.client.get("/shipping/check-serviceability/?pincode=682001").json()
+        self.assertEqual(rates.call_count, 1)  # the integration is still queried
+        self.assertTrue(data["ok"] and data["is_serviceable"] and data["free_delivery"])
+        self.assertEqual(data["shipping_charge"], 0)
+        self.assertEqual(data["available_couriers"], [])
+        self.assertEqual(data["etd"], "Sep 21, 2026")  # Shiprocket's recommended courier's estimate
+        self.assertNotIn("shiprocket_shipping", self.client.session)
+
+    def test_unserviceable_pincode_and_shiprocket_outage_still_behave(self):
+        with mock.patch.object(
+            shiprocket_client, "get_shipping_rates", return_value={"available_couriers": [], "recommended_courier_id": None}
+        ):
+            self.assertEqual(
+                self.client.get("/shipping/check-serviceability/?pincode=999999").json(), {"ok": True, "is_serviceable": False}
+            )
+        cache.clear()
+        with mock.patch.object(shiprocket_client, "get_shipping_rates", side_effect=ShiprocketAPIError("down")):
+            data = self.client.get("/shipping/check-serviceability/?pincode=560001").json()
+        self.assertFalse(data["ok"])
+        self.assertTrue(data["retryable"])
+
+    def test_courier_choice_is_refused_while_delivery_is_free(self):
+        response = self.client.post("/shipping/select-courier/", {"courier_id": "1"}).json()
+        self.assertFalse(response["ok"])
+
+    def test_order_time_charge_is_zero_even_with_a_stale_quote_or_flat_rate(self):
+        from shipping.rates import store_quote
+
+        request = self.request_with_session()
+        couriers = [dict(COURIERS["available_couriers"][0], tags=["cheapest"])]
+        store_quote(request, pincode="682001", couriers=couriers, selected_id=6)
+        self.assertEqual(resolve_order_shipping_charge(request, cart=self.cart(), pincode="682001"), Decimal("0.00"))
+
+        site = get_site_settings()
+        site.use_shiprocket_delivery_charge = False
+        site.save()
+        self.assertEqual(resolve_order_shipping_charge(request, cart=self.cart(), pincode="682001"), Decimal("0.00"))
+
+    # ---- the order, the payment and the bill agree ------------------------------
+    def test_order_total_excludes_delivery_even_if_a_charge_is_passed_in(self):
+        order = self.place(override=Decimal("99.00"))
+        self.assertEqual(order.delivery_charge, Decimal("0.00"))
+        self.assertEqual(order.total_amount, order.subtotal - order.coupon_discount)
+        self.assertEqual(order.total_amount, Decimal("100.00"))
+
+    def test_order_total_includes_the_quoted_charge_when_delivery_is_charged(self):
+        self.set_charging(True)
+        order = self.place(override=Decimal("99.00"), key="k-charged")
+        self.assertEqual(order.delivery_charge, Decimal("99.00"))
+        self.assertEqual(order.total_amount, Decimal("199.00"))
+
+    def test_payment_is_taken_for_exactly_the_order_total(self):
+        from payments.services import process_payment
+
+        order = self.place(override=Decimal("99.00"))
+        asked = {}
+
+        class Adapter:
+            is_async = True
+
+            def create_payment_intent(self, *, amount, currency, metadata):
+                asked["amount"] = amount
+                return mock.Mock(intent_id="intent-1")
+
+        with mock.patch("payments.services.get_payment_adapter", return_value=Adapter()):
+            payment = process_payment(order=order, gateway_key="fake", payment_data={})
+        self.assertEqual(payment.amount, order.total_amount)
+        self.assertEqual(asked["amount"], order.total_amount)
+        self.assertEqual(asked["amount"], Decimal("100.00"))
+
+    def test_order_page_and_bill_show_free_and_no_amount(self):
+        order = self.place()
+        page = self.client.get("/orders/%d/" % order.pk).content.decode()
+        self.assertRegex(page, r"Delivery Fee</span>\s*<span><span class=\"text-success fw-semibold\">Free</span>")
+        bill = self.client.get("/accounts/dashboard/orders/%d/invoice/" % order.pk).content.decode()
+        self.assertRegex(bill, r"<td>Delivery Charge</td>\s*<td>Free</td>")
+
+    def test_bill_shows_the_amount_when_a_charge_was_billed(self):
+        self.set_charging(True)
+        order = self.place(override=Decimal("99.00"), key="k-bill")
+        bill = self.client.get("/accounts/dashboard/orders/%d/invoice/" % order.pk).content.decode()
+        self.assertRegex(bill, r"<td>Delivery Charge</td>\s*<td>[^<]*99</td>")
+
+    def test_shiprocket_booking_still_happens_with_zero_shipping_charges(self):
+        order = self.place()
+        with mock.patch.object(shiprocket_client, "_request", return_value={"order_id": 1}) as request:
+            shiprocket_client.create_order(order, None)
+        method, path = request.call_args.args[:2]
+        self.assertEqual((method, path), ("POST", "/orders/create/adhoc"))
+        self.assertEqual(request.call_args.kwargs["json"]["shipping_charges"], "0.00")
+
+
+class DeliveryChargeSettingTests(TestCase):
+    def test_vendor_can_switch_it_off_and_on_from_the_settings_page(self):
+        admin = get_user_model().objects.create_superuser(username="adm", email="a@x.com", password="x")
+        self.client.force_login(admin)
+        page = self.client.get("/dashboard/settings/").content.decode()
+        self.assertIn('name="charge_for_delivery"', page)
+        self.assertIn("Charge customers for delivery", page)
+        self.assertTrue(get_site_settings().charge_for_delivery)  # default: charged, nothing changes until switched
+
+        from dashboard.forms import SiteSettingsForm
+
+        site = get_site_settings()
+        form = SiteSettingsForm({"site_name": "Z", "primary_color": "#000000", "secondary_color": "#111111",
+                                 "font_family": "Inter", "default_shipping_charge": "50", "tax_rate_percent": "0",
+                                 "active_payment_gateway": "razorpay", "shiprocket_pickup_location": "x"}, instance=site)
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        self.assertFalse(get_site_settings().charge_for_delivery)  # unticked box = free delivery

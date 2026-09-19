@@ -103,6 +103,18 @@ def fetch_courier_options(*, cart, pincode: str) -> list[dict]:
     return couriers
 
 
+def estimate_courier(couriers: list[dict]) -> dict:
+    """
+    The courier whose delivery estimate to quote when the customer isn't choosing one
+    (free delivery): Shiprocket's own recommendation, else the fastest, else the first.
+    """
+    for tag in ("recommended", "fastest"):
+        for courier in couriers:
+            if tag in courier["tags"]:
+                return courier
+    return couriers[0]
+
+
 def store_quote(request, *, pincode: str, couriers: list[dict], selected_id) -> None:
     request.session[SESSION_KEY] = {
         "pincode": pincode,
@@ -136,13 +148,16 @@ def select_courier(request, courier_id: str) -> Optional[dict]:
 
 def resolve_order_shipping_charge(request, *, cart, pincode: Optional[str]) -> Decimal:
     """
-    Shipping charge to bill on the order — decided server-side, never ₹0 by accident.
+    Shipping charge to bill on the order — decided server-side, never ₹0 by accident
+    (₹0 only when the vendor has turned delivery charges off).
 
     Uses the courier the customer picked. If no quote for this pincode is held
     (the browser never ran the check, or it failed), quotes it now and takes the
     cheapest; if Shiprocket is still unavailable, falls back to the flat charge.
     """
     site_settings = get_site_settings()
+    if not site_settings.charge_for_delivery:
+        return Decimal("0.00")
     if not site_settings.use_shiprocket_delivery_charge:
         return site_settings.default_shipping_charge
 

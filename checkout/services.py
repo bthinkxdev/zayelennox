@@ -143,7 +143,8 @@ def place_order(
 
     delivery_charge = summary.delivery_charge
     grand_total = summary.grand_total
-    if shipping_charge_override is not None:
+    # With free delivery switched on, a courier quote never reaches the order total.
+    if shipping_charge_override is not None and not summary.free_delivery:
         delivery_charge = shipping_charge_override
         grand_total = max(
             summary.subtotal - summary.coupon_discount + delivery_charge,

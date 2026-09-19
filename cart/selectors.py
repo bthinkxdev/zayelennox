@@ -11,6 +11,7 @@ from django.http import HttpRequest
 
 from cart.models import Cart, CartItem
 from catalog.models import Combo, ComboImage, ComboItem, Product, ProductImage
+from core.services import get_site_settings
 from delivery.selectors import get_delivery_charge
 
 _CART_CACHE_ATTR = "_floward_resolved_cart"
@@ -235,6 +236,7 @@ class CartSummary:
     coupon_code: str = ""
     coupon_discount: Decimal = Decimal("0.00")
     delivery_charge: Decimal = Decimal("0.00")
+    free_delivery: bool = False
     grand_total: Decimal = Decimal("0.00")
     item_count: int = 0
     has_stock_issues: bool = False
@@ -409,8 +411,14 @@ def get_cart_summary(*, cart: Cart) -> CartSummary:
         elif item.quantity > line.available_stock:
             has_stock_issues = True
 
+    # The vendor's "Charge customers for delivery" switch: when off, delivery is free
+    # everywhere — this is the one place the cart-side charge is decided, so the cart page,
+    # sidebar cart, checkout and the order all agree.
+    free_delivery = not get_site_settings().charge_for_delivery
     delivery_charge = cart.delivery_charge
-    if cart.destination_city_id and delivery_charge == Decimal("0.00"):
+    if free_delivery:
+        delivery_charge = Decimal("0.00")
+    elif cart.destination_city_id and delivery_charge == Decimal("0.00"):
         delivery_charge = get_delivery_charge(
             item_count=item_count,
             destination_city=cart.destination_city,
@@ -463,6 +471,7 @@ def get_cart_summary(*, cart: Cart) -> CartSummary:
         coupon_code=coupon_code,
         coupon_discount=coupon_discount,
         delivery_charge=delivery_charge,
+        free_delivery=free_delivery,
         grand_total=grand_total,
         item_count=item_count,
         has_stock_issues=has_stock_issues,

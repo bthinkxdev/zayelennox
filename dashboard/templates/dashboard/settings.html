@@ -23,10 +23,10 @@
               <div class="form-text mb-2">Shown on customer invoices, and used to decide CGST+SGST vs IGST on each order (compared against the delivery state).</div>
             </div>
             {% endif %}
-            {% if field.name == 'use_shiprocket_delivery_charge' %}
+            {% if field.name == 'charge_for_delivery' %}
             <div class="col-12 mt-3 mb-2">
               <h5 class="border-bottom pb-2 fw-semibold text-dark">Shipping Charge</h5>
-              <div class="form-text mb-2">Orders are always created, tracked, and shipped through Shiprocket — this only decides what the customer is charged for delivery.</div>
+              <div class="form-text mb-2">Orders are always created, tracked, and shipped through Shiprocket — this only decides what the customer is charged for delivery. Turn <strong>Charge customers for delivery</strong> off for free delivery: the two settings below are then ignored and checkout shows “Free delivery”.</div>
             </div>
             {% endif %}
             {% if field.name == 'active_payment_gateway' %}

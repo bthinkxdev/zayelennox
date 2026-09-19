@@ -130,6 +130,12 @@
 
           {# Outside the new-address block on purpose: it must stay visible when a saved address is selected. #}
           <div id="delivery-options" class="mt-3">
+            {% if summary.free_delivery %}
+            <div class="co-free" role="status">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+              <span><strong>{% trans "Free delivery" %}</strong> {% trans "on this order — no delivery charge will be added." %}</span>
+            </div>
+            {% endif %}
             <div id="delivery-check-result" class="co-status" aria-live="polite"></div>
             <div id="shipping-details-panel" class="co-panel mt-2" style="display:none;">
               <div class="co-panel__head">
@@ -383,7 +389,7 @@
         {% endif %}
         <div class="d-flex justify-content-between small pt-1">
           <span>{% trans "Shipping" %}</span>
-          <span id="summary-shipping" data-server-value="{{ summary.delivery_charge|stringformat:'f' }}" data-value="{{ summary.delivery_charge|stringformat:'f' }}">{{ display_currency.symbol }}{{ summary.delivery_charge }}</span>
+          <span id="summary-shipping" data-server-value="{{ summary.delivery_charge|stringformat:'f' }}" data-value="{{ summary.delivery_charge|stringformat:'f' }}"{% if summary.free_delivery %} class="text-success fw-semibold"{% endif %}>{% if summary.free_delivery %}{% trans "Free" %}{% else %}{{ display_currency.symbol }}{{ summary.delivery_charge }}{% endif %}</span>
         </div>
         <div class="d-flex justify-content-between fw-semibold mt-2 pt-2 border-top">
           <span>{% trans "Total" %}</span>
@@ -970,6 +976,9 @@
       return currencySymbol + amount.toFixed(2);
     }
 
+    // Free delivery is decided on the server; when on, the summary must never show a charge.
+    var freeDelivery = {% if summary.free_delivery %}true{% else %}false{% endif %};
+
     // data-server-value is what the server rendered and never changes. Read it directly:
     // a legitimate 0 (free/unset shipping) must not fall through to the last displayed value.
     function serverAmount(el) {
@@ -978,6 +987,7 @@
     }
 
     function updateOrderSummary(shippingCharge) {
+      if (freeDelivery) return;
       var summaryShippingEl = document.getElementById('summary-shipping');
       var summaryTotalEl = document.getElementById('summary-total');
       if (!summaryShippingEl || !summaryTotalEl) return;
@@ -996,6 +1006,7 @@
     }
 
     function resetOrderSummaryToDefault() {
+      if (freeDelivery) return;
       var summaryShippingEl = document.getElementById('summary-shipping');
       var summaryTotalEl = document.getElementById('summary-total');
       if (!summaryShippingEl || !summaryTotalEl) return;
@@ -1213,6 +1224,17 @@
             );
           } else if (data.is_serviceable) {
             lastCheckedPincode = pincode;
+            if (data.free_delivery) {
+              // Shiprocket confirmed the pincode; no price or courier choice on free delivery.
+              var when = [];
+              if (data.etd) when.push("{% trans 'Estimated delivery' %} " + formatEta(data.etd));
+              if (data.estimated_delivery_days) when.push(formatDays(data.estimated_delivery_days));
+              showCheckMessage(
+                "{% trans '✓ Delivery available to this pincode' %}" + (when.length ? ' · ' + when.join(' · ') : ''),
+                'text-success fw-semibold'
+              );
+              return;
+            }
             showCheckMessage("{% trans '✓ Delivery available to this pincode' %}", 'text-success fw-semibold');
 
             var charge = parseFloat(data.shipping_charge) || 0;

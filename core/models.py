@@ -251,6 +251,14 @@ class SiteSettings(TimeStampedModel):
     # math. Deliberately not repurposed for GST — see Product.gst_rate_percent
     # and SiteSettings.registered_state instead.
     tax_rate_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    charge_for_delivery = models.BooleanField(
+        default=True,
+        verbose_name="Charge customers for delivery",
+        help_text="Turn off to give every customer free delivery: no delivery charge is added "
+        "to the cart, checkout, order total, payment or bill, and checkout says 'Free delivery'. "
+        "Shiprocket still checks the pincode, shows the estimated delivery date and ships the "
+        "order exactly as before - it just never affects what the customer pays.",
+    )
     use_shiprocket_delivery_charge = models.BooleanField(
         default=True,
         verbose_name="Charge customers Shiprocket's live rate",

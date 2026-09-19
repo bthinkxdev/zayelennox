@@ -108,7 +108,7 @@
       {% endif %}
       <div class="cart-summary-row">
         <span>{% trans "Delivery charges" %}</span>
-        <span>{% if summary.delivery_charge %}{{ display_currency.symbol }} {{ summary.delivery_charge }}{% else %}{% trans "Calculated at checkout" %}{% endif %}</span>
+        <span>{% if summary.free_delivery %}<span class="text-success fw-semibold">{% trans "Free" %}</span>{% elif summary.delivery_charge %}{{ display_currency.symbol }} {{ summary.delivery_charge }}{% else %}{% trans "Calculated at checkout" %}{% endif %}</span>
       </div>
       <div class="cart-summary-row cart-summary-total"><span>{% trans "Total" %}</span><span class="text-floward">{{ display_currency.symbol }} {{ summary.grand_total }}</span></div>
       {% if summary.has_stock_issues %}

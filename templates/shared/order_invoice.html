@@ -342,12 +342,10 @@
                 </tr>
                 {% endif %}
                 {% endif %}
-                {% if order.delivery_charge > 0 %}
                 <tr>
                     <td>Delivery Charge</td>
-                    <td>{% money_label order.delivery_charge order.currency %}</td>
+                    <td>{% if order.delivery_charge > 0 %}{% money_label order.delivery_charge order.currency %}{% else %}Free{% endif %}</td>
                 </tr>
-                {% endif %}
                 {% if order.coupon_discount > 0 %}
                 <tr>
                     <td>Discount</td>

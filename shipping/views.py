@@ -15,6 +15,7 @@ from shipping.exceptions import ShiprocketAPIError
 from shipping.rates import (
     SESSION_KEY,
     clear_quote,
+    estimate_courier,
     fetch_courier_options,
     get_selected_courier,
     select_courier,
@@ -42,7 +43,8 @@ def check_serviceability_view(request):
     GET ?pincode=XXXXXX[&buy_now=1]
 
     Quotes real Shiprocket courier options for the customer's actual cart and
-    destination pincode, cheapest first, and holds the quote in the session so
+    destination pincode, cheapest first (or, with free delivery, just confirms the
+    pincode and the delivery estimate), and holds the quote in the session so
     the customer can choose by price/delivery time and place_order bills the
     exact charge they saw. Keeps the customer's earlier choice when they
     re-check the same pincode.
@@ -78,6 +80,23 @@ def check_serviceability_view(request):
         return JsonResponse({"ok": True, "is_serviceable": False})
 
     site_settings = get_site_settings()
+    if not site_settings.charge_for_delivery:
+        # Free delivery: Shiprocket still confirmed the pincode and gave a delivery estimate,
+        # but no price or courier choice is offered — nothing here can reach the customer's total.
+        clear_quote(request)
+        estimate = estimate_courier(couriers)
+        return JsonResponse(
+            {
+                "ok": True,
+                "is_serviceable": True,
+                "free_delivery": True,
+                "shipping_charge": 0,
+                "estimated_delivery_days": estimate["estimated_delivery_days"],
+                "etd": estimate["etd"],
+                "available_couriers": [],
+            }
+        )
+
     if not site_settings.use_shiprocket_delivery_charge:
         # The flat charge is applied in place_order; no courier choice to offer.
         clear_quote(request)
@@ -111,7 +130,8 @@ def select_courier_view(request):
     Lets the customer switch courier among the options quoted for their
     pincode. The charge is always taken from that server-held quote.
     """
-    if not get_site_settings().use_shiprocket_delivery_charge:
+    site_settings = get_site_settings()
+    if not site_settings.charge_for_delivery or not site_settings.use_shiprocket_delivery_charge:
         return JsonResponse(
             {"ok": False, "error": "Delivery options are not selectable right now."}, status=200
         )

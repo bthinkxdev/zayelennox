@@ -125,16 +125,19 @@ class ComboListView(DashboardListView):
         {"label": "Combo Price", "name": "combo_price", "type": "money"},
         {"label": "Products", "name": "item_count"},
         {"label": "Active", "name": "is_active", "type": "bool"},
+        {"label": "Sellable now", "name": "is_available", "type": "bool"},
         {"label": "Order", "name": "display_order"},
     ]
 
     def get_queryset(self):
         # annotate() with an aggregate adds a GROUP BY, which silently drops
         # the model's Meta.ordering (a Django quirk) - reapply it explicitly.
+        # "Sellable now" (Combo.is_available) reads each combo's products, so prefetch them.
         return (
             super()
             .get_queryset()
             .annotate(item_count=Count("items", distinct=True))
+            .prefetch_related("items__product", "items__variant")
             .order_by("display_order", "name")
         )
 

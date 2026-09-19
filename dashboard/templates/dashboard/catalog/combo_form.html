@@ -176,9 +176,11 @@
                   <td data-label="Product">
                     {{ iform.product }}
                     {% if iform.product.errors %}<div class="text-danger small mt-1">{{ iform.product.errors|join:", " }}</div>{% endif %}
+                    {% if iform.non_field_errors %}<div class="text-danger small mt-1">{{ iform.non_field_errors|join:", " }}</div>{% endif %}
                   </td>
                   <td data-label="Variant">
                     {{ iform.variant }}
+                    {% if iform.variant.errors %}<div class="text-danger small mt-1">{{ iform.variant.errors|join:", " }}</div>{% endif %}
                   </td>
                   <td data-label="Quantity">
                     {{ iform.quantity }}

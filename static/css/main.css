@@ -7125,3 +7125,15 @@ body.mobile-search-open .jm-wa-float {
 .order-combo__item {
   border-left: 3px solid var(--floward-primary);
 }
+
+.co-free {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--floward-primary-dark);
+  background: var(--floward-primary-light);
+  border-radius: var(--floward-radius);
+}

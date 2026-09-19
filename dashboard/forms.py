@@ -49,6 +49,12 @@ class SlugAutoMixin(forms.ModelForm):
             source = cleaned.get("name") or cleaned.get("title")
             if source:
                 cleaned["slug"] = slugify(source)
+                if not cleaned["slug"] and "slug" not in self.errors:
+                    self.add_error(
+                        "slug",
+                        "The name has no letters or numbers to build a URL slug from — "
+                        "type a slug (e.g. my-combo) here.",
+                    )
         return cleaned
 
 
@@ -501,14 +507,28 @@ class BaseComboItemFormSet(forms.BaseInlineFormSet):
             # A per-row error (e.g. missing variant) already blocks save;
             # do not pile on with the "add a product" message too.
             return
+        seen: set[tuple] = set()
+        has_product = False
         for form in self.forms:
             if not hasattr(form, "cleaned_data"):
                 continue
             if self.can_delete and form.cleaned_data.get("DELETE"):
                 continue
-            if form.cleaned_data.get("product"):
-                return
-        raise forms.ValidationError("Add at least one product to this combo before saving.")
+            product = form.cleaned_data.get("product")
+            if not product:
+                continue
+            has_product = True
+            key = (product.pk, form.cleaned_data.get("variant") and form.cleaned_data["variant"].pk)
+            if key in seen:
+                # The DB constraint can't catch this (a blank variant is NULL), and the
+                # cart merges duplicate lines, which would corrupt the combo's pricing.
+                form.add_error(
+                    "product",
+                    "This product is already in the combo — raise the quantity on that row instead.",
+                )
+            seen.add(key)
+        if not has_product:
+            raise forms.ValidationError("Add at least one product to this combo before saving.")
 
 
 ComboItemFormSet = forms.inlineformset_factory(
@@ -567,10 +587,27 @@ class ComboImageForm(forms.ModelForm):
         }
 
 
+class BaseComboImageFormSet(forms.BaseInlineFormSet):
+    """At most one image can be the combo's primary (card/cover) image."""
+
+    def clean(self):
+        super().clean()
+        primaries = [
+            form
+            for form in self.forms
+            if hasattr(form, "cleaned_data")
+            and form.cleaned_data.get("is_primary")
+            and not (self.can_delete and form.cleaned_data.get("DELETE"))
+        ]
+        if len(primaries) > 1:
+            raise forms.ValidationError("Mark only one image as the primary image.")
+
+
 ComboImageFormSet = forms.inlineformset_factory(
     Combo,
     ComboImage,
     form=ComboImageForm,
+    formset=BaseComboImageFormSet,
     extra=1,
     can_delete=True,
 )
@@ -967,6 +1004,7 @@ class SiteSettingsForm(forms.ModelForm):
         "pan_number",
         "registered_state",
         "tax_rate_percent",
+        "charge_for_delivery",
         "use_shiprocket_delivery_charge",
         "default_shipping_charge",
         "active_payment_gateway",
@@ -1001,7 +1039,8 @@ class SiteSettingsForm(forms.ModelForm):
             "pan_number",
             "registered_state",
             "tax_rate_percent",
-            "use_shiprocket_delivery_charge",
+            "charge_for_delivery",
+        "use_shiprocket_delivery_charge",
             "default_shipping_charge",
             "active_payment_gateway",
             "razorpay_key_id",
