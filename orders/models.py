@@ -22,6 +22,34 @@ class OrderStatus(models.TextChoices):
     REFUNDED = "refunded", "Refunded"
 
 
+BILL_NUMBER_PREFIX = "ZYL"
+
+
+class OrderNumberSequence(TimeStampedModel):
+    """
+    Last bill number issued in each financial-year series.
+
+    Row-locked while a number is issued (see ``orders.services.generate_order_number``)
+    so numbers are unique, strictly increasing and gapless — a bill number that was
+    never committed (order creation rolled back) is not consumed.
+    """
+
+    series = models.CharField(
+        max_length=8,
+        unique=True,
+        verbose_name="Series",
+        help_text="Indian financial year, e.g. 2627 for April 2026 – March 2027. Numbering restarts each year.",
+    )
+    last_number = models.PositiveIntegerField(default=0, verbose_name="Last number issued")
+
+    class Meta:
+        verbose_name = "Bill number sequence"
+        verbose_name_plural = "Bill number sequences"
+
+    def __str__(self) -> str:
+        return f"{self.series}: {self.last_number}"
+
+
 class Order(TimeStampedModel):
     """
     Customer order header.

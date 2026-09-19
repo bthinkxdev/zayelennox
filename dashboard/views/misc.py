@@ -15,6 +15,7 @@ from core.models import SiteSettings
 from dashboard import forms
 from dashboard.access import dashboard_required
 from dashboard.views.catalog import _style
+from orders.selectors import bill_number_filter
 from payments.models import PaymentStatus, PaymentTransaction
 
 
@@ -61,7 +62,7 @@ def payment_list(request: HttpRequest) -> HttpResponse:
     query = request.GET.get("q", "").strip()
     if query:
         qs = qs.filter(
-            Q(order__order_number__icontains=query)
+            bill_number_filter(query, field="order__order_number")
             | Q(order__customer_profile__phone__icontains=query)
             | Q(order__delivery_address_snapshot__phone__icontains=query)
         )

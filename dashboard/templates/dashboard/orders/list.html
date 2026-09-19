@@ -23,7 +23,7 @@
         <div class="input-group">
           <span class="input-group-text bg-transparent border-end-0"><i class="ti ti-search text-secondary"></i></span>
           <input type="text" name="q" value="{{ search_query }}" class="form-control border-start-0 ps-0"
-                 placeholder="Search by order number or mobile number..." />
+                 placeholder="Search by bill no. (e.g. ZYL-2627-00012 or 12) or mobile..." />
           <button type="submit" class="btn btn-outline-secondary">Search</button>
         </div>
       </div>
@@ -55,7 +55,7 @@
     <div class="card table-responsive">
       <table class="table mb-0 text-nowrap table-hover align-middle">
         <thead class="table-light">
-          <tr><th>Order #</th><th>Customer</th><th>Status</th><th>Payment</th><th>Total</th><th>Placed</th><th class="text-center">Invoice</th><th class="text-end">Actions</th></tr>
+          <tr><th>Bill No.</th><th>Customer</th><th>Status</th><th>Payment</th><th>Total</th><th>Placed</th><th class="text-center">Invoice</th><th class="text-end">Actions</th></tr>
         </thead>
         <tbody>
           {% for order in objects %}

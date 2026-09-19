@@ -159,15 +159,6 @@
             color: #718096;
             font-style: italic;
         }
-        .company-address-footer {
-            margin-top: 20px;
-            padding-top: 12px;
-            border-top: 1px solid #e2e8f0;
-            text-align: center;
-            font-size: 9pt;
-            color: #a0aec0;
-            line-height: 1.5;
-        }
     </style>
 </head>
 <body>
@@ -192,6 +183,9 @@
                         {% if site_settings.whatsapp_number %}
                             {{ site_settings.whatsapp_number }}<br>
                         {% endif %}
+                        {% if shop_address %}
+                            {{ shop_address|linebreaksbr }}<br>
+                        {% endif %}
                         {% if order.has_gst_details %}
                             {% if site_settings.gstin %}GSTIN: {{ site_settings.gstin }}<br>{% endif %}
                             {% if site_settings.pan_number %}PAN: {{ site_settings.pan_number }}<br>{% endif %}
@@ -202,7 +196,7 @@
             </div>
             <div class="invoice-meta">
                 <div class="invoice-title">{% if order.has_gst_details %}TAX INVOICE{% else %}INVOICE{% endif %}</div>
-                <div class="invoice-number">#{{ order.order_number }}</div>
+                <div class="invoice-number">Bill No: {{ order.order_number }}</div>
                 <div class="invoice-date">Date: {{ order.created_at|date:"M d, Y" }}</div>
                 {% if order.has_gst_details %}
                 <div class="invoice-date">Place of Supply: {{ order.delivery_address_snapshot.state|default:"—" }}</div>
@@ -389,11 +383,6 @@
             </div>
         </div>
 
-        {% if shop_address %}
-        <div class="company-address-footer">
-            {{ site_settings.site_name|default:"Our Store" }} &middot; {{ shop_address|linebreaksbr }}
-        </div>
-        {% endif %}
     </div>
 
     <script>

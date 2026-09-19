@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any, Optional
 
 from django.core.paginator import Paginator
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 
 from accounts.models import CustomerProfile
-from orders.models import Order, OrderItem, OrderStatusHistory
+from orders.models import BILL_NUMBER_PREFIX, Order, OrderItem, OrderStatusHistory
 
 
 @dataclass(frozen=True)
@@ -101,3 +102,31 @@ def get_order_tracking_view(
 
     history = list(order.status_history.all())
     return OrderTrackingView(order=order, status_history=history)
+
+
+def bill_number_filter(query: str, *, field: str = "order_number") -> Q:
+    """
+    Match orders by bill number however staff type it.
+
+    * just the sequence digits — ``12`` or ``00012`` — finds that number in every year
+      (four digits also match a whole financial year, e.g. ``2627``);
+    * a full or partial number in any case, with or without the dashes —
+      ``zyl-2627-00012``, ``ZYL262700012``, ``2627-00012`` — finds it;
+    * anything else is a plain substring match (still finds older random-style numbers).
+
+    ``field`` is the lookup path to the number, e.g. ``"order__order_number"``.
+    """
+    query = query.strip()
+    compact = re.sub(r"[^A-Za-z0-9]", "", query)
+
+    if re.fullmatch(r"\d{1,5}", query):
+        condition = Q(**{f"{field}__iendswith": f"-{query.zfill(5)}"})
+        if len(query) == 4:  # could equally be a financial-year series like 2627
+            condition |= Q(**{f"{field}__icontains": f"-{query}-"})
+        return condition
+
+    match = re.fullmatch(rf"(?:{BILL_NUMBER_PREFIX})?(\d{{4}})(\d{{1,5}})", compact, re.IGNORECASE)
+    condition = Q(**{f"{field}__icontains": query})
+    if match:
+        condition |= Q(**{f"{field}__iexact": f"{BILL_NUMBER_PREFIX}-{match.group(1)}-{match.group(2).zfill(5)}"})
+    return condition

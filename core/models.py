@@ -233,6 +233,12 @@ class SiteSettings(TimeStampedModel):
         help_text="Full postal address shown on the storefront and on customer invoices/bills. "
         "Falls back to the server's STORE_ADDRESS setting when left blank.",
     )
+    show_shop_address_on_invoice = models.BooleanField(
+        default=True,
+        verbose_name="Show shop address on bills",
+        help_text="Print the shop address above in the header of customer bills/invoices. "
+        "Turn off to leave it off the bill entirely.",
+    )
     default_currency = models.ForeignKey(
         Currency,
         on_delete=models.PROTECT,
@@ -357,6 +363,15 @@ class SiteSettings(TimeStampedModel):
 
     def delete(self, *args, **kwargs) -> tuple[int, dict[str, int]]:
         raise RuntimeError("SiteSettings singleton cannot be deleted.")
+
+    @property
+    def invoice_shop_address(self) -> str:
+        """The shop address to print on bills: empty when switched off, else the saved address (or the server default)."""
+        if not self.show_shop_address_on_invoice:
+            return ""
+        from django.conf import settings
+
+        return (self.shop_address or settings.STORE_ADDRESS or "").strip()
 
 
 class ContactInquiry(TimeStampedModel):

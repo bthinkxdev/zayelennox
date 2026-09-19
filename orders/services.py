@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
-import uuid
+from datetime import date
 from typing import Optional
 
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.utils import timezone
 
 from orders.exceptions import InvalidOrderStatusTransitionError
-from orders.models import Order, OrderStatus, OrderStatusHistory
+from orders.models import (
+    BILL_NUMBER_PREFIX,
+    Order,
+    OrderNumberSequence,
+    OrderStatus,
+    OrderStatusHistory,
+)
 from orders.signals import order_status_changed
 
 ALLOWED_STATUS_TRANSITIONS: dict[str, set[str]] = {
@@ -39,9 +46,29 @@ HARD_BLOCKED_TRANSITIONS: dict[str, dict[str, str]] = {
 }
 
 
-def generate_order_number() -> str:
-    """Return a unique human-readable order number."""
-    return f"ZYL-{uuid.uuid4().hex[:12].upper()}"
+def financial_year_series(day: date) -> str:
+    """Indian financial-year series for a date: April 2026 – March 2027 is ``"2627"``."""
+    start = day.year if day.month >= 4 else day.year - 1
+    return f"{start % 100:02d}{(start + 1) % 100:02d}"
+
+
+@transaction.atomic
+def generate_order_number(*, on: Optional[date] = None) -> str:
+    """
+    Issue the next bill number, e.g. ``ZYL-2627-00012``.
+
+    Numbers run 1, 2, 3… within each Indian financial year (restarting on 1 April),
+    which is what a tax invoice series needs: unique, sequential and traceable.
+    The sequence row is locked while the number is taken, so concurrent orders can't
+    get the same number, and because this runs inside the order's own transaction a
+    failed order doesn't use one up.
+    """
+    series = financial_year_series(on or timezone.localdate())
+    sequence, _ = OrderNumberSequence.objects.get_or_create(series=series)
+    sequence = OrderNumberSequence.objects.select_for_update().get(pk=sequence.pk)
+    sequence.last_number += 1
+    sequence.save(update_fields=["last_number", "updated_at"])
+    return f"{BILL_NUMBER_PREFIX}-{series}-{sequence.last_number:05d}"
 
 
 @transaction.atomic

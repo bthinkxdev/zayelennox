@@ -12,6 +12,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from dashboard.access import dashboard_required
 from orders.exceptions import InvalidOrderStatusTransitionError
 from orders.models import Order, OrderStatus
+from orders.selectors import bill_number_filter
 from orders.services import ALLOWED_STATUS_TRANSITIONS, transition_order_status
 
 
@@ -55,7 +56,7 @@ def order_list(request: HttpRequest) -> HttpResponse:
     query = request.GET.get("q", "").strip()
     if query:
         qs = qs.filter(
-            Q(order_number__icontains=query)
+            bill_number_filter(query)
             | Q(customer_profile__phone__icontains=query)
             | Q(delivery_address_snapshot__phone__icontains=query)
         )
@@ -187,8 +188,6 @@ def order_payment_transition(request: HttpRequest, pk: int) -> HttpResponse:
 @require_http_methods(["GET"])
 def order_invoice_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """Render the HTML invoice for an order."""
-    from django.conf import settings as django_settings
-
     from core.services import get_site_settings
     order = get_object_or_404(
         Order.objects.select_related("customer_profile__user", "currency"), pk=pk
@@ -198,7 +197,7 @@ def order_invoice_detail(request: HttpRequest, pk: int) -> HttpResponse:
     context = {
         "order": order,
         "site_settings": site_settings,
-        "shop_address": site_settings.shop_address or django_settings.STORE_ADDRESS,
+        "shop_address": site_settings.invoice_shop_address,
     }
     return render(request, "shared/order_invoice.html", context)
 
