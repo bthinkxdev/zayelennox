@@ -48,6 +48,7 @@
           hx-swap="outerHTML"
           hx-trigger="pageshow from:window, cartItemAdded from:body, cartUpdated from:body">
           {% if combo.is_available and max_combo_qty > 0 %}
+          {% if not combo_in_cart %}
           <div class="qty-stepper jm-pdp-qty mb-3" aria-label="{% trans 'Quantity' %}">
             <button class="qty-stepper__btn" type="button"
               onclick="let inp = document.getElementById('combo-qty'); let msg = document.getElementById('combo-qty-limit-msg'); if(inp.value > 1) { inp.value = parseInt(inp.value, 10) - 1; document.querySelectorAll('.combo-qty-input').forEach(i => i.value = inp.value); } if(msg) msg.classList.add('d-none');"
@@ -62,6 +63,7 @@
           <div id="combo-qty-limit-msg" class="text-danger small mt-1 mb-3 d-none">
             {% blocktrans %}Only {{ max_combo_qty }} of this combo available — {{ limiting_component_name }}'s stock won't cover more.{% endblocktrans %}
           </div>
+          {% endif %}
 
           {% if combo_in_cart %}
           <a href="{% url 'cart:page' %}" class="btn btn-outline-floward btn-lg w-100 mb-2">

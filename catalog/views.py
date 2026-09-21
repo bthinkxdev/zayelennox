@@ -213,9 +213,21 @@ def pdp_view(request: HttpRequest, slug: str) -> HttpResponse:
         resolved_variant_id = default_variant.pk
 
     if resolved_variant_id is not None:
-        cart_item = CartItem.objects.filter(cart=cart, product=product, variant_id=resolved_variant_id).first() if cart else None
+        cart_item = (
+            CartItem.objects.filter(
+                cart=cart, product=product, variant_id=resolved_variant_id, combo__isnull=True
+            ).first()
+            if cart
+            else None
+        )
     else:
-        cart_item = CartItem.objects.filter(cart=cart, product=product, variant__isnull=True).first() if cart else None
+        cart_item = (
+            CartItem.objects.filter(
+                cart=cart, product=product, variant__isnull=True, combo__isnull=True
+            ).first()
+            if cart
+            else None
+        )
     is_in_cart = cart_item is not None
 
     quantity = cart_item.quantity if cart_item else 1
@@ -332,9 +344,21 @@ def variant_price_view(request: HttpRequest, product_id: int) -> JsonResponse:
     
     cart = get_cart_for_request(request=request)
     if parsed_variant:
-        cart_item = CartItem.objects.filter(cart=cart, product_id=product_id, variant_id=parsed_variant).first() if cart else None
+        cart_item = (
+            CartItem.objects.filter(
+                cart=cart, product_id=product_id, variant_id=parsed_variant, combo__isnull=True
+            ).first()
+            if cart
+            else None
+        )
     else:
-        cart_item = CartItem.objects.filter(cart=cart, product_id=product_id, variant__isnull=True).first() if cart else None
+        cart_item = (
+            CartItem.objects.filter(
+                cart=cart, product_id=product_id, variant__isnull=True, combo__isnull=True
+            ).first()
+            if cart
+            else None
+        )
     data["is_in_cart"] = cart_item is not None
 
     return JsonResponse(data)

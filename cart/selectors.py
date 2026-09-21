@@ -414,10 +414,14 @@ def get_cart_summary(*, cart: Cart) -> CartSummary:
     # The vendor's "Charge customers for delivery" switch: when off, delivery is free
     # everywhere — this is the one place the cart-side charge is decided, so the cart page,
     # sidebar cart, checkout and the order all agree.
-    free_delivery = not get_site_settings().charge_for_delivery
+    site_settings = get_site_settings()
+    free_delivery = not site_settings.charge_for_delivery
     delivery_charge = cart.delivery_charge
     if free_delivery:
         delivery_charge = Decimal("0.00")
+    elif not site_settings.use_shiprocket_delivery_charge:
+        
+        delivery_charge = site_settings.default_shipping_charge
     elif cart.destination_city_id and delivery_charge == Decimal("0.00"):
         delivery_charge = get_delivery_charge(
             item_count=item_count,
