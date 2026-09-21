@@ -902,6 +902,41 @@
   }
 
 
+  function restoreVariantPendingPreview(input) {
+
+    var previewHost = input.parentElement ? input.parentElement.querySelector("[data-new-image-preview]") : null;
+    if (!previewHost) return;
+    var pending = input._pendingFiles || [];
+    var fieldName = input.dataset.primaryFieldName || "";
+    previewHost.innerHTML = "";
+    pending.forEach(function (file, index) {
+      var item = document.createElement("div");
+      item.className = "variant-image-grid__item";
+      item.setAttribute("data-pending-image", "1");
+      item.setAttribute("data-pending-index", String(index));
+      var checked = input._primaryPendingFile === file;
+      var isVideo = (file.type && file.type.indexOf("video/") === 0) || /\.(mp4|webm|ogg|mov)$/i.test(file.name || "");
+      var mediaMarkup = isVideo
+        ? '<span class="variant-image-grid__video-placeholder" title="' + file.name + '"><i class="ti ti-player-play-filled"></i></span>'
+        : '<img src="' + URL.createObjectURL(file) + '" alt="">';
+      item.innerHTML =
+        mediaMarkup +
+        '<button type="button" class="variant-image-grid__remove-pending" title="Remove"><i class="ti ti-x"></i></button>' +
+        '<label class="variant-image-grid__primary-toggle" title="Set as primary image">' +
+        '<input type="radio" name="' + fieldName + '" value="new:' + index + '"' + (checked ? " checked" : "") + '>' +
+        '<i class="ti ti-star-filled"></i></label>';
+      previewHost.appendChild(item);
+    });
+
+    var row = input.closest("tr[data-variant-row]");
+    var summaryImg = row ? row.querySelector('[data-summary="image_count"]') : null;
+    if (summaryImg) {
+      var existingCount = row.querySelectorAll(".variant-image-grid__item[data-existing-image]").length;
+      var total = existingCount + pending.length;
+      summaryImg.textContent = total + (total === 1 ? " image" : " images");
+    }
+  }
+
   function bindFilePersistForm(formId, reinit) {
     var form = document.getElementById(formId);
     if (!form || form.dataset.ajaxBound === "1") return;
@@ -920,9 +955,15 @@
         //actually carry the file to persist, so skip the picker itself to
         //avoid restoring into the wrong row's picker by an empty-name match.
         if (input.hasAttribute("data-media-picker")) return;
-        if (input.files && input.files[0]) {
-          pickedFiles.push({ name: input.name, file: input.files[0] });
-        }
+       
+        var files = Array.prototype.slice.call(input.files || []);
+        if (!files.length) return;
+        pickedFiles.push({
+          name: input.name,
+          files: files,
+          isVariantNewImages: input.hasAttribute("data-variant-file-input"),
+          primaryFile: input.hasAttribute("data-variant-file-input") ? (input._primaryPendingFile || null) : null,
+        });
       });
 
       if (submitBtn) {
@@ -949,16 +990,25 @@
             var imported = document.importNode(newForm, true);
             formEl.parentNode.replaceChild(imported, formEl);
 
+            reinit();
+
             pickedFiles.forEach(function (entry) {
               var input = imported.querySelector('input[type="file"][name="' + entry.name + '"]');
               if (!input) return;
               var dt = new DataTransfer();
-              dt.items.add(entry.file);
+              entry.files.forEach(function (file) { dt.items.add(file); });
               input.files = dt.files;
-              input.dispatchEvent(new Event("change", { bubbles: true }));
+
+              if (entry.isVariantNewImages) {
+
+                input._pendingFiles = entry.files;
+                input._primaryPendingFile = entry.primaryFile;
+                restoreVariantPendingPreview(input);
+              } else {
+                input.dispatchEvent(new Event("change", { bubbles: true }));
+              }
             });
 
-            reinit();
             bindFilePersistForm(formId, reinit);
             window.scrollTo({ top: 0, behavior: "smooth" });
           } else if (doc.getElementById("sidebar")) {
