@@ -103,6 +103,7 @@ class ProductForm(SlugAutoMixin):
             "sku",
             "category",
             "brand",
+            "description",
             "base_price",
             "mrp",
             "purchase_price",

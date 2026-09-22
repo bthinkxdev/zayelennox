@@ -116,3 +116,125 @@ class SlugAutoMixinTests(TestCase):
         form = CategoryForm({"name": "???", "slug": "", "display_order": 0, "is_active": "on"})
         self.assertFalse(form.is_valid())
         self.assertIn("slug", form.errors)
+
+
+class ProductDescriptionTests(TestCase):
+    """The product write-up field: it exists, saves, and shows on the PDP."""
+
+    def setUp(self):
+        admin = get_user_model().objects.create_superuser(username="pAdm2", email="p2@x.com", password="x")
+        self.client.force_login(admin)
+        self.category = Category.objects.create(name="Cat2", slug="cat2")
+
+    def base_data(self, **overrides):
+        data = {
+            "name": "Argan Oil", "slug": "", "sku": "SKU-DESC", "category": self.category.pk, "brand": "",
+            "description": "Cold-pressed, deep conditioning oil for dry hair.",
+            "base_price": "199.00", "mrp": "249.00", "purchase_price": "", "hsn_code": "1001",
+            "gst_rate_percent": "18.00", "color": "", "stock_quantity": "10", "low_stock_threshold": "5",
+            "is_active": "on", "weight_kg": "0.5", "length_cm": "10", "width_cm": "10", "height_cm": "10",
+            "meta_title": "", "meta_description": "",
+        }
+        for prefix in ("variants", "images", "specifications", "documents"):
+            data.update({f"{prefix}-TOTAL_FORMS": "0", f"{prefix}-INITIAL_FORMS": "0",
+                        f"{prefix}-MIN_NUM_FORMS": "0", f"{prefix}-MAX_NUM_FORMS": "1000"})
+        data.update(overrides)
+        return data
+
+    def test_description_is_saved_and_editable(self):
+        response = self.client.post("/dashboard/product/create/", self.base_data())
+        self.assertEqual(response.status_code, 302, "product should have been created")
+        product = Product.objects.get(sku="SKU-DESC")
+        self.assertEqual(product.description, "Cold-pressed, deep conditioning oil for dry hair.")
+
+        response = self.client.post(
+            f"/dashboard/product/{product.pk}/edit/", self.base_data(description="Updated write-up.")
+        )
+        self.assertEqual(response.status_code, 302)
+        product.refresh_from_db()
+        self.assertEqual(product.description, "Updated write-up.")
+
+    def test_description_is_optional(self):
+        response = self.client.post("/dashboard/product/create/", self.base_data(description=""))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Product.objects.get(sku="SKU-DESC").description, "")
+
+    def test_description_shows_on_the_pdp_only_when_set(self):
+        with_desc = Product.objects.create(
+            name="With Desc", slug="with-desc", category=self.category, base_price=Decimal("100"),
+            hsn_code="1001", stock_quantity=5, description="Smells like fresh mint.",
+        )
+        without_desc = Product.objects.create(
+            name="No Desc", slug="no-desc", category=self.category, base_price=Decimal("100"),
+            hsn_code="1001", stock_quantity=5,
+        )
+        page = self.client.get(f"/shop/products/{with_desc.slug}/").content.decode()
+        self.assertIn("Smells like fresh mint.", page)
+        self.assertIn("Description", page)
+
+        page = self.client.get(f"/shop/products/{without_desc.slug}/").content.decode()
+        self.assertNotIn("jm-pdp-description", page)
+
+
+class ProductFormSilentFailureTests(TestCase):
+    """Every rejected product submission must show its error somewhere on the page."""
+
+    def setUp(self):
+        admin = get_user_model().objects.create_superuser(username="pAdm3", email="p3@x.com", password="x")
+        self.client.force_login(admin)
+        self.category = Category.objects.create(name="Cat3", slug="cat3")
+
+    def base_data(self, **overrides):
+        data = {
+            "name": "P", "slug": "", "sku": "SKU-X", "category": self.category.pk, "brand": "", "description": "",
+            "base_price": "100.00", "mrp": "150.00", "purchase_price": "", "hsn_code": "1001",
+            "gst_rate_percent": "18.00", "color": "", "stock_quantity": "5", "low_stock_threshold": "5",
+            "is_active": "on", "weight_kg": "0.5", "length_cm": "10", "width_cm": "10", "height_cm": "10",
+            "meta_title": "", "meta_description": "",
+        }
+        for prefix in ("variants", "images", "specifications", "documents"):
+            data.update({f"{prefix}-TOTAL_FORMS": "0", f"{prefix}-INITIAL_FORMS": "0",
+                        f"{prefix}-MIN_NUM_FORMS": "0", f"{prefix}-MAX_NUM_FORMS": "1000"})
+        data.update(overrides)
+        return data
+
+    def spec_row(self, i, **fields):
+        row = {"name": "", "value": "", "display_order": str(i)}
+        row.update(fields)
+        return {f"specifications-{i}-{k}": v for k, v in row.items()}
+
+    def test_duplicate_specification_name_is_rejected_with_a_visible_error(self):
+        data = self.base_data(**{"specifications-TOTAL_FORMS": "2"})
+        data.update(self.spec_row(0, name="Material", value="Cotton"))
+        data.update(self.spec_row(1, name="Material", value="Silk"))
+        response = self.client.post("/dashboard/product/create/", data)
+        self.assertEqual(response.status_code, 200, "must not silently succeed or silently fail")
+        body = response.content.decode()
+        self.assertIn("duplicate", body.lower())
+        self.assertFalse(Product.objects.filter(sku="SKU-X").exists())
+
+    def test_tampered_specifications_management_form_shows_an_error(self):
+        data = self.base_data()
+        del data["specifications-TOTAL_FORMS"]
+        del data["specifications-INITIAL_FORMS"]
+        response = self.client.post("/dashboard/product/create/", data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("tampered", response.content.decode().lower())
+        self.assertFalse(Product.objects.filter(sku="SKU-X").exists())
+
+    def test_tampered_documents_management_form_shows_an_error(self):
+        data = self.base_data()
+        del data["documents-TOTAL_FORMS"]
+        del data["documents-INITIAL_FORMS"]
+        response = self.client.post("/dashboard/product/create/", data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("tampered", response.content.decode().lower())
+        self.assertFalse(Product.objects.filter(sku="SKU-X").exists())
+
+    def test_a_valid_product_with_a_specification_still_saves(self):
+        data = self.base_data(**{"specifications-TOTAL_FORMS": "1"})
+        data.update(self.spec_row(0, name="Material", value="Cotton"))
+        response = self.client.post("/dashboard/product/create/", data)
+        self.assertEqual(response.status_code, 302)
+        product = Product.objects.get(sku="SKU-X")
+        self.assertEqual(product.specifications.count(), 1)

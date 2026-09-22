@@ -1645,6 +1645,13 @@ video.jm-pdp-gallery__image {
 }
 
 
+.jm-pdp-description {
+  max-width: 68ch;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--jm-ink, #1a1a1a);
+}
+
 .jm-pdp-specs {
   border: 1px solid var(--jm-border-light, #e8eef4);
   border-radius: 14px;

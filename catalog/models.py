@@ -130,6 +130,13 @@ class Product(TimeStampedModel):
         related_name="products",
         verbose_name="Category",
     )
+    description = models.TextField(
+        max_length=5000,
+        blank=True,
+        verbose_name="Description",
+        help_text="Full product write-up shown on the product detail page. Not the same as "
+        "Meta description below, which is the short SEO snippet search engines show.",
+    )
     brand = models.ForeignKey(
         Brand,
         on_delete=models.PROTECT,

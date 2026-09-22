@@ -201,6 +201,13 @@
 
   </div>
 
+  {% if product.description %}
+  <section class="jm-pdp-section mt-4 mt-lg-5 pt-4 border-top">
+    <h2 class="section-title h5 mb-3">{% trans "Description" %}</h2>
+    <div class="jm-pdp-description">{{ product.description|linebreaksbr }}</div>
+  </section>
+  {% endif %}
+
   {% if product.specifications.all or product.documents.all %}
   <section class="jm-pdp-section mt-4 mt-lg-5 pt-4 border-top">
     <div class="row g-4">

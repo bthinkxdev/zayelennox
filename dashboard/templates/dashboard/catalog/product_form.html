@@ -26,6 +26,7 @@
             <div class="col-md-6">{% include "dashboard/partials/_field.html" with field=form.slug %}</div>
             <div class="col-md-6">{% include "dashboard/partials/_field.html" with field=form.category %}</div>
             <div class="col-md-6">{% include "dashboard/partials/_field.html" with field=form.brand %}</div>
+            <div class="col-12">{% include "dashboard/partials/_field.html" with field=form.description %}</div>
             <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.base_price simple_product_required=True %}</div>
             <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.mrp simple_product_required=True %}</div>
             <div class="col-md-3">{% include "dashboard/partials/_field.html" with field=form.purchase_price %}</div>
@@ -464,6 +465,9 @@
         </div>
         <div class="card-body p-0">
           {{ specifications.management_form }}
+          {% if specifications.non_form_errors %}
+          <div class="alert alert-danger mx-3 mt-3 mb-0">{{ specifications.non_form_errors|join:", " }}</div>
+          {% endif %}
           <div class="table-responsive">
             <table class="table repeater align-middle mb-0">
               <thead>
@@ -486,6 +490,9 @@
                     {{ sform.name }}
                     {% if sform.name.errors %}
                     <div class="text-danger small mt-1">{{ sform.name.errors|join:", " }}</div>
+                    {% endif %}
+                    {% if sform.non_field_errors %}
+                    <div class="text-danger small mt-1">{{ sform.non_field_errors|join:", " }}</div>
                     {% endif %}
                   </td>
                   <td>
@@ -541,6 +548,9 @@
         </div>
         <div class="card-body p-0">
           {{ documents.management_form }}
+          {% if documents.non_form_errors %}
+          <div class="alert alert-danger mx-3 mt-3 mb-0">{{ documents.non_form_errors|join:", " }}</div>
+          {% endif %}
           <div class="table-responsive">
             <table class="table repeater align-middle mb-0">
               <thead>
@@ -564,6 +574,9 @@
                     {{ dform.title }}
                     {% if dform.title.errors %}
                     <div class="text-danger small mt-1">{{ dform.title.errors|join:", " }}</div>
+                    {% endif %}
+                    {% if dform.non_field_errors %}
+                    <div class="text-danger small mt-1">{{ dform.non_field_errors|join:", " }}</div>
                     {% endif %}
                   </td>
                   <td data-label="Image/Video/PDF File">
