@@ -25,9 +25,9 @@
 
     <div class="jm-product-card__pricing">
       <p class="product-price mb-0">{% money_label combo.combo_price display_currency %}</p>
-      {% if combo.savings > 0 %}
+      {% if combo.mrp_savings > 0 %}
       <p class="jm-product-card__was mb-0">
-        <span class="text-decoration-line-through">{% money_label combo.normal_price display_currency %}</span>
+        <span class="text-decoration-line-through">{% money_label combo.mrp_total display_currency %}</span>
       </p>
       {% endif %}
     </div>

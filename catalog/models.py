@@ -877,6 +877,34 @@ class Combo(TimeStampedModel):
         return max(self.normal_price - self.combo_price, Decimal("0.00"))
 
     @property
+    def mrp_total(self):
+        """
+        Sum of each component's real MRP × quantity — the reference "was" price
+        shown on the combo card/detail page (not to be confused with
+        ``normal_price``, the selling-price sum used for cart/GST proration).
+
+        None if any component has no MRP set, same as a single product hides
+        its MRP strikethrough when unset (see
+        ``core.templatetags.storefront_tags.card_mrp``) — a partial total
+        would be misleading, not honest.
+        """
+        total = Decimal("0.00")
+        for item in self.items.all():
+            unit_mrp = item.variant.effective_mrp if item.variant_id else item.product.mrp
+            if unit_mrp is None:
+                return None
+            total += unit_mrp * item.quantity
+        return total
+
+    @property
+    def mrp_savings(self):
+        """Discount vs. buying every component at its real MRP, or None if mrp_total is unknown."""
+        mrp_total = self.mrp_total
+        if mrp_total is None:
+            return None
+        return max(mrp_total - self.combo_price, Decimal("0.00"))
+
+    @property
     def is_available(self) -> bool:
         """True only when the combo is active and every component is currently sellable."""
         if not self.is_active:
