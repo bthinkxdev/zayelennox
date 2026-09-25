@@ -108,22 +108,22 @@
       <div class="mb-5 text-center">
         <h2 class="mb-4"
           style="font-family: 'Playfair Display', 'Times New Roman', serif; font-size: clamp(1.5rem, 4vw, 2.25rem); color: #1a1a1a;">
-          {{ doc.title }}</h2>
-        <img src="{{ doc.document_file.url }}" alt="{{ doc.title }}" class="img-fluid w-100 rounded"
+          {{ doc.display_title }}</h2>
+        <img src="{{ doc.document_file.url }}" alt="{{ doc.display_title }}" class="img-fluid w-100 rounded"
           style="object-fit: contain;">
       </div>
       {% elif doc.is_video %}
       <div class="mb-5 text-center">
         <h2 class="mb-4"
           style="font-family: 'Playfair Display', 'Times New Roman', serif; font-size: clamp(1.5rem, 4vw, 2.25rem); color: #1a1a1a;">
-          {{ doc.title }}</h2>
+          {{ doc.display_title }}</h2>
         <video src="{{ doc.document_file.url }}" class="w-100 rounded" style="object-fit: contain;"
           controls playsinline preload="metadata"></video>
       </div>
       {% else %}
       <div class="jm-pdp-doc">
         <div>
-          <h3 class="jm-pdp-doc__title">{{ doc.title }}</h3>
+          <h3 class="jm-pdp-doc__title">{{ doc.display_title }}</h3>
           <span class="jm-pdp-doc__type">PDF {% trans "Document" %}</span>
         </div>
         <div class="jm-pdp-doc__actions">

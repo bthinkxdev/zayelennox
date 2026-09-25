@@ -60,6 +60,7 @@
                         </div>
                         <form action="{% url 'catalog:submit-review' item.product.id %}" method="post">
                           {% csrf_token %}
+                          <input type="hidden" name="order_id" value="{{ order.pk }}">
                           <div class="modal-body">
                             <div class="mb-3">
                               <label for="rating{{ item.product.id }}" class="form-label">{% trans "Rating (1-5)" %}</label>

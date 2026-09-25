@@ -7,11 +7,15 @@ under a tests/ package as coverage grows (see scripts/scaffold_apps.py).
 from __future__ import annotations
 
 import io
+import shutil
+import tempfile
 from decimal import Decimal
+
+from django.conf import settings
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from PIL import Image
 
 from catalog.models import Category, Combo, ComboItem, Product, ProductVariant
@@ -238,3 +242,72 @@ class ProductFormSilentFailureTests(TestCase):
         self.assertEqual(response.status_code, 302)
         product = Product.objects.get(sku="SKU-X")
         self.assertEqual(product.specifications.count(), 1)
+
+
+def _sized_file(name, mb, content_type="application/pdf"):
+    return SimpleUploadedFile(name, b"x" * int(mb * 1024 * 1024), content_type=content_type)
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="zayelennox-test-media-"))
+class DocumentUploadTests(TestCase):
+    """Product/Combo documents: 15 MB cap with a visible error, and an optional title."""
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(settings.MEDIA_ROOT, ignore_errors=True)
+
+    def setUp(self):
+        admin = get_user_model().objects.create_superuser(username="docTestAdm", email="dt@x.com", password="x")
+        self.client.force_login(admin)
+        self.category = Category.objects.create(name="DocCat", slug="doccat")
+
+    def product_data(self, docs):
+        data = {
+            "name": "Doc P", "slug": "", "sku": "SKU-DOCP", "category": self.category.pk, "brand": "", "description": "",
+            "base_price": "100.00", "mrp": "150.00", "purchase_price": "", "hsn_code": "1001",
+            "gst_rate_percent": "18.00", "color": "", "stock_quantity": "5", "low_stock_threshold": "5",
+            "is_active": "on", "weight_kg": "0.5", "length_cm": "10", "width_cm": "10", "height_cm": "10",
+            "meta_title": "", "meta_description": "",
+        }
+        for prefix in ("variants", "images", "specifications"):
+            data.update({f"{prefix}-TOTAL_FORMS": "0", f"{prefix}-INITIAL_FORMS": "0",
+                        f"{prefix}-MIN_NUM_FORMS": "0", f"{prefix}-MAX_NUM_FORMS": "1000"})
+        data.update({"documents-TOTAL_FORMS": str(len(docs)), "documents-INITIAL_FORMS": "0",
+                    "documents-MIN_NUM_FORMS": "0", "documents-MAX_NUM_FORMS": "1000"})
+        for i, row in enumerate(docs):
+            data.update({f"documents-{i}-{k}": v for k, v in row.items()})
+        return data
+
+    def test_file_over_15mb_is_rejected_with_a_visible_message(self):
+        response = self.client.post("/dashboard/product/create/", self.product_data(
+            [{"title": "Manual", "document_file": _sized_file("big.pdf", 16), "display_order": "0"}]
+        ))
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode()
+        self.assertIn("15", body)
+        self.assertIn("maximum allowed size", body)
+        self.assertFalse(Product.objects.filter(sku="SKU-DOCP").exists())
+
+    def test_file_at_exactly_15mb_is_accepted(self):
+        response = self.client.post("/dashboard/product/create/", self.product_data(
+            [{"title": "Manual", "document_file": _sized_file("ok.pdf", 15), "display_order": "0"}]
+        ))
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Product.objects.filter(sku="SKU-DOCP").exists())
+
+    def test_title_is_optional_and_falls_back_to_the_file_name(self):
+        response = self.client.post("/dashboard/product/create/", self.product_data(
+            [{"title": "", "document_file": _sized_file("warranty-card.pdf", 0.01), "display_order": "0"}]
+        ))
+        self.assertEqual(response.status_code, 302, "a blank title must not block saving")
+        doc = Product.objects.get(sku="SKU-DOCP").documents.first()
+        self.assertEqual(doc.title, "")
+        self.assertEqual(doc.display_title, "warranty card")
+
+    def test_a_title_when_given_is_used_as_is(self):
+        response = self.client.post("/dashboard/product/create/", self.product_data(
+            [{"title": "User Manual", "document_file": _sized_file("f.pdf", 0.01), "display_order": "0"}]
+        ))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Product.objects.get(sku="SKU-DOCP").documents.first().display_title, "User Manual")

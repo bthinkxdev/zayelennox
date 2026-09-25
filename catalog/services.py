@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any, Union
+from typing import TYPE_CHECKING, Any, Union
 
+from django.conf import settings
 from django.contrib.auth.models import User
+from django.core import signing
 from django.db import transaction
+from django.urls import reverse
 
 from accounts.models import CustomerProfile
 from catalog.exceptions import InsufficientStockError, ProductValidationError
@@ -16,6 +19,11 @@ from catalog.models import (
     ProductVariant,
     Review,
 )
+
+if TYPE_CHECKING:
+    from orders.models import Order
+
+REVIEW_INVITE_SALT = "catalog.review-invite"
 
 
 @transaction.atomic
@@ -88,6 +96,43 @@ def adjust_stock(
     return locked
 
 
+def has_delivered_purchase(*, customer_profile: CustomerProfile, product: Product) -> bool:
+    """Whether this customer has a delivered order containing this product."""
+    from orders.models import OrderItem, OrderStatus
+
+    return OrderItem.objects.filter(
+        product=product,
+        order__customer_profile=customer_profile,
+        order__order_status=OrderStatus.DELIVERED,
+    ).exists()
+
+
+def create_review_invite_token(*, order_id: int, product_id: int) -> str:
+    """
+    Create a stateless signed token proving the bearer may review this
+    order+product — no login required to use it (see verify_review_invite_token).
+    """
+    return signing.dumps({"order_id": order_id, "product_id": product_id}, salt=REVIEW_INVITE_SALT)
+
+
+def verify_review_invite_token(*, token: str) -> dict[str, Any]:
+    """
+    Verify and decode a review invite token.
+
+    Raises:
+        signing.BadSignature: Invalid/tampered token.
+        signing.SignatureExpired: Older than REVIEW_INVITE_TOKEN_MAX_AGE.
+    """
+    return signing.loads(token, salt=REVIEW_INVITE_SALT, max_age=settings.REVIEW_INVITE_TOKEN_MAX_AGE)
+
+
+def build_review_invite_path(*, order_id: int, product: Product) -> str:
+    """PDP path (relative) with a signed review-invite token, ready to scroll to #reviews."""
+    token = create_review_invite_token(order_id=order_id, product_id=product.pk)
+    pdp_path = reverse("catalog:pdp", args=[product.slug])
+    return f"{pdp_path}?review_token={token}#reviews"
+
+
 @transaction.atomic
 def submit_review(
     *,
@@ -96,6 +141,7 @@ def submit_review(
     rating: int,
     title: str,
     body: str,
+    order: "Order | None" = None,
     is_verified_purchase: bool = False,
 ) -> Review:
     """
@@ -107,6 +153,7 @@ def submit_review(
         rating: Star rating 1–5.
         title: Review headline.
         body: Review body text.
+        order: Delivered order this review is attributed to, if any.
         is_verified_purchase: Whether the customer bought this product.
     Returns:
         Created Review in PENDING status.
@@ -116,6 +163,7 @@ def submit_review(
     review = Review.objects.create(
         product=product,
         customer=customer,
+        order=order,
         rating=rating,
         title=title,
         body=body,

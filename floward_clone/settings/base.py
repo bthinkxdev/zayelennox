@@ -199,6 +199,12 @@ ACCOUNTS_OTP_EXPIRY_SECONDS = env.int("ACCOUNTS_OTP_EXPIRY_SECONDS", default=300
 ACCOUNTS_OTP_MAX_ATTEMPTS = env.int("ACCOUNTS_OTP_MAX_ATTEMPTS", default=5)
 ACCOUNTS_GUEST_TOKEN_MAX_AGE = env.int("ACCOUNTS_GUEST_TOKEN_MAX_AGE", default=86400)
 
+# Absolute base URL used to build links in emails sent from contexts with no
+# request (e.g. Celery tasks) — see notifications/tasks.py review-invite links.
+SITE_URL = env("SITE_URL", default="http://localhost:8000")
+# How long a "leave a review" link emailed on delivery stays valid.
+REVIEW_INVITE_TOKEN_MAX_AGE = env.int("REVIEW_INVITE_TOKEN_MAX_AGE", default=60 * 60 * 24 * 30)
+
 LANGUAGE_CODE = "en"
 
 LANGUAGES = [

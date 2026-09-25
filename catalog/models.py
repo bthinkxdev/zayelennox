@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator, MaxValueValidator, MinValueValidator
 from django.db import models
 
+from catalog.validators import MaxFileSizeValidator
 from core.models import TimeStampedModel
 
 
@@ -685,6 +686,15 @@ class Review(TimeStampedModel):
         related_name="reviews",
         verbose_name="Customer",
     )
+    order = models.ForeignKey(
+        "orders.Order",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviews",
+        verbose_name="Order",
+        help_text="Delivered order this review was submitted against, if any.",
+    )
     rating = models.PositiveSmallIntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(5)],
         verbose_name="Rating",
@@ -718,6 +728,13 @@ class Review(TimeStampedModel):
             models.Index(
                 fields=["product", "moderation_status"],
                 name="cat_review_product_mod_idx",
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["order", "product"],
+                condition=models.Q(order__isnull=False),
+                name="cat_review_unique_order_product",
             ),
         ]
 
@@ -997,13 +1014,16 @@ class ComboDocument(TimeStampedModel):
     )
     title = models.CharField(
         max_length=150,
+        blank=True,
         verbose_name="Title",
-        help_text="e.g., How it's used, What's included, Care instructions",
+        help_text="Optional — e.g., How it's used, What's included, Care instructions. "
+        "Falls back to the file name when left blank.",
     )
     document_file = models.FileField(
         upload_to="combos/documents/",
         verbose_name="Document File",
-        help_text="Image, video, or PDF file.",
+        help_text="Image, video, or PDF file. Max 15 MB.",
+        validators=[MaxFileSizeValidator(15)],
     )
     display_order = models.PositiveIntegerField(
         default=0,
@@ -1022,6 +1042,14 @@ class ComboDocument(TimeStampedModel):
         return os.path.basename(self.document_file.name) if self.document_file else ""
 
     @property
+    def display_title(self) -> str:
+        """Title if set, else a readable fallback from the file name — never blank on screen."""
+        if self.title:
+            return self.title
+        import os
+        return os.path.splitext(self.filename)[0].replace("_", " ").replace("-", " ").strip() or self.filename
+
+    @property
     def is_image(self) -> bool:
         if not self.document_file:
             return False
@@ -1038,7 +1066,7 @@ class ComboDocument(TimeStampedModel):
         return ext in ['.mp4', '.webm', '.ogg', '.mov']
 
     def __str__(self) -> str:
-        return f"{self.combo.name} - {self.title}"
+        return f"{self.combo.name} - {self.display_title}"
 
 
 class ProductDocument(TimeStampedModel):
@@ -1052,13 +1080,16 @@ class ProductDocument(TimeStampedModel):
     )
     title = models.CharField(
         max_length=150,
+        blank=True,
         verbose_name="Document Title",
-        help_text="e.g., User Manual, Installation Guide, Warranty Details",
+        help_text="Optional — e.g., User Manual, Installation Guide, Warranty Details. "
+        "Falls back to the file name when left blank.",
     )
     document_file = models.FileField(
         upload_to="products/documents/",
         verbose_name="Document File",
-        help_text="Image, video, or PDF file.",
+        help_text="Image, video, or PDF file. Max 15 MB.",
+        validators=[MaxFileSizeValidator(15)],
     )
     display_order = models.PositiveIntegerField(
         default=0,
@@ -1077,6 +1108,14 @@ class ProductDocument(TimeStampedModel):
         return os.path.basename(self.document_file.name) if self.document_file else ""
 
     @property
+    def display_title(self) -> str:
+        """Title if set, else a readable fallback from the file name — never blank on screen."""
+        if self.title:
+            return self.title
+        import os
+        return os.path.splitext(self.filename)[0].replace("_", " ").replace("-", " ").strip() or self.filename
+
+    @property
     def is_image(self) -> bool:
         if not self.document_file:
             return False
@@ -1093,4 +1132,4 @@ class ProductDocument(TimeStampedModel):
         return ext in ['.mp4', '.webm', '.ogg', '.mov']
 
     def __str__(self) -> str:
-        return f"{self.product.name} - {self.title}"
+        return f"{self.product.name} - {self.display_title}"

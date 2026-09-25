@@ -4,18 +4,19 @@ from __future__ import annotations
 
 import json
 
+from django.core import signing
+from django.db import IntegrityError
 from django.db.models import Sum
 from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.shortcuts import get_object_or_404, redirect
 from django.views.decorators.http import require_GET, require_POST
 from django.views.decorators.cache import never_cache
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 
-from catalog.models import Product
+from catalog.models import Product, Review
 from catalog.forms import ReviewSubmissionForm
-from catalog.services import submit_review
+from catalog.services import has_delivered_purchase, submit_review, verify_review_invite_token
 
 from catalog.selectors import (
     get_active_combos,
@@ -251,12 +252,40 @@ def pdp_view(request: HttpRequest, slug: str) -> HttpResponse:
 
     has_delivered_order = False
     if request.user.is_authenticated and hasattr(request.user, "customer_profile"):
-        from orders.models import OrderItem, OrderStatus
-        has_delivered_order = OrderItem.objects.filter(
-            product=product,
-            order__customer_profile=request.user.customer_profile,
-            order__order_status=OrderStatus.DELIVERED
+        has_delivered_order = has_delivered_purchase(
+            customer_profile=request.user.customer_profile, product=product
+        )
+
+    review_token = ""
+    review_order_id = None
+    raw_token = request.GET.get("review_token", "")
+    if raw_token:
+        from orders.models import Order, OrderItem, OrderStatus
+
+        try:
+            payload = verify_review_invite_token(token=raw_token)
+        except signing.BadSignature:
+            payload = None
+        if payload and payload.get("product_id") == product.pk:
+            order_exists = Order.objects.filter(
+                pk=payload.get("order_id"), order_status=OrderStatus.DELIVERED
+            ).exists()
+            item_exists = order_exists and OrderItem.objects.filter(
+                order_id=payload.get("order_id"), product=product
+            ).exists()
+            if item_exists:
+                review_token = raw_token
+                review_order_id = payload.get("order_id")
+
+    already_reviewed = False
+    if review_order_id is not None:
+        already_reviewed = Review.objects.filter(order_id=review_order_id, product=product).exists()
+    elif has_delivered_order:
+        already_reviewed = Review.objects.filter(
+            order__customer_profile=request.user.customer_profile, product=product
         ).exists()
+
+    can_review = has_delivered_order or bool(review_token)
 
     context = seo_context(
         request=request,
@@ -278,6 +307,9 @@ def pdp_view(request: HttpRequest, slug: str) -> HttpResponse:
             "is_in_wishlist": is_in_wishlist,
             "related_products": get_related_products(product=product, user=request.user),
             "has_delivered_order": has_delivered_order,
+            "can_review": can_review,
+            "already_reviewed": already_reviewed,
+            "review_token": review_token,
             "product_json_ld": json.dumps(
                 build_product_json_ld(
                     product=product,
@@ -464,29 +496,82 @@ def combo_detail_view(request: HttpRequest, slug: str) -> HttpResponse:
 
 
 @require_POST
-@login_required
 def submit_review_view(request, product_id: int):
-    """Handle product review submission from the customer order details page."""
+    """
+    Handle product review submission — either from an authenticated customer's
+    order-history page, or an unauthenticated visitor following a signed
+    review-invite link emailed on delivery (see catalog.services.create_review_invite_token).
+    Both paths require proof of a delivered order containing this product.
+    """
+    from django.urls import reverse
+    from orders.models import Order, OrderItem, OrderStatus
+
     product = get_object_or_404(Product, pk=product_id, is_active=True)
-    from catalog.forms import ReviewSubmissionForm
+    redirect_url = f"{reverse('catalog:pdp', args=[product.slug])}#reviews"
     form = ReviewSubmissionForm(request.POST)
-    
-    if not hasattr(request.user, "customer_profile"):
-        messages.error(request, "Only customers can submit reviews.")
-        return redirect(request.META.get('HTTP_REFERER', '/'))
-        
-    if form.is_valid():
-        from catalog.services import submit_review
-        submit_review(
-            product=product,
-            customer=request.user.customer_profile,
-            rating=form.cleaned_data["rating"],
-            title=form.cleaned_data["title"],
-            body=form.cleaned_data["body"],
-            is_verified_purchase=True,
+
+    token = request.POST.get("token", "")
+    order = None
+    customer = None
+
+    if token:
+        try:
+            payload = verify_review_invite_token(token=token)
+        except signing.BadSignature:
+            messages.error(request, "This review link is invalid or has expired.")
+            return redirect(redirect_url)
+        if payload.get("product_id") != product.pk:
+            messages.error(request, "This review link doesn't match this product.")
+            return redirect(redirect_url)
+        order = (
+            Order.objects.filter(pk=payload.get("order_id"), order_status=OrderStatus.DELIVERED)
+            .select_related("customer_profile")
+            .first()
         )
-        messages.success(request, "Thank you for your valuable review!")
+        customer = order.customer_profile if order else None
+    elif request.user.is_authenticated and hasattr(request.user, "customer_profile"):
+        customer = request.user.customer_profile
+        order_id = request.POST.get("order_id", "")
+        if order_id.isdigit():
+            order = Order.objects.filter(
+                pk=order_id,
+                customer_profile=customer,
+                order_status=OrderStatus.DELIVERED,
+            ).first()
+
+    if order is None or customer is None:
+        messages.error(
+            request,
+            "We couldn't verify a delivered order for this review. Please use the link from "
+            "your delivery email, or sign in.",
+        )
+        return redirect(redirect_url)
+
+    if not OrderItem.objects.filter(order=order, product=product).exists():
+        messages.error(request, "This product wasn't part of that order.")
+        return redirect(redirect_url)
+
+    if Review.objects.filter(order=order, product=product).exists():
+        messages.info(request, "You've already reviewed this product for this order.")
+        return redirect(redirect_url)
+
+    if form.is_valid():
+        try:
+            submit_review(
+                product=product,
+                customer=customer,
+                order=order,
+                rating=form.cleaned_data["rating"],
+                title=form.cleaned_data["title"],
+                body=form.cleaned_data["body"],
+                is_verified_purchase=True,
+            )
+        except IntegrityError:
+            # Lost a race with a duplicate submission for this order+product.
+            messages.info(request, "You've already reviewed this product for this order.")
+        else:
+            messages.success(request, "Thank you for your valuable review!")
     else:
         messages.error(request, "There was an error with your review submission. Please check your inputs.")
-        
-    return redirect(request.META.get('HTTP_REFERER', '/'))
+
+    return redirect(redirect_url)

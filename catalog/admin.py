@@ -247,14 +247,15 @@ class ReviewAdmin(admin.ModelAdmin):
     list_display = (
         "product",
         "customer",
+        "order",
         "rating",
         "moderation_status",
         "is_verified_purchase",
         "updated_at",
     )
     list_filter = ("moderation_status", "rating", "is_verified_purchase")
-    search_fields = ("product__name", "customer__user__email", "title")
-    list_select_related = ("product", "customer", "customer__user", "moderated_by")
+    search_fields = ("product__name", "customer__user__email", "title", "order__order_number")
+    list_select_related = ("product", "customer", "customer__user", "order", "moderated_by")
     inlines = [ReviewPhotoInline]
 
 

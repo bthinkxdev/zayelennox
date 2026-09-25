@@ -550,12 +550,13 @@ class ComboDocumentForm(forms.ModelForm):
             "document_file": forms.FileInput(),
         }
         error_messages = {
-            "title": {"required": "Title is required."},
             "document_file": {"required": "File is required."},
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["title"].required = False
+        self.fields["title"].widget.attrs["placeholder"] = "Optional — falls back to the file name"
         self.fields["display_order"].required = False
         if not self.instance.pk:
             self.initial["display_order"] = None
@@ -670,12 +671,13 @@ class ProductDocumentForm(forms.ModelForm):
             "document_file": forms.FileInput(),
         }
         error_messages = {
-            "title": {"required": "Document title is required."},
             "document_file": {"required": "Document file is required."},
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["title"].required = False
+        self.fields["title"].widget.attrs["placeholder"] = "Optional — falls back to the file name"
         self.fields["display_order"].required = False
         if not self.instance.pk:
             self.initial["display_order"] = None

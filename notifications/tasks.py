@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from celery import shared_task
+from django.conf import settings
 
 from notifications.services import create_notification, send_email, send_sms, send_whatsapp
 
@@ -44,18 +45,33 @@ def dispatch_order_status_notification(
     product_names = ", ".join([item.product.name for item in items[:3]])
     if len(items) > 3:
         product_names += " and more"
-        
+
     status_messages = {
         "preparing": f"Great news! We have started packing your order ({order.order_number}) containing {product_names} and will ship it out soon.",
         "packaging": f"Great news! We have started packing your order ({order.order_number}) containing {product_names} and will ship it out soon.",
         "ready": f"Your order ({order.order_number}) is ready to be shipped out.",
         "out_for_delivery": f"Your order ({order.order_number}) containing {product_names} is out for delivery today! Please make sure someone is available to receive it.",
-        "delivered": f"Your order ({order.order_number}) has been delivered! We hope you love your new equipment. (You can now leave a review in your dashboard!).",
+        "delivered": f"Your order ({order.order_number}) has been delivered! We hope you love your new equipment.",
         "cancelled": f"Your order ({order.order_number}) has been cancelled successfully. If you have already paid, your refund will be processed within 5-7 business days.",
         "refunded": f"Your order ({order.order_number}) has been refunded."
     }
-    
+
     body = status_messages.get(new_status, f"Your order status changed from {old_status} to {new_status}.")
+
+    if new_status == "delivered" and items:
+        from catalog.services import build_review_invite_path
+
+        seen_product_ids: set[int] = set()
+        review_lines = []
+        for item in items:
+            if item.product_id in seen_product_ids:
+                continue
+            seen_product_ids.add(item.product_id)
+            path = build_review_invite_path(order_id=order.pk, product=item.product)
+            review_lines.append(f"- {item.product.name}: {settings.SITE_URL}{path}")
+        if review_lines:
+            body += "\n\nLoved what you got? Leave a review:\n" + "\n".join(review_lines)
+
     body += "\n\nBest regards,\nThe ZAYE LENNOX Team"
 
     if profile.notify_via_email and user.email:

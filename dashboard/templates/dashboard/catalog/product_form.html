@@ -556,7 +556,7 @@
               <thead>
                 <tr>
                   <th class="d-none"></th>
-                  <th>Title</th>
+                  <th>Title <span class="text-muted fw-normal">(optional)</span></th>
                   <th>Image/Video/PDF File</th>
                   <th>Display Order</th>
                   <th class="text-center">View</th>
@@ -594,7 +594,7 @@
                     <span class="text-muted d-block mt-1" style="font-size: 0.75rem;">Replace current image, video, or PDF.</span>
                     {% else %}
                     {{ dform.document_file }}
-                    <span class="text-muted d-block mt-1" style="font-size: 0.75rem;">Upload an image, video, or PDF.</span>
+                    <span class="text-muted d-block mt-1" style="font-size: 0.75rem;">Upload an image, video, or PDF. Max 15 MB.</span>
                     {% endif %}
                     {% if dform.document_file.errors %}
                     <div class="text-danger small mt-1">{{ dform.document_file.errors|join:", " }}</div>
@@ -635,7 +635,7 @@
               <td data-label="Title">{{ document_empty_form.title }}</td>
               <td data-label="Image/Video/PDF File">
                 {{ document_empty_form.document_file }}
-                <span class="text-muted d-block mt-1" style="font-size: 0.75rem;">Upload an image, video, or PDF.</span>
+                <span class="text-muted d-block mt-1" style="font-size: 0.75rem;">Upload an image, video, or PDF. Max 15 MB.</span>
               </td>
               <td data-label="Display Order">{{ document_empty_form.display_order }}</td>
               <td class="text-center" data-view-container data-label="View">

@@ -237,22 +237,22 @@
           <div class="jm-pdp-doc-image mb-5 text-center">
             <h2 class="mb-4"
               style="font-family: 'Playfair Display', 'Times New Roman', serif; font-size: clamp(1.5rem, 4vw, 2.25rem); color: #1a1a1a;">
-              {{ doc.title }}</h2>
-            <img src="{{ doc.document_file.url }}" alt="{{ doc.title }}" class="img-fluid w-100 rounded"
+              {{ doc.display_title }}</h2>
+            <img src="{{ doc.document_file.url }}" alt="{{ doc.display_title }}" class="img-fluid w-100 rounded"
               style="object-fit: contain;">
           </div>
           {% elif doc.is_video %}
           <div class="jm-pdp-doc-image mb-5 text-center">
             <h2 class="mb-4"
               style="font-family: 'Playfair Display', 'Times New Roman', serif; font-size: clamp(1.5rem, 4vw, 2.25rem); color: #1a1a1a;">
-              {{ doc.title }}</h2>
+              {{ doc.display_title }}</h2>
             <video src="{{ doc.document_file.url }}" class="w-100 rounded" style="object-fit: contain;"
               controls playsinline preload="metadata"></video>
           </div>
           {% else %}
           <div class="jm-pdp-doc">
             <div>
-              <h3 class="jm-pdp-doc__title">{{ doc.title }}</h3>
+              <h3 class="jm-pdp-doc__title">{{ doc.display_title }}</h3>
               <span class="jm-pdp-doc__type">PDF {% trans "Document" %}</span>
             </div>
             <div class="jm-pdp-doc__actions">
@@ -274,13 +274,38 @@
     <div
       class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-3">
       <h2 class="section-title h5 mb-0">{% trans "Reviews" %}</h2>
-      {% if has_delivered_order %}
+      {% if has_delivered_order and not review_token %}
       <p class="text-muted small mb-0">
-        {% trans "You can review this product from your" %}
+        {% trans "You can also review this product from your" %}
         <a href="{% url 'orders:list' %}" class="text-decoration-underline">{% trans "Order History" %}</a>.
       </p>
       {% endif %}
     </div>
+
+    {% if can_review %}
+      {% if already_reviewed %}
+      <div class="alert alert-info py-2 px-3 mb-3">{% trans "You've already reviewed this product. Thank you!" %}</div>
+      {% else %}
+      <form action="{% url 'catalog:submit-review' product.pk %}" method="post" class="jm-pdp-review-form border rounded-3 p-3 mb-4">
+        {% csrf_token %}
+        {% if review_token %}<input type="hidden" name="token" value="{{ review_token }}">{% endif %}
+        <h3 class="h6 mb-3">{% trans "Write a review" %}</h3>
+        <div class="mb-2">
+          <label for="pdp-review-rating" class="form-label small">{% trans "Rating (1-5)" %}</label>
+          <input type="number" class="form-control" id="pdp-review-rating" name="rating" min="1" max="5" required>
+        </div>
+        <div class="mb-2">
+          <label for="pdp-review-title" class="form-label small">{% trans "Title" %}</label>
+          <input type="text" class="form-control" id="pdp-review-title" name="title" required placeholder="{% trans 'Brief summary of your review' %}">
+        </div>
+        <div class="mb-3">
+          <label for="pdp-review-body" class="form-label small">{% trans "Review" %}</label>
+          <textarea class="form-control" id="pdp-review-body" name="body" rows="4" required placeholder="{% trans 'What did you think about this product?' %}"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">{% trans "Submit Review" %}</button>
+      </form>
+      {% endif %}
+    {% endif %}
 
     {% for review in product.approved_reviews %}
     <div class="jm-pdp-review">
